@@ -31,7 +31,7 @@ Spis treści:
 | Boty z osobowościami | zrobione |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
 | Teksty prowadzącego | wersja tymczasowa, do rozbudowy w etapie 5 |
-| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione (142 testy) |
+| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione (146 testów) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -146,7 +146,7 @@ Układ ekranu (w poziomie):
 - niżej: 5 pulpitów ułożonych w łuk; na każdym imię, 3 lampki szans, a w finale punkty; nad pulpitem pojawia się dymek z odpowiedzią gracza (zielony albo czerwony),
 - na dole: przyciski zależne od sytuacji („Zgłaszam się!”, „Biorę na siebie”, „Pomiń do wyników”).
 
-Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Licznik czasu rusza razem z pokazaniem pytania. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
+Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Licznik czasu rusza razem z pokazaniem pytania. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
 
 Między zdarzeniami są krótkie pauzy (wynik odpowiedzi ok. 2 s, „X wskazuje Y” ok. 2 s), żeby było widać, co się stało. Dotknięcie ekranu pomija pauzę. Plansza z zasadami etapu nie znika sama, tylko po dotknięciu, a przez pierwsze 0,7 s ignoruje dotyk, żeby nie zamknąć jej przypadkiem. Gdy gracz odpadnie, może pominąć resztę gry i od razu zobaczyć wyniki. Na końcu jest ranking z przyciskami „Zagraj ponownie” i „Menu”. Wyjście w trakcie gry (przycisk albo systemowy „wstecz”) wymaga potwierdzenia, a na czas pytania gra jest wstrzymana.
 
@@ -175,7 +175,8 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Znajdują
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
 | `controller-test.ts` | 30 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, liczniki, pauzy, ruchy botów, zgłaszanie się |
 | `view-test.ts` | 9 | teksty prowadzącego, wybór pytania do wyświetlenia, losowe miejsce gracza |
-| **Razem** | **142** | |
+| `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
+| **Razem** | **146** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 10–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -312,6 +313,9 @@ Pierwsza gra na telefonie pokazała, że plansza z zasadami etapu (z napisem „
 
 **7.27. Boty wskazywały się nawzajem, pomijając gracza**
 W tej samej grze dwa boty przez wiele pytań wskazywały tylko siebie nawzajem i gracz długo nic nie robił. Formalnie było to zgodne z zasadami, ale nudne. Rozwiązanie: nowa reguła silnika. Po 4 pytaniach z rzędu zadanych innym bot musi wskazać człowieka, a silnik odrzuca każde inne wskazanie (wyjątek `GameRuleError`). Regułę zrobiliśmy w silniku, a nie tylko w logice botów, żeby nie dało się jej obejść. Ciekawy efekt uboczny: po dodaniu reguły nie przeszły 4 testy finału. Okazało się, że pomocnicza funkcja testowa `driveToFinal`, która „ręcznie” prowadzi grę do finału, wykonywała ruchy niezgodne z nową regułą, a silnik słusznie je odrzucał. Funkcję poprawiliśmy tak, żeby wybierała tylko dozwolone ruchy (`pickTargets`). Przy pomiarze efektu reguły popełniliśmy też błąd w samym pomiarze: liczyliśmy czekanie gracza także po jego odpadnięciu, przez co wyszło „najdłuższe czekanie: 90 pytań”. Po poprawce wynik to 5–6 pytań. Testy: 4 nowe w silniku (limit działa, złe wskazanie jest odrzucane, człowiek ma swobodny wybór, regułę można wyłączyć) i sprawdzenie reguły w 900 symulowanych grach.
+
+**7.28. Klawiatura zasłaniała pole odpowiedzi**
+Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie widać, co się wpisuje. W Expo SDK 57 aplikacja na Androidzie działa w trybie edge-to-edge, więc okno nie zmniejsza się po otwarciu klawiatury, tylko klawiatura je przykrywa. W poziomie zajmuje ona 60–70% wysokości ekranu, a panel odpowiedzi razem z paskiem etapu był wyższy niż miejsce, które zostawało nad klawiaturą. Na zrzucie ekranu w przeglądarce problemu nie było widać, bo tam nie ma klawiatury ekranowej. Rozwiązanie: aplikacja nasłuchuje zdarzeń klawiatury i zna jej wysokość (`useKeyboardHeight`). Przy otwartej klawiaturze panel ustawia się tuż nad nią, pasek etapu się chowa, a przy małej ilości miejsca panel przechodzi w tryb kompaktowy. Obliczenia układu są w osobnej czystej funkcji `answerLayout`, która ma 4 testy (bez klawiatury, z klawiaturą, mało miejsca, wycięcie ekranu). Panel jest ten sam przy otwartej i zamkniętej klawiaturze, zmienia się tylko styl, dzięki czemu pole nie traci fokusu ani wpisanego tekstu. Układ sprawdziliśmy na zrzucie z tymczasowej wersji, w której wysokość klawiatury była ustawiona na stałe na 230 dp. Ostateczne potwierdzenie wymaga testu na telefonie.
 
 ## 8. Dalsze plany
 

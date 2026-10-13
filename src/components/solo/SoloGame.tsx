@@ -13,9 +13,11 @@ import { getPlayer, pickTargets } from '@/game/engine';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import { HUMAN_ID } from '@/game/solo';
 import type { Difficulty, PlayerState } from '@/game/types';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSoloController } from '@/hooks/useSoloController';
 
 import { AnswerPanel } from './AnswerPanel';
+import { answerLayout, KEYBOARD_GAP } from './answerLayout';
 import { Host } from './Host';
 import { PhaseBanner } from './PhaseBanner';
 import { Podium, type PodiumBubble } from './Podium';
@@ -55,6 +57,7 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
   const { controller, view } = useSoloController(difficulty);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
 
   const { game, overlay } = view;
   const turn = humanTurn(view);
@@ -104,6 +107,8 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
     Math.min((stageWidth - PODIUM_GAP * 4) / 5, (usableHeight - 230) / 1.35, 130),
   );
 
+  const answering = answerLayout({ windowHeight: height, keyboardHeight, safeTop: insets.top });
+
   const finalCounter =
     game.phase === 'final' ? `Pytanie ${game.rules.finalQuestionPool - game.finalQuestionsLeft}/${game.rules.finalQuestionPool}` : null;
 
@@ -122,31 +127,52 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
           },
         ]}
       >
-        <View style={styles.topBar}>
-          <Pressable
-            onPress={confirmExit}
-            accessibilityRole="button"
-            accessibilityLabel="Przerwij grę"
-            hitSlop={10}
-            style={({ pressed }) => [styles.exit, pressed && styles.exitPressed]}
-          >
-            <Ionicons name="close" size={22} color={colors.outline} />
-          </Pressable>
-          <Text style={styles.phase}>{PHASE_TITLES[game.phase]}</Text>
-          <Text style={styles.meta}>
-            {[finalCounter, DIFFICULTY_PRESETS[difficulty].label].filter(Boolean).join('  •  ')}
-          </Text>
-        </View>
+        {/* Przy otwartej klawiaturze pasek znika, żeby zostało więcej miejsca na pytanie i pole odpowiedzi. */}
+        {!(turn === 'answer' && answering.keyboardOpen) && (
+          <View style={styles.topBar}>
+            <Pressable
+              onPress={confirmExit}
+              accessibilityRole="button"
+              accessibilityLabel="Przerwij grę"
+              hitSlop={10}
+              style={({ pressed }) => [styles.exit, pressed && styles.exitPressed]}
+            >
+              <Ionicons name="close" size={22} color={colors.outline} />
+            </Pressable>
+            <Text style={styles.phase}>{PHASE_TITLES[game.phase]}</Text>
+            <Text style={styles.meta}>
+              {[finalCounter, DIFFICULTY_PRESETS[difficulty].label].filter(Boolean).join('  •  ')}
+            </Text>
+          </View>
+        )}
 
         {turn === 'answer' && question ? (
-          <AnswerPanel
-            key={`${question.id}-${game.cursor}`}
-            question={question}
-            deadline={view.deadline}
-            totalMs={view.timerMs}
-            paused={view.paused}
-            onSubmit={(text) => controller.submitAnswer(text)}
-          />
+          // Ten sam element niezależnie od klawiatury — zmienia się tylko styl, więc pole nie traci fokusu ani tekstu.
+          <View
+            style={
+              answering.keyboardOpen
+                ? [
+                    styles.aboveKeyboard,
+                    {
+                      top: insets.top + KEYBOARD_GAP,
+                      bottom: answering.bottom,
+                      left: insets.left + 12,
+                      right: insets.right + 12,
+                    },
+                  ]
+                : undefined
+            }
+          >
+            <AnswerPanel
+              key={`${question.id}-${game.cursor}`}
+              question={question}
+              deadline={view.deadline}
+              totalMs={view.timerMs}
+              paused={view.paused}
+              compact={answering.compact}
+              onSubmit={(text) => controller.submitAnswer(text)}
+            />
+          </View>
         ) : (
           <Pressable style={styles.stage} onPress={() => controller.skip()} accessible={false}>
             <View style={{ width: hostWidth }}>
@@ -260,6 +286,10 @@ const styles = StyleSheet.create({
     color: colors.sky,
     fontSize: 13,
     fontWeight: '800',
+  },
+  aboveKeyboard: {
+    position: 'absolute',
+    justifyContent: 'flex-end',
   },
   stage: {
     flex: 1,
