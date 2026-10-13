@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "questions": [
+    { "id": "his-001", "category": "Historia", "difficulty": 1, "answerType": "data", "question": "W którym roku odbyła się bitwa pod Grunwaldem?", "answers": ["1410"] },
+    { "id": "his-002", "category": "Historia", "difficulty": 1, "answerType": "osoba", "question": "Jak miał na imię pierwszy historyczny władca Polski z dynastii Piastów?", "answers": ["Mieszko I", "Mieszko"], "wrongAnswers": ["Bolesław", "Kazimierz", "Popiel"] },
+    { "id": "his-003", "category": "Historia", "difficulty": 1, "answerType": "data", "question": "W którym roku Polska odzyskała niepodległość po okresie zaborów?", "answers": ["1918"] },
+    { "id": "his-004", "category": "Historia", "difficulty": 2, "answerType": "osoba", "question": "Kto był pierwszym koronowanym królem Polski?", "answers": ["Bolesław Chrobry", "Bolesław I Chrobry", "Chrobry"], "wrongAnswers": ["Mieszko I", "Kazimierz Wielki", "Władysław Łokietek"] },
+    { "id": "his-005", "category": "Historia", "difficulty": 1, "answerType": "osoba", "question": "Który cesarz Francuzów poniósł ostateczną klęskę pod Waterloo?", "answers": ["Napoleon Bonaparte", "Napoleon", "Napoleon I"], "wrongAnswers": ["Ludwik XIV", "Karol Wielki", "Ludwik XVI"] },
+    { "id": "his-006", "category": "Historia", "difficulty": 2, "answerType": "data", "question": "W którym roku upadł mur berliński?", "answers": ["1989"] },
+    { "id": "his-007", "category": "Historia", "difficulty": 2, "answerType": "nazwa", "question": "Pod jaką potoczną nazwą znana jest polska ustawa zasadnicza uchwalona w 1791 roku?", "answers": ["Konstytucja 3 Maja", "Konstytucja Trzeciego Maja", "3 Maja", "Trzeciego Maja", "Ustawa Rządowa"], "wrongAnswers": ["Konstytucja marcowa", "Pacta conventa", "Złota Wolność"] },
+    { "id": "his-008", "category": "Historia", "difficulty": 2, "answerType": "osoba", "question": "Który rzymski wódz przekroczył Rubikon w 49 roku p.n.e.?", "answers": ["Juliusz Cezar", "Gajusz Juliusz Cezar", "Cezar"], "wrongAnswers": ["Neron", "Oktawian August", "Pompejusz"] },
+
+    { "id": "geo-001", "category": "Geografia", "difficulty": 2, "answerType": "miejsce", "question": "Jak nazywa się stolica Australii?", "answers": ["Canberra"], "wrongAnswers": ["Sydney", "Melbourne", "Perth"] },
+    { "id": "geo-002", "category": "Geografia", "difficulty": 1, "answerType": "miejsce", "question": "Jak nazywa się najdłuższa rzeka w Polsce?", "answers": ["Wisła"], "wrongAnswers": ["Odra", "Warta", "Bug"] },
+    { "id": "geo-003", "category": "Geografia", "difficulty": 1, "answerType": "miejsce", "question": "Jak nazywa się najwyższy szczyt Polski?", "answers": ["Rysy"], "wrongAnswers": ["Śnieżka", "Giewont", "Kasprowy Wierch"] },
+    { "id": "geo-004", "category": "Geografia", "difficulty": 2, "answerType": "miejsce", "question": "W którym państwie znajdują się ruiny Machu Picchu?", "answers": ["Peru"], "wrongAnswers": ["Boliwia", "Chile", "Meksyk"] },
+    { "id": "geo-005", "category": "Geografia", "difficulty": 1, "answerType": "miejsce", "question": "Jak nazywa się największy ocean na Ziemi?", "answers": ["Ocean Spokojny", "Spokojny", "Pacyfik"], "wrongAnswers": ["Ocean Atlantycki", "Ocean Indyjski", "Ocean Arktyczny"] },
+    { "id": "geo-006", "category": "Geografia", "difficulty": 2, "answerType": "miejsce", "question": "Jak nazywa się stolica Kanady?", "answers": ["Ottawa"], "wrongAnswers": ["Toronto", "Montreal", "Vancouver"] },
+    { "id": "geo-007", "category": "Geografia", "difficulty": 2, "answerType": "liczba", "question": "Z iloma państwami graniczy Polska?", "answers": ["7", "siedem"] },
+    { "id": "geo-008", "category": "Geografia", "difficulty": 1, "answerType": "miejsce", "question": "Jak nazywa się najwyższy szczyt świata?", "answers": ["Mount Everest", "Everest", "Czomolungma"], "wrongAnswers": ["K2", "Kangczendzonga", "Mont Blanc"] },
+
+    { "id": "nau-001", "category": "Nauka", "difficulty": 1, "answerType": "nazwa", "question": "Jaki jest symbol chemiczny złota?", "answers": ["Au"], "wrongAnswers": ["Ag", "Zn", "Cu"] },
+    { "id": "nau-002", "category": "Nauka", "difficulty": 1, "answerType": "liczba", "question": "Ile wynosi pierwiastek kwadratowy z liczby 144?", "answers": ["12", "dwanaście"] },
+    { "id": "nau-003", "category": "Nauka", "difficulty": 1, "answerType": "nazwa", "question": "Która planeta Układu Słonecznego jest największa?", "answers": ["Jowisz"], "wrongAnswers": ["Saturn", "Neptun", "Uran"] },
+    { "id": "nau-004", "category": "Nauka", "difficulty": 1, "answerType": "osoba", "question": "Kto sformułował ogólną teorię względności?", "answers": ["Albert Einstein", "Einstein"], "wrongAnswers": ["Isaac Newton", "Nikola Tesla", "Max Planck"] },
+    { "id": "nau-005", "category": "Nauka", "difficulty": 2, "answerType": "liczba", "question": "Ile kości ma szkielet dorosłego człowieka?", "answers": ["206"] },
+    { "id": "nau-006", "category": "Nauka", "difficulty": 1, "answerType": "osoba", "question": "Która polska uczona odkryła polon i rad?", "answers": ["Maria Skłodowska-Curie", "Skłodowska-Curie", "Maria Curie", "Maria Skłodowska", "Skłodowska"], "wrongAnswers": ["Ada Lovelace", "Irena Joliot-Curie", "Lise Meitner"] },
+    { "id": "nau-007", "category": "Nauka", "difficulty": 1, "answerType": "nazwa", "question": "Jaki gaz rośliny pochłaniają z powietrza w procesie fotosyntezy?", "answers": ["dwutlenek węgla", "ditlenek węgla", "CO2"], "wrongAnswers": ["tlen", "azot", "metan"] },
+    { "id": "nau-008", "category": "Nauka", "difficulty": 2, "answerType": "nazwa", "question": "Jak nazywa się najlżejszy pierwiastek chemiczny?", "answers": ["wodór"], "wrongAnswers": ["hel", "lit", "tlen"] },
+    { "id": "nau-009", "category": "Nauka", "difficulty": 1, "answerType": "liczba", "question": "Ile stopni wynosi suma kątów wewnętrznych trójkąta?", "answers": ["180"] },
+
+    { "id": "prz-001", "category": "Przyroda", "difficulty": 2, "answerType": "nazwa", "question": "Jakie zwierzę jest największym ssakiem na Ziemi?", "answers": ["płetwal błękitny", "płetwal", "wieloryb błękitny"], "wrongAnswers": ["słoń afrykański", "kaszalot", "rekin wielorybi"] },
+    { "id": "prz-002", "category": "Przyroda", "difficulty": 1, "answerType": "liczba", "question": "Ile odnóży krocznych ma pająk?", "answers": ["8", "osiem"] },
+    { "id": "prz-003", "category": "Przyroda", "difficulty": 1, "answerType": "nazwa", "question": "Jak nazywa się samiec kury?", "answers": ["kogut"], "wrongAnswers": ["indyk", "bażant", "gąsior"] },
+    { "id": "prz-004", "category": "Przyroda", "difficulty": 1, "answerType": "nazwa", "question": "Które zwierzę lądowe jest najszybsze na świecie?", "answers": ["gepard"], "wrongAnswers": ["lew", "antylopa", "puma"] },
+    { "id": "prz-005", "category": "Przyroda", "difficulty": 1, "answerType": "nazwa", "question": "Na jakim drzewie rosną żołędzie?", "answers": ["dąb"], "wrongAnswers": ["buk", "kasztanowiec", "grab"] },
+    { "id": "prz-006", "category": "Przyroda", "difficulty": 3, "answerType": "nazwa", "question": "Jak nazywa się proces przemiany gąsienicy w dorosłego motyla?", "answers": ["przeobrażenie zupełne", "przeobrażenie", "metamorfoza"], "wrongAnswers": ["linienie", "fotosynteza", "mitoza"] },
+    { "id": "prz-007", "category": "Przyroda", "difficulty": 1, "answerType": "nazwa", "question": "Jaki ptak widnieje w godle Polski?", "answers": ["orzeł biały", "orzeł"], "wrongAnswers": ["sokół", "jastrząb", "bocian"] },
+
+    { "id": "spo-001", "category": "Sport", "difficulty": 1, "answerType": "liczba", "question": "Ilu zawodników jednej drużyny przebywa jednocześnie na boisku w piłce nożnej?", "answers": ["11", "jedenastu", "jedenaście"] },
+    { "id": "spo-002", "category": "Sport", "difficulty": 2, "answerType": "miejsce", "question": "W jakim mieście odbyły się Letnie Igrzyska Olimpijskie w 2016 roku?", "answers": ["Rio de Janeiro", "Rio"], "wrongAnswers": ["Londyn", "Tokio", "Pekin"] },
+    { "id": "spo-003", "category": "Sport", "difficulty": 2, "answerType": "osoba", "question": "Który polski skoczek narciarski zdobył trzy indywidualne złote medale olimpijskie?", "answers": ["Kamil Stoch", "Stoch"], "wrongAnswers": ["Adam Małysz", "Piotr Żyła", "Dawid Kubacki"] },
+    { "id": "spo-004", "category": "Sport", "difficulty": 1, "answerType": "osoba", "question": "Kto jest rekordzistą pod względem liczby goli strzelonych dla piłkarskiej reprezentacji Polski?", "answers": ["Robert Lewandowski", "Lewandowski"], "wrongAnswers": ["Włodzimierz Lubański", "Grzegorz Lato", "Kazimierz Deyna"] },
+    { "id": "spo-005", "category": "Sport", "difficulty": 1, "answerType": "liczba", "question": "Ile punktów zdobywa się w koszykówce za celny rzut zza linii 6,75 m?", "answers": ["3", "trzy"] },
+    { "id": "spo-006", "category": "Sport", "difficulty": 1, "answerType": "nazwa", "question": "W jakiej dyscyplinie sportu rozgrywany jest turniej Wimbledon?", "answers": ["tenis", "tenis ziemny"], "wrongAnswers": ["golf", "badminton", "krykiet"] },
+    { "id": "spo-007", "category": "Sport", "difficulty": 2, "answerType": "liczba", "question": "Ile kilometrów liczy dystans maratonu (w pełnych kilometrach)?", "answers": ["42", "42,195"] },
+
+    { "id": "kul-001", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Kto napisał epopeję „Pan Tadeusz”?", "answers": ["Adam Mickiewicz", "Mickiewicz"], "wrongAnswers": ["Juliusz Słowacki", "Henryk Sienkiewicz", "Adam Asnyk"] },
+    { "id": "kul-002", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Kto namalował obraz „Bitwa pod Grunwaldem”?", "answers": ["Jan Matejko", "Matejko"], "wrongAnswers": ["Józef Chełmoński", "Jacek Malczewski", "Stanisław Wyspiański"] },
+    { "id": "kul-003", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Który polski kompozytor, autor mazurków i polonezów, urodził się w Żelazowej Woli?", "answers": ["Fryderyk Chopin", "Chopin", "Szopen"], "wrongAnswers": ["Stanisław Moniuszko", "Karol Szymanowski", "Ignacy Paderewski"] },
+    { "id": "kul-004", "category": "Kultura", "difficulty": 2, "answerType": "osoba", "question": "Kto jest autorem powieści „Lalka”?", "answers": ["Bolesław Prus", "Prus", "Aleksander Głowacki"], "wrongAnswers": ["Henryk Sienkiewicz", "Eliza Orzeszkowa", "Stefan Żeromski"] },
+    { "id": "kul-005", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Kto namalował „Mona Lisę”?", "answers": ["Leonardo da Vinci", "Leonardo", "da Vinci"], "wrongAnswers": ["Michał Anioł", "Rafael", "Botticelli"] },
+    { "id": "kul-006", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Jak ma na imię rudowłosy najlepszy przyjaciel Harry'ego Pottera?", "answers": ["Ron", "Ron Weasley"], "wrongAnswers": ["Neville", "Draco", "Seamus"] },
+    { "id": "kul-007", "category": "Kultura", "difficulty": 1, "answerType": "osoba", "question": "Kto jest autorem sagi o wiedźminie Geralcie?", "answers": ["Andrzej Sapkowski", "Sapkowski"], "wrongAnswers": ["Stanisław Lem", "Jacek Dukaj", "Jarosław Grzędowicz"] },
+    { "id": "kul-008", "category": "Kultura", "difficulty": 1, "answerType": "miejsce", "question": "W którym mieście znajduje się muzeum Luwr?", "answers": ["Paryż"], "wrongAnswers": ["Londyn", "Rzym", "Madryt"] },
+
+    { "id": "roz-001", "category": "Rozmaitości", "difficulty": 2, "answerType": "liczba", "question": "Ile minut ma doba?", "answers": ["1440"] },
+    { "id": "roz-002", "category": "Rozmaitości", "difficulty": 2, "answerType": "nazwa", "question": "Jak nazywa się waluta Japonii?", "answers": ["jen", "jeny"], "wrongAnswers": ["juan", "won", "rupia"] },
+    { "id": "roz-003", "category": "Rozmaitości", "difficulty": 1, "answerType": "liczba", "question": "Ile dni ma rok przestępny?", "answers": ["366"] }
+  ]
+}

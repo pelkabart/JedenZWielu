@@ -43,3 +43,6 @@ yarn-error.*
 # Generated native folders
 /ios/
 /android/
+
+# Pliki blokady Worda/Office (powstają, gdy dokument jest otwarty)
+~$*
