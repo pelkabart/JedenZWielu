@@ -11,6 +11,8 @@ type Props = {
   deadline: number | null;
   totalMs: number | null;
   paused: boolean;
+  /** Mało miejsca nad klawiaturą: bez nagłówka i z mniejszym pytaniem. */
+  compact?: boolean;
   onSubmit: (text: string) => void;
 };
 
@@ -18,19 +20,21 @@ type Props = {
  * Widok na czas wpisywania odpowiedzi. W poziomie klawiatura zasłania ok. połowę ekranu,
  * więc wszystko, co potrzebne, mieści się w górnej części.
  */
-export function AnswerPanel({ question, deadline, totalMs, paused, onSubmit }: Props) {
+export function AnswerPanel({ question, deadline, totalMs, paused, compact = false, onSubmit }: Props) {
   const [text, setText] = useState('');
   const submit = () => {
     if (text.trim() !== '') onSubmit(text);
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.category}>{question.category}</Text>
-        <Text style={styles.turn}>Twoja kolej!</Text>
-      </View>
-      <Text style={styles.question} numberOfLines={2}>
+    <View style={[styles.root, compact && styles.rootCompact]}>
+      {!compact && (
+        <View style={styles.header}>
+          <Text style={styles.category}>{question.category}</Text>
+          <Text style={styles.turn}>Twoja kolej!</Text>
+        </View>
+      )}
+      <Text style={[styles.question, compact && styles.questionCompact]} numberOfLines={2}>
         {question.question}
       </Text>
       <View style={styles.row}>
@@ -73,6 +77,11 @@ const styles = StyleSheet.create({
     borderColor: colors.outline,
     backgroundColor: colors.navyDeep,
   },
+  rootCompact: {
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -97,6 +106,9 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: '800',
+  },
+  questionCompact: {
+    fontSize: 14,
   },
   row: {
     flexDirection: 'row',
