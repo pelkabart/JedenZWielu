@@ -72,9 +72,9 @@ Sterownik nie zna z góry długości wypowiedzi, więc czeka na sygnał końca: 
 **Test:** ręcznie: rozmiary APK w dokumentacji postępów (7.43).
 
 ### 13. Model głosu w repozytorium
-**Ryzyko:** `voice.onnx` ma 63 MB. GitHub ostrzega przy plikach ponad 50 MB i odrzuca ponad 100 MB, a każda wersja modelu zostaje w historii na zawsze.
-**Zabezpieczenie:** `voiceModel/*.onnx` i wygenerowany folder `voiceModel/vits-piper-pl/` są w `.gitignore`. Wtyczka `withVoiceModel` przerywa `expo prebuild` z instrukcją, gdy modelu brakuje, zamiast po cichu budować aplikację bez głosu.
-**Test:** `git status` nie pokazuje modelu; ręcznie: prebuild bez modelu kończy się czytelnym błędem.
+**Ryzyko:** `voice.onnx` ma 63 MB. GitHub ostrzega przy plikach ponad 50 MB i odrzuca ponad 100 MB, a każda wersja modelu zostaje w historii na zawsze. Bez modelu w repozytorium nikt poza autorem nie zbuduje aplikacji z głosem.
+**Zabezpieczenie:** w repozytorium jest tylko źródłowy `voiceModel/voice.onnx` (63 MB, poniżej limitu GitHuba) z `voice.onnx.json`, zwykłym commitem, bez Git LFS (jeden plik, bez dodatkowej instalacji i limitów transferu LFS). Przygotowany folder `voiceModel/vits-piper-pl/` (kolejne 77 MB) jest w `.gitignore`, bo `prepare_voice_model.py` robi go z `voice.onnx` w kilka sekund. Model wymieniamy rzadko, bo każda wersja to 63 MB więcej w historii. Wtyczka `withVoiceModel` przerywa `expo prebuild` z instrukcją, gdy przygotowanego modelu brakuje, zamiast po cichu budować aplikację bez głosu.
+**Test:** `git ls-files voiceModel`; ręcznie: prebuild bez przygotowanego modelu kończy się czytelnym błędem.
 
 ### 14. Gra nie działa w Expo Go
 **Ryzyko:** sherpa-onnx to moduł natywny, którego nie ma w Expo Go. Import przy starcie wywróciłby aplikację w Expo Go.

@@ -41,7 +41,7 @@ npm run test:integration  # integration tests only
 npm run test:coverage     # coverage report
 ```
 
-Host voice (lektor): everything the host says and every question is synthesized live on the device from the Piper model via `react-native-sherpa-onnx` (`src/narration/`). No audio files are pre-generated. The model is not committed (`voiceModel/voice.onnx`, 63 MB); prepare it once before `npx expo prebuild`, which copies it into Android assets via `plugins/withVoiceModel.js` (prebuild fails with instructions if it is missing):
+Host voice (lektor): everything the host says and every question is synthesized live on the device from the Piper model via `react-native-sherpa-onnx` (`src/narration/`). No audio files are pre-generated. The source model `voiceModel/voice.onnx` (63 MB) is committed; the sherpa-ready folder `voiceModel/vits-piper-pl/` is generated and git-ignored — prepare it once before `npx expo prebuild`, which copies it into Android assets via `plugins/withVoiceModel.js` (prebuild fails with instructions if it is missing):
 
 ```bash
 scripts/narration/.venv/Scripts/python scripts/narration/prepare_voice_model.py   # venv setup: see the script's docstring
