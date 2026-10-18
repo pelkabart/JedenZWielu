@@ -45,7 +45,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest",
+    "test:integration": "jest integration-test",
+    "test:coverage": "jest --coverage"
   },
   "private": true,
   "jest": {

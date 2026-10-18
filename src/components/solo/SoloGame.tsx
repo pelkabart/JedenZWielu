@@ -15,6 +15,7 @@ import { HUMAN_ID } from '@/game/solo';
 import type { Difficulty, PlayerState } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSoloController } from '@/hooks/useSoloController';
+import { createLogger } from '@/lib/log';
 
 import { AnswerPanel } from './AnswerPanel';
 import { answerLayout, KEYBOARD_GAP } from './answerLayout';
@@ -28,6 +29,8 @@ const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
 /** Przesunięcie pulpitów w pionie — układają się w łuk. */
 const ARC = [16, 6, 0, 6, 16];
 const PODIUM_GAP = 8;
+
+const log = createLogger('ekran-gry');
 
 type Props = {
   difficulty: Difficulty;
@@ -78,7 +81,14 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
       'Postęp tej rozgrywki zostanie utracony.',
       [
         { text: 'Graj dalej', style: 'cancel', onPress: () => controller.start() },
-        { text: 'Wyjdź', style: 'destructive', onPress: () => router.dismissAll() },
+        {
+          text: 'Wyjdź',
+          style: 'destructive',
+          onPress: () => {
+            log.info('Gracz przerwał grę', { phase: game.phase });
+            router.dismissAll();
+          },
+        },
       ],
       { cancelable: true, onDismiss: () => controller.start() },
     );

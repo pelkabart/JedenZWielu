@@ -6,6 +6,10 @@ Raporty z dynamicznej analizy dla prowadzącego:
 - `docs/Jeden_z_Wielu_Analiza_dynamiczna_etap1.docx` – ekran główny, silnik gry i boty,
 - `docs/Jeden_z_Wielu_Analiza_dynamiczna_etap2.docx` – ekran rozgrywki.
 
+Zabezpieczenia (co mogło pójść nie tak przy tworzeniu każdej funkcjonalności i jak temu zapobiegliśmy) są w folderze `docs/zabezpieczenia/`, po jednym pliku na funkcjonalność.
+
+Zasada pracy od 18.10.2026: każda nowa funkcjonalność ma logi, testy jednostkowe i testy integracyjne. Plik w `docs/zabezpieczenia/` powstaje przed napisaniem kodu.
+
 Spis treści:
 
 1. Stan projektu
@@ -19,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (13.10.2026)
+## 1. Stan projektu (18.10.2026)
 
 | Element | Stan |
 |---|---|
@@ -31,7 +35,11 @@ Spis treści:
 | Boty z osobowościami | zrobione |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
 | Teksty prowadzącego | wersja tymczasowa, do rozbudowy w etapie 5 |
-| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione (146 testów) |
+| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione |
+| Logi aplikacji (`src/lib/log.ts`) | zrobione |
+| Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
+| Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
+| Razem testów automatycznych | 170 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -164,7 +172,7 @@ Zegar jest wstrzykiwany, dzięki czemu w testach można użyć udawanego czasu J
 
 ## 6. Testy i analiza dynamiczna
 
-Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Znajdują się w folderze `src/game/__tests__/`.
+Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
 
 | Plik | Liczba testów | Co sprawdza |
 |---|---|---|
@@ -176,9 +184,35 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Znajdują
 | `controller-test.ts` | 30 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, liczniki, pauzy, ruchy botów, zgłaszanie się |
 | `view-test.ts` | 9 | teksty prowadzącego, wybór pytania do wyświetlenia, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
-| **Razem** | **146** | |
+| `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
+| `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
+| **Razem** | **170** | |
 
-Wszystkie testy przechodzą. Cały zestaw trwa ok. 10–35 sekund, z czego najwięcej zajmują symulacje.
+Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
+
+### Testy integracyjne
+
+Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 12 pytań testowych i bot, który zawsze odpowiada po 4 s. Testy integracyjne (`src/game/__tests__/integration-test.ts`) składają aplikację tak samo jak ekran gry (`useSoloController`): prawdziwą bazę pytań, `createSoloGame` z losowym miejscem gracza, prawdziwe profile botów, sterownik, silnik, symulator i logi. Test prowadzi grę jak gracz na telefonie: zamyka plansze etapów, odpowiada, zgłasza się i wskazuje. Wszystko dzieje się na udawanym zegarze. Sprawdzamy:
+
+- czy pełna gra kończy się poprawnie na każdym poziomie i nie zostają uruchomione liczniki,
+- czy gracz, który nie odpowiada, odpada, a „Pomiń do wyników” kończy grę,
+- czy to samo ziarno daje identyczny przebieg całej gry,
+- czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
+
+### Logi
+
+Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy wpis ma poziom (`debug`, `info`, `warn`, `error`), moduł, treść i małe dane. Wpisy trafiają do konsoli (w Expo Go widać je w terminalu z `npx expo start`) i do bufora ostatnich 500 wpisów w pamięci, z którego korzystają testy.
+
+| Moduł | Co logujemy |
+|---|---|
+| `[gra-solo]` | start gry: ziarno generatora, poziom, gracze; dzięki ziarnu grę z telefonu da się odtworzyć |
+| `[sterownik]` | start, pauza i wznowienie z pozostałym czasem, każdy ruch, etapy, odpadnięcia, koniec czasu, decyzje botów, zignorowane ruchy gracza (np. podwójne kliknięcie), błąd silnika |
+| `[baza-pytan]` | liczba załadowanych pytań albo błąd walidacji |
+| `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
+| `[ekran-gry]` | przerwanie gry przez gracza |
+| `[symulator]` | przekroczenie limitu kroków |
+
+Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
 
 ### Testy z udawanym zegarem
 
@@ -190,7 +224,7 @@ Aplikację zbudowaliśmy w wersji webowej (`npx expo export --platform web`) i u
 
 ### Pokrycie kodu
 
-`npx jest --coverage` dla `src/game`: instrukcje 94,8%, gałęzie 87,1%, funkcje 99,2%, linie 97,5%. Najsłabiej pokryte są teksty prowadzącego (`hostLine.ts`, ok. 69% instrukcji), które i tak zostaną przepisane w etapie 5.
+`npx jest --coverage` dla `src/game` i `src/lib`: instrukcje 94,8%, gałęzie 87,5%, funkcje 99,3%, linie 97,0%. Moduł logów ma 100% instrukcji. Najsłabiej pokryte są teksty prowadzącego (`hostLine.ts`, ok. 69% instrukcji), które i tak zostaną przepisane w etapie 5. Niepokryte zostały też gałęzie obsługi błędów, do których prawidłowa gra nie dochodzi (błąd bazy pytań, limit kroków symulatora, odrzucony ruch w sterowniku).
 
 ### Symulacje gier
 
@@ -317,6 +351,14 @@ W tej samej grze dwa boty przez wiele pytań wskazywały tylko siebie nawzajem i
 **7.28. Klawiatura zasłaniała pole odpowiedzi**
 Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie widać, co się wpisuje. W Expo SDK 57 aplikacja na Androidzie działa w trybie edge-to-edge, więc okno nie zmniejsza się po otwarciu klawiatury, tylko klawiatura je przykrywa. W poziomie zajmuje ona 60–70% wysokości ekranu, a panel odpowiedzi razem z paskiem etapu był wyższy niż miejsce, które zostawało nad klawiaturą. Na zrzucie ekranu w przeglądarce problemu nie było widać, bo tam nie ma klawiatury ekranowej. Rozwiązanie: aplikacja nasłuchuje zdarzeń klawiatury i zna jej wysokość (`useKeyboardHeight`). Przy otwartej klawiaturze panel ustawia się tuż nad nią, pasek etapu się chowa, a przy małej ilości miejsca panel przechodzi w tryb kompaktowy. Obliczenia układu są w osobnej czystej funkcji `answerLayout`, która ma 4 testy (bez klawiatury, z klawiaturą, mało miejsca, wycięcie ekranu). Panel jest ten sam przy otwartej i zamkniętej klawiaturze, zmienia się tylko styl, dzięki czemu pole nie traci fokusu ani wpisanego tekstu. Układ sprawdziliśmy na zrzucie z tymczasowej wersji, w której wysokość klawiatury była ustawiona na stałe na 230 dp. Ostateczne potwierdzenie wymaga testu na telefonie.
 
+### Logi i testy integracyjne
+
+**7.29. Gra „skończona” za wcześnie w teście integracyjnym**
+Pierwsza wersja testu pełnej gry czekała, aż silnik ustawi etap `finished`, i sprawdzała, że nie zostały żadne uruchomione liczniki. Test nie przeszedł na żadnym poziomie: został 1 licznik. Błąd był w teście. Kiedy silnik kończy grę, na ekranie wciąż przez ok. 2 s widać wynik ostatniej odpowiedzi, a ten licznik właśnie odlicza tę pauzę. Ekran pokazuje wyniki dopiero wtedy, gdy etap to `finished` i nie ma już nakładki (`SoloGame.tsx`). Test czeka teraz na ten sam warunek (`isResultsScreen`).
+
+**7.30. Brak zainstalowanych zależności i niezgodny lockfile**
+Przy instalacji zależności od zera `npm ci` odmówiło instalacji, bo `package-lock.json` nie zawierał dwóch opcjonalnych paczek (`@emnapi/core`, `@emnapi/runtime`). Bez zależności `npx tsc` próbowało pobrać zupełnie inną paczkę o nazwie `tsc`. Rozwiązanie: `npm install`, które uzupełniło lockfile. Zmiany w lockfile nie weszły do tego commita, bo zależą od systemu.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie).
@@ -325,3 +367,4 @@ Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie wi
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
 - Poprawa balansu poziomów Normalny i Ekspert (po limicie pytań przeciętny gracz rzadko dochodzi do finału na poziomie Ekspert).
 - Rozbudowa bazy pytań.
+- Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.

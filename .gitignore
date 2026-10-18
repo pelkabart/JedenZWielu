@@ -46,3 +46,6 @@ yarn-error.*
 
 # Pliki blokady Worda/Office (powstają, gdy dokument jest otwarty)
 ~$*
+
+# Raport pokrycia kodu (npm run test:coverage)
+coverage/

@@ -1,3 +1,5 @@
+import { createLogger } from '@/lib/log';
+
 import { decideAnswer, decideBuzz, decideTarget, type BotAnswer, type BotContext } from './bots/brain';
 import { AVERAGE_PLAYER_PROFILE, getBotProfile, type BotProfile } from './bots/profiles';
 import { activePlayers, reduce } from './engine';
@@ -5,6 +7,8 @@ import type { Rng } from './rng';
 import type { GameState, PlayerState, Question } from './types';
 
 const MAX_STEPS = 10000;
+
+const log = createLogger('symulator');
 
 export interface SimulationOptions {
   rng: Rng;
@@ -66,5 +70,7 @@ export function simulateGame(initial: GameState, { rng, bank, humanProfile = AVE
       }
     }
   }
+  // Pojedyncze gry nie są logowane (900 symulacji w testach), tylko ten błąd.
+  log.error('Symulacja przekroczyła limit kroków', { maxSteps: MAX_STEPS, phase: state.phase });
   throw new Error(`Symulacja nie zakończyła się w ${MAX_STEPS} krokach`);
 }

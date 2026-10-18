@@ -1,3 +1,5 @@
+import { createLogger } from '@/lib/log';
+
 import { decideAnswer, decideBuzz, decidePickDelay, decideTarget, type BotAnswer, type BotContext } from '../bots/brain';
 import { getBotProfile, type BotProfile } from '../bots/profiles';
 import { activePlayers, getPlayer, pickTargets, reduce } from '../engine';
@@ -5,6 +7,8 @@ import type { Rng } from '../rng';
 import { simulateGame } from '../simulate';
 import { HUMAN_ID } from '../solo';
 import type { GameAction, GameEvent, GameState, Phase, Question } from '../types';
+
+const log = createLogger('sterownik');
 
 /** Zegar wstrzykiwany, żeby w testach dało się użyć udawanego czasu. */
 export interface Clock {
@@ -149,6 +153,7 @@ export class SoloController {
   start() {
     if (!this.started) {
       this.started = true;
+      log.info('Start rozgrywki', { phase: this.view.game.phase });
       this.showBanner(this.view.game.phase);
       return;
     }
@@ -156,6 +161,7 @@ export class SoloController {
     const paused = this.pausedTimer;
     this.pausedTimer = null;
     const now = this.clock.now();
+    log.info('Wznowienie', { remainingMs: paused?.remaining ?? null });
     this.update({
       paused: false,
       deadline: paused?.deadlineRemaining != null ? now + paused.deadlineRemaining : this.view.deadline,
@@ -174,25 +180,29 @@ export class SoloController {
       };
       this.clearTimer();
     }
+    log.info('Pauza', { remainingMs: this.pausedTimer?.remaining ?? null });
     this.update({ paused: true });
   }
 
   // ---------- ruchy człowieka ----------
 
   submitAnswer(text: string) {
-    if (humanTurn(this.view) !== 'answer') return;
+    if (!this.isHumanTurn('answer')) return;
     this.answer(HUMAN_ID, text);
   }
 
   buzz() {
-    if (humanTurn(this.view) !== 'buzz') return;
+    if (!this.isHumanTurn('buzz')) return;
     this.prepared = null;
     this.buzzBy(HUMAN_ID);
   }
 
   pick(targetId: string) {
-    if (humanTurn(this.view) !== 'pick') return;
-    if (!pickTargets(this.view.game, HUMAN_ID).some((p) => p.id === targetId)) return;
+    if (!this.isHumanTurn('pick')) return;
+    if (!pickTargets(this.view.game, HUMAN_ID).some((p) => p.id === targetId)) {
+      log.debug('Zignorowano niedozwolone wskazanie', { targetId });
+      return;
+    }
     this.pickBy(HUMAN_ID, targetId);
   }
 
@@ -200,7 +210,10 @@ export class SoloController {
   skip() {
     if (this.view.overlay === null || this.view.paused) return;
     if (this.view.overlay.kind === 'banner') {
-      if (this.clock.now() - this.bannerShownAt < this.pacing.bannerLockMs) return;
+      if (this.clock.now() - this.bannerShownAt < this.pacing.bannerLockMs) {
+        log.debug('Zignorowano dotknięcie planszy tuż po jej pokazaniu');
+        return;
+      }
       this.activate();
       return;
     }
@@ -213,10 +226,15 @@ export class SoloController {
   /** Gdy gracz już odpadł, rozgrywa resztę gry natychmiast. */
   fastForward() {
     const { game } = this.view;
-    if (game.phase === 'finished' || !getPlayer(game, HUMAN_ID).eliminated) return;
+    if (game.phase === 'finished' || !getPlayer(game, HUMAN_ID).eliminated) {
+      log.debug('Zignorowano przewinięcie gry', { phase: game.phase });
+      return;
+    }
     this.clearTimer();
     this.prepared = null;
+    log.info('Przewinięcie do wyników', { phase: game.phase });
     const finished = simulateGame(game, { rng: this.rng, bank: this.bank, getProfile: this.getProfile });
+    log.info('Koniec gry', { ranking: finished.ranking });
     this.update({ game: finished, overlay: null, deadline: null, timerMs: null, thinkingId: null });
   }
 
@@ -241,7 +259,10 @@ export class SoloController {
           return;
         }
         if (playerId === HUMAN_ID) {
-          this.countdown(rules.answerTimeMs, rules.answerTimeMs, () => this.answer(HUMAN_ID, null));
+          this.countdown(rules.answerTimeMs, rules.answerTimeMs, () => {
+            log.info('Koniec czasu na odpowiedź', { playerId: HUMAN_ID });
+            this.answer(HUMAN_ID, null);
+          });
           return;
         }
         const prepared = this.prepared;
@@ -250,6 +271,7 @@ export class SoloController {
           prepared && prepared.playerId === playerId && prepared.questionId === question.id
             ? prepared.answer
             : decideAnswer(this.botContext(playerId), question, rules);
+        log.debug('Bot odpowie', { playerId, delayMs: answer.delayMs, noAnswer: answer.text === null });
         this.update({ thinkingId: playerId });
         this.countdown(rules.answerTimeMs, answer.delayMs, () => this.answer(playerId, answer.text));
         return;
@@ -270,6 +292,7 @@ export class SoloController {
           answer: fastest.answer,
         };
         const winner = fastest;
+        log.debug('Okno zgłoszeń', { fastestBot: winner?.playerId ?? null, delayMs: winner?.delayMs ?? null });
         this.countdown(rules.buzzWindowMs, winner?.delayMs ?? rules.buzzWindowMs, () =>
           winner ? this.buzzBy(winner.playerId) : this.noBuzz(),
         );
@@ -353,9 +376,32 @@ export class SoloController {
 
   private apply(action: GameAction): GameEvent[] {
     const before = this.view.game.events.length;
-    const game = reduce(this.view.game, action);
+    let game: GameState;
+    try {
+      game = reduce(this.view.game, action);
+    } catch (error) {
+      // Sterownik nie powinien wysłać niedozwolonego ruchu; jeśli to się stanie, chcemy to zobaczyć.
+      log.error('Silnik odrzucił ruch', { action, error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
     this.update({ game, deadline: null, timerMs: null, thinkingId: null });
-    return game.events.slice(before);
+    const events = game.events.slice(before);
+    log.debug('Ruch', { ...action });
+    for (const event of events) logEvent(event);
+    return events;
+  }
+
+  /** Sprawdza, czy człowiek może teraz wykonać dany ruch; zignorowane ruchy (np. podwójne kliknięcie) trafiają do logów. */
+  private isHumanTurn(expected: Exclude<HumanTurn, null>): boolean {
+    const turn = humanTurn(this.view);
+    if (turn === expected) return true;
+    log.debug('Zignorowano ruch gracza', {
+      move: expected,
+      turn,
+      overlay: this.view.overlay?.kind ?? null,
+      paused: this.view.paused,
+    });
+    return false;
   }
 
   /** Pokazuje licznik `totalMs`, a akcję wykonuje po `fireInMs` (bot może zdążyć wcześniej). */
@@ -393,5 +439,26 @@ export class SoloController {
   private update(patch: Partial<SoloView>) {
     this.view = { ...this.view, ...patch };
     for (const listener of this.listeners) listener();
+  }
+}
+
+/** Ważne zdarzenia silnika na poziomie `info`, reszta jako `debug`. */
+function logEvent(event: GameEvent) {
+  switch (event.type) {
+    case 'phase':
+      log.info('Etap', { phase: event.phase });
+      break;
+    case 'eliminated':
+      log.info('Gracz odpadł', { playerId: event.playerId });
+      break;
+    case 'gameOver':
+      log.info('Koniec gry', { ranking: event.ranking });
+      break;
+    case 'answer':
+      log.debug('Odpowiedź', { playerId: event.playerId, questionId: event.questionId, correct: event.correct });
+      break;
+    case 'lifeLost':
+      log.debug('Utrata szansy', { playerId: event.playerId, livesLeft: event.livesLeft });
+      break;
   }
 }
