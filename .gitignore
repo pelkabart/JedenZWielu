@@ -46,3 +46,12 @@ yarn-error.*
 
 # Pliki blokady Worda/Office (powstają, gdy dokument jest otwarty)
 ~$*
+
+# Raport pokrycia kodu (npm run test:coverage)
+coverage/
+
+# Lektor: środowisko Pythona do przygotowania modelu (sam model voiceModel/voice.onnx jest w repozytorium)
+scripts/narration/.venv/
+scripts/narration/__pycache__/
+# Model przygotowany dla sherpa-onnx (prepare_voice_model.py) — 61 MB, generowany z voice.onnx
+voiceModel/vits-piper-pl/

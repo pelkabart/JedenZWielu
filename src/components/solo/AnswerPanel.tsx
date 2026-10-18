@@ -1,8 +1,10 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
 import type { Question } from '@/game/types';
+import { useVoiceAnswer } from '@/hooks/useVoiceAnswer';
 
 import { TimerBar } from './TimerBar';
 
@@ -14,17 +16,24 @@ type Props = {
   /** Mało miejsca nad klawiaturą: bez nagłówka i z mniejszym pytaniem. */
   compact?: boolean;
   onSubmit: (text: string) => void;
+  /** Mikrofon zaczął albo przestał słuchać (sterownik ucisza wtedy lektora). */
+  onListening?: (listening: boolean) => void;
 };
 
 /**
- * Widok na czas wpisywania odpowiedzi. W poziomie klawiatura zasłania ok. połowę ekranu,
- * więc wszystko, co potrzebne, mieści się w górnej części.
+ * Widok na czas odpowiedzi: wpisanej albo powiedzianej (mikrofon). W poziomie klawiatura zasłania
+ * ok. połowę ekranu, więc wszystko, co potrzebne, mieści się w górnej części.
  */
-export function AnswerPanel({ question, deadline, totalMs, paused, compact = false, onSubmit }: Props) {
+export function AnswerPanel({ question, deadline, totalMs, paused, compact = false, onSubmit, onListening }: Props) {
   const [text, setText] = useState('');
   const submit = () => {
     if (text.trim() !== '') onSubmit(text);
   };
+  const voice = useVoiceAnswer(question, paused, {
+    onTranscript: setText,
+    onAnswer: onSubmit,
+    onListening: (listening) => onListening?.(listening),
+  });
 
   return (
     <View style={[styles.root, compact && styles.rootCompact]}>
@@ -43,7 +52,7 @@ export function AnswerPanel({ question, deadline, totalMs, paused, compact = fal
           value={text}
           onChangeText={setText}
           onSubmitEditing={submit}
-          placeholder="Dotknij, aby wpisać odpowiedź…"
+          placeholder={voice.listening ? 'Słucham…' : voice.available ? 'Wpisz albo powiedz odpowiedź…' : 'Dotknij, aby wpisać odpowiedź…'}
           placeholderTextColor="#7C8DB5"
           autoCorrect={false}
           spellCheck={false}
@@ -52,8 +61,19 @@ export function AnswerPanel({ question, deadline, totalMs, paused, compact = fal
           submitBehavior="submit"
           // Bez tego Android w poziomie otwiera pełnoekranowe pole edycji.
           disableFullscreenUI
-          editable={!paused}
+          editable={!paused && !voice.listening}
         />
+        {voice.available && (
+          <Pressable
+            onPress={voice.toggle}
+            disabled={paused}
+            accessibilityRole="button"
+            accessibilityLabel={voice.listening ? 'Zakończ mówienie' : 'Powiedz odpowiedź'}
+            style={({ pressed }) => [styles.mic, voice.listening && styles.micListening, pressed && styles.submitPressed]}
+          >
+            <Ionicons name={voice.listening ? 'stop' : 'mic'} size={22} color={colors.outline} />
+          </Pressable>
+        )}
         <Pressable
           onPress={submit}
           accessibilityRole="button"
@@ -63,6 +83,7 @@ export function AnswerPanel({ question, deadline, totalMs, paused, compact = fal
           <Text style={styles.submitLabel}>OK</Text>
         </Pressable>
       </View>
+      {voice.message && <Text style={styles.message}>{voice.message}</Text>}
       <TimerBar deadline={deadline} totalMs={totalMs} paused={paused} />
     </View>
   );
@@ -136,6 +157,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: `0 3px 0 ${colors.outline}`,
+  },
+  mic: {
+    width: 48,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: colors.outline,
+    backgroundColor: colors.multi,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: `0 3px 0 ${colors.outline}`,
+  },
+  micListening: {
+    backgroundColor: colors.extras,
+  },
+  message: {
+    color: colors.starYellow,
+    fontSize: 12,
+    fontWeight: '800',
   },
   submitPressed: {
     transform: [{ translateY: 2 }],

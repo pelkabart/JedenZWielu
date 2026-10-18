@@ -6,6 +6,10 @@ Raporty z dynamicznej analizy dla prowadzącego:
 - `docs/Jeden_z_Wielu_Analiza_dynamiczna_etap1.docx` – ekran główny, silnik gry i boty,
 - `docs/Jeden_z_Wielu_Analiza_dynamiczna_etap2.docx` – ekran rozgrywki.
 
+Zabezpieczenia (co mogło pójść nie tak przy tworzeniu każdej funkcjonalności i jak temu zapobiegliśmy) są w folderze `docs/zabezpieczenia/`, po jednym pliku na funkcjonalność.
+
+Zasada pracy od 18.10.2026: każda nowa funkcjonalność ma logi, testy jednostkowe i testy integracyjne. Plik w `docs/zabezpieczenia/` powstaje przed napisaniem kodu.
+
 Spis treści:
 
 1. Stan projektu
@@ -19,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (13.10.2026)
+## 1. Stan projektu (18.10.2026)
 
 | Element | Stan |
 |---|---|
@@ -31,11 +35,17 @@ Spis treści:
 | Boty z osobowościami | zrobione |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
 | Teksty prowadzącego | wersja tymczasowa, do rozbudowy w etapie 5 |
-| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione (146 testów) |
+| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione |
+| Logi aplikacji (`src/lib/log.ts`) | zrobione |
+| Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
+| Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
+| Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
+| Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
+| Razem testów automatycznych | 241 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, Jest (jest-expo).
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), Jest (jest-expo); Python tylko do przygotowania modelu głosu.
 
 ## 2. Ekran główny
 
@@ -146,7 +156,7 @@ Układ ekranu (w poziomie):
 - niżej: 5 pulpitów ułożonych w łuk; na każdym imię, 3 lampki szans, a w finale punkty; nad pulpitem pojawia się dymek z odpowiedzią gracza (zielony albo czerwony),
 - na dole: przyciski zależne od sytuacji („Zgłaszam się!”, „Biorę na siebie”, „Pomiń do wyników”).
 
-Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Licznik czasu rusza razem z pokazaniem pytania. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
+Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Pytanie czyta lektor (punkt 5, „Lektor”). Licznik czasu rusza dopiero, gdy lektor skończy czytać. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
 
 Między zdarzeniami są krótkie pauzy (wynik odpowiedzi ok. 2 s, „X wskazuje Y” ok. 2 s), żeby było widać, co się stało. Dotknięcie ekranu pomija pauzę. Plansza z zasadami etapu nie znika sama, tylko po dotknięciu, a przez pierwsze 0,7 s ignoruje dotyk, żeby nie zamknąć jej przypadkiem. Gdy gracz odpadnie, może pominąć resztę gry i od razu zobaczyć wyniki. Na końcu jest ranking z przyciskami „Zagraj ponownie” i „Menu”. Wyjście w trakcie gry (przycisk albo systemowy „wstecz”) wymaga potwierdzenia, a na czas pytania gra jest wstrzymana.
 
@@ -162,9 +172,41 @@ Silnik z etapu 3 nie wie nic o czasie. Czasem zajmuje się osobna klasa `SoloCon
 
 Zegar jest wstrzykiwany, dzięki czemu w testach można użyć udawanego czasu Jesta. Ekran (React) tylko wyświetla stan sterownika i przekazuje mu ruchy gracza.
 
+### Lektor
+
+Wszystko, co mówi prowadzący (tekst w jego dymku), i każde pytanie jest czytane na żywo polskim głosem z modelu Piper (`voiceModel/voice.onnx`, 22 050 Hz). Nie ma gotowych nagrań: tekst pojawia się na ekranie i w tej samej chwili telefon zamienia go na mowę. Model działa w telefonie przez bibliotekę `react-native-sherpa-onnx` (sherpa-onnx + onnxruntime). Pierwsza wersja lektora odtwarzała nagrania przygotowane wcześniej na komputerze, ale założenie było inne: mowa ma powstawać na żywo (7.37).
+
+Model trzeba raz przygotować na komputerze. Skrypt `scripts/narration/prepare_voice_model.py` dopisuje do modelu metadane, których szuka sherpa-onnx, robi `tokens.txt` z mapy fonemów i pobiera dane `espeak-ng-data` (zamiana tekstu na fonemy). Wtyczka `plugins/withVoiceModel.js` kopiuje gotowy folder do zasobów aplikacji przy `npx expo prebuild`:
+
+```bash
+python -m venv scripts/narration/.venv
+scripts/narration/.venv/Scripts/python -m pip install -r scripts/narration/requirements.txt
+scripts/narration/.venv/Scripts/python scripts/narration/prepare_voice_model.py
+```
+
+Model ma 63 MB, więc nie trafia do repozytorium (`.gitignore`). Sherpa-onnx to moduł natywny, którego nie ma w Expo Go: w Expo Go gra działa dalej, ale bez głosu. Lektora słychać w development buildzie albo w APK.
+
+Jak to działa w grze:
+
+- `hostSpeech` (`hostLine.ts`) zwraca kwestię prowadzącego jako listę zdań. W dymku są połączone w jeden tekst.
+- `NarrationDirector` słucha zmian w sterowniku i mówi każdą nową kwestię z dymku, a w czasie czytania także pytanie. Ta sama kwestia nie pada dwa razy z rzędu: w czasie czytania i podczas odpowiedzi bota dymek ma ten sam tekst („Ola, Twoje pytanie.”).
+- `sherpaVoice` syntezuje zdania po kolei i odtwarza je przez `expo-audio`; następne zdanie liczy się, gdy poprzednie gra. Silnik syntezy wczytuje się raz (ok. 2 s na emulatorze) i zostaje w pamięci.
+- Sterownik nie zna z góry długości wypowiedzi. Lektor zgłasza mu początek i koniec mowy (`setSpeaking`). Krok „czytanie pytania” (nakładka `reading`) i pauzy po wyniku, wskazaniu, zgłoszeniu i zapowiedzi trwają co najmniej swój dotychczasowy czas, a potem czekają, aż prowadzący skończy. Najdłużej czekają 20 s, na wypadek gdyby lektor się zawiesił.
+- W czasie czytania pytanie już widać, przy kategorii jest ikona głośnika, a licznik i boty czekają. Gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju. Dotknięcie ekranu pomija czytanie i każdą pauzę. Pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale przed zgłoszeniami.
+- Cyfry rzymskie po imieniu są czytane jako liczebniki („Mieszko I” → „Mieszko Pierwszy”), bo espeak czytałby je jak literę „i”. Zapowiedzi etapów są słowami („Przechodzimy do drugiego etapu!”).
+
+### Odpowiadanie głosem
+
+Na pytanie można odpowiedzieć na dwa sposoby: wpisać odpowiedź albo ją powiedzieć. Obok pola odpowiedzi jest przycisk z mikrofonem. Włącza on rozpoznawanie mowy Androida (`expo-speech-recognition`, język `pl-PL`). W trakcie mówienia rozpoznany tekst pojawia się w polu, a gdy gracz skończy, odpowiedź jest zatwierdzana tak samo jak wpisana. Drugie dotknięcie mikrofonu kończy mówienie od razu.
+
+- Rozpoznawanie zwraca kilka wersji tego, co usłyszało. Gra bierze pierwszą, którą sprawdzanie uznaje za poprawną, a jeśli żadna nie pasuje, najbardziej prawdopodobną. Liczebniki po imieniu wracają do zapisu z bazy („Mieszko pierwszy” → „Mieszko I”).
+- Gdy mikrofon słucha, lektor milczy, bo rozpoznawanie słyszałoby jego głos.
+- Cisza albo brak zgody na mikrofon nie kosztują szansy: gracz widzi komunikat i może spróbować jeszcze raz albo wpisać.
+- Przycisk pojawia się tylko wtedy, gdy telefon ma rozpoznawanie mowy (nie ma go w Expo Go ani na emulatorze bez usług Google). O zgodę na mikrofon gra pyta dopiero przy pierwszym dotknięciu przycisku.
+
 ## 6. Testy i analiza dynamiczna
 
-Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Znajdują się w folderze `src/game/__tests__/`.
+Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
 
 | Plik | Liczba testów | Co sprawdza |
 |---|---|---|
@@ -173,12 +215,48 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Znajdują
 | `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
 | `bots-test.ts` | 25 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju |
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
-| `controller-test.ts` | 30 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, liczniki, pauzy, ruchy botów, zgłaszanie się |
-| `view-test.ts` | 9 | teksty prowadzącego, wybór pytania do wyświetlenia, losowe miejsce gracza |
+| `controller-test.ts` | 47 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
+| `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
-| **Razem** | **146** | |
+| `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
+| `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
+| `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
+| `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
+| `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
+| `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
+| `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
+| `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
+| **Razem** | **241** | |
 
-Wszystkie testy przechodzą. Cały zestaw trwa ok. 10–35 sekund, z czego najwięcej zajmują symulacje.
+Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
+
+### Testy integracyjne
+
+Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 12 pytań testowych i bot, który zawsze odpowiada po 4 s. Testy integracyjne (`src/game/__tests__/integration-test.ts`) składają aplikację tak samo jak ekran gry (`useSoloController`): prawdziwą bazę pytań, `createSoloGame` z losowym miejscem gracza, prawdziwe profile botów, sterownik, silnik, symulator i logi. Test prowadzi grę jak gracz na telefonie: zamyka plansze etapów, odpowiada, zgłasza się i wskazuje. Wszystko dzieje się na udawanym zegarze. Sprawdzamy:
+
+- czy pełna gra kończy się poprawnie na każdym poziomie i nie zostają uruchomione liczniki,
+- czy gracz, który nie odpowiada, odpada, a „Pomiń do wyników” kończy grę,
+- czy to samo ziarno daje identyczny przebieg całej gry,
+- czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
+
+Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
+
+### Logi
+
+Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy wpis ma poziom (`debug`, `info`, `warn`, `error`), moduł, treść i małe dane. Wpisy trafiają do konsoli (w Expo Go widać je w terminalu z `npx expo start`) i do bufora ostatnich 500 wpisów w pamięci, z którego korzystają testy.
+
+| Moduł | Co logujemy |
+|---|---|
+| `[gra-solo]` | start gry: ziarno generatora, poziom, gracze; dzięki ziarnu grę z telefonu da się odtworzyć |
+| `[sterownik]` | start, pauza i wznowienie z pozostałym czasem, każdy ruch, etapy, odpadnięcia, koniec czasu, decyzje botów, zignorowane ruchy gracza (np. podwójne kliknięcie), błąd silnika |
+| `[baza-pytan]` | liczba załadowanych pytań albo błąd walidacji |
+| `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
+| `[ekran-gry]` | przerwanie gry przez gracza |
+| `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
+| `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
+| `[symulator]` | przekroczenie limitu kroków |
+
+Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
 
 ### Testy z udawanym zegarem
 
@@ -190,7 +268,7 @@ Aplikację zbudowaliśmy w wersji webowej (`npx expo export --platform web`) i u
 
 ### Pokrycie kodu
 
-`npx jest --coverage` dla `src/game`: instrukcje 94,8%, gałęzie 87,1%, funkcje 99,2%, linie 97,5%. Najsłabiej pokryte są teksty prowadzącego (`hostLine.ts`, ok. 69% instrukcji), które i tak zostaną przepisane w etapie 5.
+`npx jest --coverage` dla `src/game` i `src/lib`: instrukcje 94,8%, gałęzie 87,5%, funkcje 99,3%, linie 97,0%. Moduł logów ma 100% instrukcji. Najsłabiej pokryte są teksty prowadzącego (`hostLine.ts`, ok. 69% instrukcji), które i tak zostaną przepisane w etapie 5. Niepokryte zostały też gałęzie obsługi błędów, do których prawidłowa gra nie dochodzi (błąd bazy pytań, limit kroków symulatora, odrzucony ruch w sterowniku).
 
 ### Symulacje gier
 
@@ -317,11 +395,69 @@ W tej samej grze dwa boty przez wiele pytań wskazywały tylko siebie nawzajem i
 **7.28. Klawiatura zasłaniała pole odpowiedzi**
 Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie widać, co się wpisuje. W Expo SDK 57 aplikacja na Androidzie działa w trybie edge-to-edge, więc okno nie zmniejsza się po otwarciu klawiatury, tylko klawiatura je przykrywa. W poziomie zajmuje ona 60–70% wysokości ekranu, a panel odpowiedzi razem z paskiem etapu był wyższy niż miejsce, które zostawało nad klawiaturą. Na zrzucie ekranu w przeglądarce problemu nie było widać, bo tam nie ma klawiatury ekranowej. Rozwiązanie: aplikacja nasłuchuje zdarzeń klawiatury i zna jej wysokość (`useKeyboardHeight`). Przy otwartej klawiaturze panel ustawia się tuż nad nią, pasek etapu się chowa, a przy małej ilości miejsca panel przechodzi w tryb kompaktowy. Obliczenia układu są w osobnej czystej funkcji `answerLayout`, która ma 4 testy (bez klawiatury, z klawiaturą, mało miejsca, wycięcie ekranu). Panel jest ten sam przy otwartej i zamkniętej klawiaturze, zmienia się tylko styl, dzięki czemu pole nie traci fokusu ani wpisanego tekstu. Układ sprawdziliśmy na zrzucie z tymczasowej wersji, w której wysokość klawiatury była ustawiona na stałe na 230 dp. Ostateczne potwierdzenie wymaga testu na telefonie.
 
+### Logi i testy integracyjne
+
+**7.29. Gra „skończona” za wcześnie w teście integracyjnym**
+Pierwsza wersja testu pełnej gry czekała, aż silnik ustawi etap `finished`, i sprawdzała, że nie zostały żadne uruchomione liczniki. Test nie przeszedł na żadnym poziomie: został 1 licznik. Błąd był w teście. Kiedy silnik kończy grę, na ekranie wciąż przez ok. 2 s widać wynik ostatniej odpowiedzi, a ten licznik właśnie odlicza tę pauzę. Ekran pokazuje wyniki dopiero wtedy, gdy etap to `finished` i nie ma już nakładki (`SoloGame.tsx`). Test czeka teraz na ten sam warunek (`isResultsScreen`).
+
+**7.30. Brak zainstalowanych zależności i niezgodny lockfile**
+Przy instalacji zależności od zera `npm ci` odmówiło instalacji, bo `package-lock.json` nie zawierał dwóch opcjonalnych paczek (`@emnapi/core`, `@emnapi/runtime`). Bez zależności `npx tsc` próbowało pobrać zupełnie inną paczkę o nazwie `tsc`. Rozwiązanie: `npm install`, które uzupełniło lockfile. Zmiany w lockfile nie weszły do tego commita, bo zależą od systemu.
+
+### Lektor
+
+Punkty 7.31–7.35 dotyczą pierwszej wersji lektora, z nagraniami przygotowanymi wcześniej. Tę wersję zastąpiła synteza na żywo (7.37).
+
+**7.31. Test „każde pytanie swoim nagraniem” przechodził pozornie**
+Test integracyjny lektora porównywał, które nagranie zagrało, po wartości z `require('…mp3')`. Wyszło to dopiero przy innym teście, który sprawdzał czas czytania i nie przeszedł: oczekiwał 2885 ms, a dostał 2165 ms. Okazało się, że w Jeście każdy plik mp3 zamienia się na tę samą liczbę `1`, więc test „właściwego nagrania” przechodziłby nawet przy pomylonych plikach, a test czasu brał długość niewłaściwego nagrania. W aplikacji (Metro) każdy plik ma inny numer. Rozwiązanie: test integracyjny buduje katalog z prawdziwego manifestu Pipera (te same teksty i długości), ale pliki numeruje sam (1, 2, 3…), więc da się odróżnić, które nagranie zagrało. Wniosek: atrapa środowiska (tu zasoby w Jeście) może sprawić, że test sprawdza mniej, niż się wydaje. Warto upewnić się, że test potrafi nie przejść.
+
+**7.32. Brak typów Node w kompilatorze**
+Pierwsza wersja testu nagrań sprawdzała pliki na dysku przez moduły `fs` i `path`. Jest to uruchomił, ale `npx tsc --noEmit` zgłosił błąd, bo projekt nie ma `@types/node` (aplikacja działa w React Native, nie w Node). Zamiast dodawać zależność dla jednego testu, skorzystaliśmy z tego, że brak pliku i tak wywraca import mapy nagrań (Metro i Jest rozwiązują każde `require`). Sprawdziliśmy to ręcznie: po usunięciu jednego mp3 test kończy się błędem `Cannot find module`.
+
+**7.33. Polskie znaki w konsoli Windows**
+Logi skryptu generującego nagrania wyświetlały się jako „nagra�” zamiast „nagrań”, bo konsola Windows domyślnie nie używa UTF-8. Rozwiązanie: skrypt przełącza wyjście błędów (na które pisze moduł `logging`) na UTF-8.
+
+**7.34. Piper nie jest powtarzalny**
+To samo zdanie nagrane dwa razy miało 2531 ms i 2485 ms, bo Piper dodaje do głosu losowy szum (`noise_scale`), żeby brzmiał naturalniej. Dlatego długości czytania nie wyliczamy z tekstu ani nie zapisujemy na sztywno, tylko liczymy z liczby próbek w nagraniu, które naprawdę trafia do aplikacji. Skrypt nie nagrywa ponownie pytań, których tekst się nie zmienił, żeby nagrania (i ich długości) nie zmieniały się bez potrzeby.
+
+**7.35. Brakująca zależność `expo-asset`**
+Po instalacji `expo-audio` wszystkie testy przechodziły, a w Expo Go wszystko by działało. `npx expo-doctor` wykazał jednak, że `expo-audio` wymaga zainstalowanego bezpośrednio `expo-asset` i bez niego zbudowana aplikacja może się wywrócić. Doinstalowaliśmy go przez `npx expo install expo-asset`. Przy okazji wyłączyliśmy w `app.json` uprawnienie do mikrofonu i odtwarzanie w tle, które wtyczka `expo-audio` dodaje domyślnie. Paczkę Androida zbudowaliśmy próbnie (`npx expo export --platform android`) i sprawdziliśmy, że zawiera nagrania.
+
+**7.36. APK wywracał się od razu po uruchomieniu na emulatorze**
+Pierwsze testowe APK (budowane lokalnie: `npx expo prebuild --platform android`, potem `gradlew assembleRelease`) zbudowaliśmy tylko dla architektury `arm64-v8a`, żeby skrócić czas budowania. Na emulatorze x86_64 aplikacja zamykała się zaraz po starcie. Emulator przyjął instalację, bo potrafi tłumaczyć kod ARM, ale React Native szukał swoich bibliotek dla x86_64 i ich nie znalazł. Log z `adb logcat -b crash`: `SoLoaderDSONotFoundError: couldn't find DSO to load: libreactnative.so`. Błąd był w sposobie budowania, nie w kodzie gry: wywracało się, zanim ruszył JavaScript. Rozwiązanie: APK uniwersalne dla wszystkich 4 architektur (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`, domyślne ustawienie w `android/gradle.properties`). Na emulatorze sprawdziliśmy przez `adb`: ekran główny, wybór poziomu, start gry, krok czytania z ikoną głośnika, w logach `[lektor] Lektor czyta pytanie` dla kolejnych pytań, brak błędów i awarii.
+
+**7.37. Lektor miał mówić na żywo, a nie z gotowych nagrań**
+Pierwsza wersja lektora nagrywała wszystkie pytania i kwestie Piperem na komputerze (247 plików mp3), bo tak gra działała dalej w Expo Go. Założenie było jednak inne: tekst pojawia się w grze i od razu jest czytany. Model działa teraz w telefonie przez sherpa-onnx, a nagrania i skrypt nagrywający usunęliśmy. Wniosek: wybór, który zmienia sposób działania funkcji (tu: Expo Go kontra synteza na telefonie), trzeba uzgodnić przed pisaniem kodu, a nie przyjmować samemu.
+
+**7.38. sherpa-onnx nie czytał mapy fonemów**
+Pierwsza próba wczytania przygotowanego modelu (na komputerze, pythonowym `sherpa-onnx`) skończyła się błędem `Error when reading tokens at Line aɪ`. Mapa fonemów tego modelu ma 5 symboli wieloznakowych (dyftongi `aɪ`, `aʊ`, `ɔɪ`, `eɪ`, `oʊ` z domyślnej mapy Pipera), a sherpa-onnx czyta tylko jednoznakowe. Espeak dla polskiego takich sekwencji nie wytwarza, więc skrypt je pomija i zapisuje to w logu. Sprawdzenie modelu na komputerze przed budowaniem APK oszczędziło kilka cykli budowania i instalacji.
+
+**7.39. Aplikacja wywracała się przy pierwszym zdaniu (SIGSEGV)**
+Pierwsze APK z lektorem wczytywało model, a przy syntezie pierwszego zdania („Witam w grze „Jeden z Wielu”! Zaczynamy.”) padało w kodzie natywnym (`signal 11 SIGSEGV` w `libsherpa-onnx-jni.so`, `OfflineTts.generate`). Na komputerze to samo zdanie dało czytelny błąd: `Can't read dictionary file: espeak-ng-data/en_dict`. Przyczyna: żeby zmniejszyć APK, skrypt zostawiał w danych espeak tylko słownik polski, a espeak przy niektórych słowach przełącza się na angielski. Test na komputerze tego nie wykrył, bo sprawdzał zdania bez takich słów. Rozwiązanie: pełne `espeak-ng-data` (18 MB zamiast 1,1 MB) i sprawdzanie zdań z cudzysłowami i obcymi nazwami. Takiej awarii nie da się złapać w JavaScripcie, więc nie zastąpią jej testy Jesta: potrzebne było uruchomienie na emulatorze.
+
+**7.40. Po aktualizacji aplikacja używałaby starego modelu**
+Po poprawce z 7.39 zainstalowaliśmy nową wersję, ale w plikach aplikacji wciąż leżała stara, przycięta kopia modelu. Kod biblioteki pokazał, że model jest kopiowany z zasobów tylko wtedy, gdy jego folderu jeszcze nie ma. Ten sam problem dotknąłby graczy przy każdej aktualizacji modelu, a przerwane kopiowanie (ok. 80 MB) zostawiłoby niepełny model na zawsze. Rozwiązanie: wtyczka nadaje folderowi nazwę ze skrótem zawartości modelu (`vits-piper-pl-976a80a8`). Aplikacja usuwa starsze wersje, a gdy model się nie wczyta, kasuje kopię i próbuje jeszcze raz. Sprawdzone na emulatorze instalacją nowej wersji na starą.
+
+**7.41. Lektor zaczynał czytać kwestie, które zaraz znikały**
+Test integracyjny „kwestie nie są ucinane” wykazał, że po zamknięciu planszy etapu lektor zaczynał mówić „Kapitan Marek, Twoje pytanie.” i natychmiast przerywał na rzecz zapowiedzi. Sterownik w jednym kroku gry zmieniał widok kilka razy: najpierw zdejmował nakładkę, potem pokazywał nową. Lektor reagował na stan pośredni. Na telefonie oznaczałoby to zmarnowaną syntezę, która blokuje kolejkę i opóźnia właściwą kwestię. Rozwiązanie: sterownik grupuje zmiany z jednego kroku (`batch`) i powiadamia tylko o stanie końcowym.
+
+**7.42. Obietnice a udawany zegar w testach**
+W pierwszej wersji testu integracyjnego co kwestia sterownik czekał pełne 20 s na prowadzącego („Prowadzący mówi za długo”). Koniec wypowiedzi przychodzi przez obietnicę, a pętla testu przesuwała udawany zegar synchronicznie (`advanceTimersByTime`), więc obietnice nie miały kiedy się wykonać. W aplikacji wykonują się normalnie. Test używa teraz `advanceTimersByTimeAsync`, który między licznikami wykonuje też obietnice. Dopiero wtedy test oddaje zachowanie aplikacji i mógł wykryć problem z 7.41.
+
+**7.43. Rozmiar APK i miejsce na emulatorze**
+APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla `x86_64` 149 MB. Najwięcej zajmują model (58 MB po kompresji), onnxruntime (22 MB na architekturę) i dane espeak. Emulator miał 323 MB wolnego, a instalacja potrzebuje mniej więcej dwa razy tyle co APK, więc się nie zmieściła. Do testów budujemy osobne APK na architekturę (`-PreactNativeArchitectures=arm64-v8a` dla telefonów, `x86_64` dla emulatora). Do Google Play trzeba będzie wysłać paczkę AAB, z której sklep sam wybiera biblioteki dla telefonu.
+
+### Odpowiadanie głosem
+
+**7.44. `expo install` wybrał wersję biblioteki dla innego SDK**
+`npx expo install expo-speech-recognition` zainstalował wersję 58.0.0, choć projekt jest na Expo SDK 57. Dla paczek spoza Expo `expo install` nie zna zgodności z SDK i bierze najnowszą wersję. Zauważyliśmy to, porównując wersję z tabelą zgodności w README biblioteki. Zainstalowaliśmy ręcznie gałąź `^57` (57.1.1).
+
 ## 8. Dalsze plany
 
-- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie).
+- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
+- Lektor: mniejszy model (kwantyzacja do int8 zmniejszyłaby go ok. 4 razy, kosztem jakości głosu — do odsłuchania), paczka AAB do Google Play, włącznik lektora w ustawieniach.
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
 - Poprawa balansu poziomów Normalny i Ekspert (po limicie pytań przeciętny gracz rzadko dochodzi do finału na poziomie Ekspert).
 - Rozbudowa bazy pytań.
+- Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.

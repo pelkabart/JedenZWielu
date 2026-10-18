@@ -5,18 +5,28 @@ import { QUESTION_BANK } from '@/game/questions';
 import { createRng } from '@/game/rng';
 import { createSoloGame } from '@/game/solo';
 import type { Difficulty } from '@/game/types';
+import { createLogger } from '@/lib/log';
+
+import { useNarration } from './useNarration';
+
+const log = createLogger('gra-solo');
 
 export function useSoloController(difficulty: Difficulty) {
   const [controller] = useState(() => {
-    const rng = createRng(Date.now());
+    const seed = Date.now();
+    const rng = createRng(seed);
     const game = createSoloGame({ difficulty, humanName: 'Ty', questions: QUESTION_BANK, rng });
-    return new SoloController({ game, rng, bank: QUESTION_BANK });
+    // Ziarno pozwala odtworzyć dokładnie tę samą grę, jeśli na telefonie wyjdzie błąd.
+    log.info('Nowa gra', { seed, difficulty, players: game.players.map((p) => p.id) });
+    return new SoloController({ game, rng, bank: QUESTION_BANK, readQuestions: true });
   });
 
   useEffect(() => {
     controller.start();
     return () => controller.pause();
   }, [controller]);
+
+  useNarration(controller);
 
   const view = useSyncExternalStore(controller.subscribe, controller.getView);
   return { controller, view };

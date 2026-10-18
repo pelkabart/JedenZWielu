@@ -1,4 +1,5 @@
 import rawBank from '@/data/questions.json';
+import { createLogger } from '@/lib/log';
 
 import { isCorrectAnswer } from './answers';
 import { ANSWER_TYPES, CATEGORIES, type AnswerType, type Category, type Question } from './types';
@@ -57,4 +58,17 @@ export function parseQuestionBank(raw: unknown): Question[] {
   });
 }
 
-export const QUESTION_BANK: Question[] = parseQuestionBank(rawBank);
+const log = createLogger('baza-pytan');
+
+function loadBank(): Question[] {
+  try {
+    const bank = parseQuestionBank(rawBank);
+    log.info('Załadowano bazę pytań', { count: bank.length });
+    return bank;
+  } catch (error) {
+    log.error('Błąd w bazie pytań', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export const QUESTION_BANK: Question[] = loadBank();

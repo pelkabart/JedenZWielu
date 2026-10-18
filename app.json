@@ -32,6 +32,22 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset",
+      "./plugins/withVoiceModel",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Gra używa mikrofonu, żeby można było odpowiadać na pytania głosem.",
+          "speechRecognitionPermission": "Gra rozpoznaje mowę, żeby można było odpowiadać na pytania głosem."
+        }
       ]
     ],
     "experiments": {

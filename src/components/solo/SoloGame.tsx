@@ -15,6 +15,7 @@ import { HUMAN_ID } from '@/game/solo';
 import type { Difficulty, PlayerState } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSoloController } from '@/hooks/useSoloController';
+import { createLogger } from '@/lib/log';
 
 import { AnswerPanel } from './AnswerPanel';
 import { answerLayout, KEYBOARD_GAP } from './answerLayout';
@@ -28,6 +29,8 @@ const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
 /** Przesunięcie pulpitów w pionie — układają się w łuk. */
 const ARC = [16, 6, 0, 6, 16];
 const PODIUM_GAP = 8;
+
+const log = createLogger('ekran-gry');
 
 type Props = {
   difficulty: Difficulty;
@@ -46,7 +49,8 @@ function isHighlighted(view: SoloView, player: PlayerState): boolean {
   const { overlay, game } = view;
   if (overlay?.kind === 'reveal' || overlay?.kind === 'buzz' || overlay?.kind === 'intro') return overlay.playerId === player.id;
   if (overlay?.kind === 'pick') return overlay.targetId === player.id;
-  if (overlay) return false;
+  // W czasie czytania pytania wyróżniamy tego, kto będzie odpowiadał.
+  if (overlay && overlay.kind !== 'reading') return false;
   const { pending } = game;
   if (pending.kind === 'answer') return pending.playerId === player.id;
   if (pending.kind === 'pick') return pending.chooserId === player.id;
@@ -78,7 +82,14 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
       'Postęp tej rozgrywki zostanie utracony.',
       [
         { text: 'Graj dalej', style: 'cancel', onPress: () => controller.start() },
-        { text: 'Wyjdź', style: 'destructive', onPress: () => router.dismissAll() },
+        {
+          text: 'Wyjdź',
+          style: 'destructive',
+          onPress: () => {
+            log.info('Gracz przerwał grę', { phase: game.phase });
+            router.dismissAll();
+          },
+        },
       ],
       { cancelable: true, onDismiss: () => controller.start() },
     );
@@ -171,6 +182,7 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
               paused={view.paused}
               compact={answering.compact}
               onSubmit={(text) => controller.submitAnswer(text)}
+              onListening={(listening) => controller.setListening(listening)}
             />
           </View>
         ) : (
@@ -186,6 +198,7 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
                 deadline={view.deadline}
                 totalMs={view.timerMs}
                 paused={view.paused}
+                reading={overlay?.kind === 'reading'}
               />
 
               <View style={styles.podiums}>
