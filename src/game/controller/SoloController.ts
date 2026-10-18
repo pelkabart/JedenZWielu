@@ -39,6 +39,9 @@ export interface Pacing {
 
 export const DEFAULT_PACING: Pacing = { revealMs: 2200, bannerLockMs: 700, announceMs: 2000, introMs: 4000 };
 
+/** Dłużej na prowadzącego nie czekamy — gdyby lektor się zawiesił, gra i tak pójdzie dalej. */
+export const MAX_SPEECH_WAIT_MS = 20000;
+
 export type Overlay =
   | { kind: 'banner'; phase: Phase }
   | {
@@ -105,8 +108,11 @@ export interface SoloControllerOptions {
   pacing?: Partial<Pacing>;
   /** Pozwala podmienić profile botów (np. w testach). */
   getProfile?: (botId: string) => BotProfile;
-  /** Jak długo lektor czyta pytanie; 0 = bez czytania (np. brak nagrania). */
-  narrationMs?: (question: Question) => number;
+  /**
+   * Czy przed pytaniem jest krok „czytanie” (lektor). Jak długo trwa, decyduje lektor przez `setSpeaking`;
+   * bez lektora krok kończy się od razu.
+   */
+  readQuestions?: boolean;
 }
 
 interface Scheduled {
@@ -128,7 +134,7 @@ export class SoloController {
   private readonly clock: Clock;
   private readonly pacing: Pacing;
   private readonly getProfile: (botId: string) => BotProfile;
-  private readonly narrationMs: (question: Question) => number;
+  private readonly readQuestions: boolean;
   private timer: Scheduled | null = null;
   private pausedTimer: { fn: () => void; remaining: number; deadlineRemaining: number | null } | null = null;
   private started = false;
@@ -140,11 +146,19 @@ export class SoloController {
   private introducedCursor: number | null = null;
   /** Które pytanie (wg kursora talii) lektor już przeczytał. */
   private readCursor: number | null = null;
+  /** Prowadzący właśnie mówi (zgłasza lektor przez `setSpeaking`). */
+  private speaking = false;
+  /** Krok po pauzie, która czeka na prowadzącego; dotknięcie ekranu wykonuje go od razu. */
+  private holdStep: (() => void) | null = null;
+  private waitingForSpeech = false;
+  /** Grupowanie zmian widoku (patrz `batch`). */
+  private batchDepth = 0;
+  private dirty = false;
 
-  constructor({ game, rng, bank, clock = realClock, pacing, getProfile = getBotProfile, narrationMs = () => 0 }: SoloControllerOptions) {
+  constructor({ game, rng, bank, clock = realClock, pacing, getProfile = getBotProfile, readQuestions = false }: SoloControllerOptions) {
     this.rng = rng;
     this.getProfile = getProfile;
-    this.narrationMs = narrationMs;
+    this.readQuestions = readQuestions;
     this.bank = bank;
     this.clock = clock;
     this.pacing = { ...DEFAULT_PACING, ...pacing };
@@ -164,91 +178,122 @@ export class SoloController {
 
   /** Rozpoczyna grę albo wznawia ją po pauzie. */
   start() {
-    if (!this.started) {
-      this.started = true;
-      log.info('Start rozgrywki', { phase: this.view.game.phase });
-      this.showBanner(this.view.game.phase);
-      return;
-    }
-    if (!this.view.paused) return;
-    const paused = this.pausedTimer;
-    this.pausedTimer = null;
-    const now = this.clock.now();
-    log.info('Wznowienie', { remainingMs: paused?.remaining ?? null });
-    this.update({
-      paused: false,
-      deadline: paused?.deadlineRemaining != null ? now + paused.deadlineRemaining : this.view.deadline,
+    this.batch(() => {
+      if (!this.started) {
+        this.started = true;
+        log.info('Start rozgrywki', { phase: this.view.game.phase });
+        this.showBanner(this.view.game.phase);
+        return;
+      }
+      if (!this.view.paused) return;
+      const paused = this.pausedTimer;
+      this.pausedTimer = null;
+      const now = this.clock.now();
+      log.info('Wznowienie', { remainingMs: paused?.remaining ?? null });
+      this.update({
+        paused: false,
+        deadline: paused?.deadlineRemaining != null ? now + paused.deadlineRemaining : this.view.deadline,
+      });
+      if (paused) this.schedule(paused.remaining, paused.fn);
+      // Prowadzący mógł skończyć, zanim gra została wstrzymana.
+      this.releaseSpeechWait();
     });
-    if (paused) this.schedule(paused.remaining, paused.fn);
   }
 
   pause() {
-    if (!this.started || this.view.paused) return;
-    const now = this.clock.now();
-    if (this.timer) {
-      this.pausedTimer = {
-        fn: this.timer.fn,
-        remaining: Math.max(0, this.timer.dueAt - now),
-        deadlineRemaining: this.view.deadline === null ? null : Math.max(0, this.view.deadline - now),
-      };
-      this.clearTimer();
-    }
-    log.info('Pauza', { remainingMs: this.pausedTimer?.remaining ?? null });
-    this.update({ paused: true });
+    this.batch(() => {
+      if (!this.started || this.view.paused) return;
+      const now = this.clock.now();
+      if (this.timer) {
+        this.pausedTimer = {
+          fn: this.timer.fn,
+          remaining: Math.max(0, this.timer.dueAt - now),
+          deadlineRemaining: this.view.deadline === null ? null : Math.max(0, this.view.deadline - now),
+        };
+        // Bez `clearTimer`: pauza nie kasuje czekania na prowadzącego.
+        this.cancelTimer();
+      }
+      log.info('Pauza', { remainingMs: this.pausedTimer?.remaining ?? null });
+      this.update({ paused: true });
+    });
+  }
+
+  /** Lektor zgłasza początek i koniec wypowiedzi; pauzy w grze czekają na jej koniec. */
+  setSpeaking(speaking: boolean) {
+    this.batch(() => {
+      if (this.speaking === speaking) return;
+      this.speaking = speaking;
+      if (!speaking) this.releaseSpeechWait();
+    });
   }
 
   // ---------- ruchy człowieka ----------
 
   submitAnswer(text: string) {
-    if (!this.isHumanTurn('answer')) return;
-    this.answer(HUMAN_ID, text);
+    this.batch(() => {
+      if (!this.isHumanTurn('answer')) return;
+      this.answer(HUMAN_ID, text);
+    });
   }
 
   buzz() {
-    if (!this.isHumanTurn('buzz')) return;
-    this.prepared = null;
-    this.buzzBy(HUMAN_ID);
+    this.batch(() => {
+      if (!this.isHumanTurn('buzz')) return;
+      this.prepared = null;
+      this.buzzBy(HUMAN_ID);
+    });
   }
 
   pick(targetId: string) {
-    if (!this.isHumanTurn('pick')) return;
-    if (!pickTargets(this.view.game, HUMAN_ID).some((p) => p.id === targetId)) {
-      log.debug('Zignorowano niedozwolone wskazanie', { targetId });
-      return;
-    }
-    this.pickBy(HUMAN_ID, targetId);
+    this.batch(() => {
+      if (!this.isHumanTurn('pick')) return;
+      if (!pickTargets(this.view.game, HUMAN_ID).some((p) => p.id === targetId)) {
+        log.debug('Zignorowano niedozwolone wskazanie', { targetId });
+        return;
+      }
+      this.pickBy(HUMAN_ID, targetId);
+    });
   }
 
   /** Zamyka planszę etapu albo pomija trwającą pauzę (wynik, zapowiedź). */
   skip() {
-    if (this.view.overlay === null || this.view.paused) return;
-    if (this.view.overlay.kind === 'banner') {
-      if (this.clock.now() - this.bannerShownAt < this.pacing.bannerLockMs) {
-        log.debug('Zignorowano dotknięcie planszy tuż po jej pokazaniu');
+    this.batch(() => {
+      if (this.view.overlay === null || this.view.paused) return;
+      if (this.view.overlay.kind === 'banner') {
+        if (this.clock.now() - this.bannerShownAt < this.pacing.bannerLockMs) {
+          log.debug('Zignorowano dotknięcie planszy tuż po jej pokazaniu');
+          return;
+        }
+        this.activate();
         return;
       }
-      this.activate();
-      return;
-    }
-    if (!this.timer) return;
-    const { fn } = this.timer;
-    this.clearTimer();
-    fn();
+      // Dotknięcie pomija też czekanie na prowadzącego (lektor sam przerwie kwestię).
+      if (this.holdStep) {
+        this.runHoldStep();
+        return;
+      }
+      if (!this.timer) return;
+      const { fn } = this.timer;
+      this.clearTimer();
+      fn();
+    });
   }
 
   /** Gdy gracz już odpadł, rozgrywa resztę gry natychmiast. */
   fastForward() {
-    const { game } = this.view;
-    if (game.phase === 'finished' || !getPlayer(game, HUMAN_ID).eliminated) {
-      log.debug('Zignorowano przewinięcie gry', { phase: game.phase });
-      return;
-    }
-    this.clearTimer();
-    this.prepared = null;
-    log.info('Przewinięcie do wyników', { phase: game.phase });
-    const finished = simulateGame(game, { rng: this.rng, bank: this.bank, getProfile: this.getProfile });
-    log.info('Koniec gry', { ranking: finished.ranking });
-    this.update({ game: finished, overlay: null, deadline: null, timerMs: null, thinkingId: null });
+    this.batch(() => {
+      const { game } = this.view;
+      if (game.phase === 'finished' || !getPlayer(game, HUMAN_ID).eliminated) {
+        log.debug('Zignorowano przewinięcie gry', { phase: game.phase });
+        return;
+      }
+      this.clearTimer();
+      this.prepared = null;
+      log.info('Przewinięcie do wyników', { phase: game.phase });
+      const finished = simulateGame(game, { rng: this.rng, bank: this.bank, getProfile: this.getProfile });
+      log.info('Koniec gry', { ranking: finished.ranking });
+      this.update({ game: finished, overlay: null, deadline: null, timerMs: null, thinkingId: null });
+    });
   }
 
   // ---------- przebieg ----------
@@ -268,7 +313,7 @@ export class SoloController {
         if (pending.reason === 'turn' && this.introducedCursor !== game.cursor) {
           this.introducedCursor = game.cursor;
           this.update({ overlay: { kind: 'intro', playerId } });
-          this.schedule(this.pacing.introMs, () => this.activate());
+          this.hold(this.pacing.introMs, () => this.activate());
           return;
         }
         if (this.startReading(question)) return;
@@ -343,14 +388,14 @@ export class SoloController {
         eliminated: events.some((e) => e.type === 'eliminated' && e.playerId === playerId),
       },
     });
-    this.schedule(this.pacing.revealMs, () => this.continueAfter(events));
+    this.hold(this.pacing.revealMs, () => this.continueAfter(events));
   }
 
   private buzzBy(playerId: string) {
     this.clearTimer();
     this.apply({ type: 'buzz', playerId });
     this.update({ overlay: { kind: 'buzz', playerId } });
-    this.schedule(this.pacing.announceMs, () => this.activate());
+    this.hold(this.pacing.announceMs, () => this.activate());
   }
 
   private noBuzz() {
@@ -360,14 +405,14 @@ export class SoloController {
     this.prepared = null;
     const events = this.apply({ type: 'noBuzz' });
     this.update({ overlay: { kind: 'noBuzz', question: pending.question, correctAnswer: pending.question.answers[0] } });
-    this.schedule(this.pacing.revealMs, () => this.continueAfter(events));
+    this.hold(this.pacing.revealMs, () => this.continueAfter(events));
   }
 
   private pickBy(chooserId: string, targetId: string) {
     this.clearTimer();
     this.apply({ type: 'pick', chooserId, targetId });
     this.update({ overlay: { kind: 'pick', chooserId, targetId } });
-    this.schedule(this.pacing.announceMs, () => this.activate());
+    this.hold(this.pacing.announceMs, () => this.activate());
   }
 
   /** Po pokazaniu wyniku: plansza nowego etapu albo dalsza gra. */
@@ -386,17 +431,49 @@ export class SoloController {
    */
   private startReading(question: Question): boolean {
     const { cursor } = this.view.game;
-    if (this.readCursor === cursor) return false;
+    if (!this.readQuestions || this.readCursor === cursor) return false;
     this.readCursor = cursor;
-    const ms = this.narrationMs(question);
-    if (ms <= 0) {
-      log.debug('Pytanie bez czytania', { questionId: question.id });
-      return false;
-    }
-    log.debug('Czytanie pytania', { questionId: question.id, ms });
+    log.debug('Czytanie pytania', { questionId: question.id });
+    // Lektor zgłasza `setSpeaking(true)` już przy tej zmianie widoku, więc krok trwa do końca czytania.
     this.update({ overlay: { kind: 'reading', question } });
-    this.schedule(ms, () => this.activate());
+    this.hold(0, () => this.activate());
     return true;
+  }
+
+  /**
+   * Następny krok po `minMs`, ale nie zanim prowadzący skończy mówić — najdłużej `MAX_SPEECH_WAIT_MS`.
+   */
+  private hold(minMs: number, step: () => void) {
+    // Lektor dowiaduje się o nowej nakładce dopiero z powiadomienia — wysyłamy je przed sprawdzeniem, czy mówi.
+    this.flush();
+    if (minMs <= 0 && !this.speaking) {
+      // Czytanie bez lektora (np. model się nie wczytał) — od razu dalej.
+      step();
+      return;
+    }
+    this.schedule(minMs, () => {
+      if (!this.speaking) {
+        this.runHoldStep();
+        return;
+      }
+      log.debug('Czekam, aż prowadzący skończy mówić', { overlay: this.view.overlay?.kind ?? null });
+      this.waitingForSpeech = true;
+      this.schedule(MAX_SPEECH_WAIT_MS, () => {
+        log.warn('Prowadzący mówi za długo, gra idzie dalej', { overlay: this.view.overlay?.kind ?? null });
+        this.runHoldStep();
+      });
+    });
+    this.holdStep = step;
+  }
+
+  private runHoldStep() {
+    const step = this.holdStep;
+    this.clearTimer();
+    step?.();
+  }
+
+  private releaseSpeechWait() {
+    if (this.waitingForSpeech && !this.speaking && !this.view.paused) this.runHoldStep();
   }
 
   /** Plansza etapu czeka, aż gracz ją przeczyta i dotknie ekranu. */
@@ -445,19 +522,26 @@ export class SoloController {
   }
 
   private schedule(ms: number, fn: () => void) {
-    this.clearTimer();
+    this.cancelTimer();
     const timer: Scheduled = {
       fn,
       dueAt: this.clock.now() + ms,
       handle: this.clock.setTimeout(() => {
         if (this.timer === timer) this.timer = null;
-        fn();
+        this.batch(fn);
       }, ms),
     };
     this.timer = timer;
   }
 
+  /** Kasuje licznik i czekanie na prowadzącego. */
   private clearTimer() {
+    this.cancelTimer();
+    this.holdStep = null;
+    this.waitingForSpeech = false;
+  }
+
+  private cancelTimer() {
     if (this.timer) {
       this.clock.clearTimeout(this.timer.handle);
       this.timer = null;
@@ -472,6 +556,34 @@ export class SoloController {
 
   private update(patch: Partial<SoloView>) {
     this.view = { ...this.view, ...patch };
+    if (this.batchDepth > 0) {
+      this.dirty = true;
+      return;
+    }
+    this.notify();
+  }
+
+  /**
+   * Zmiany z jednego kroku gry trafiają do słuchaczy razem, jako stan końcowy. Stany pośrednie
+   * (np. nakładka już zdjęta, a nowa jeszcze nie pokazana) mylą lektora: zaczynałby czytać kwestię, która zaraz znika.
+   */
+  private batch(fn: () => void) {
+    this.batchDepth++;
+    try {
+      fn();
+    } finally {
+      this.batchDepth--;
+      if (this.batchDepth === 0) this.flush();
+    }
+  }
+
+  private flush() {
+    if (!this.dirty) return;
+    this.dirty = false;
+    this.notify();
+  }
+
+  private notify() {
     for (const listener of this.listeners) listener();
   }
 }

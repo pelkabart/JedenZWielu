@@ -39,12 +39,12 @@ Spis treści:
 | Logi aplikacji (`src/lib/log.ts`) | zrobione |
 | Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
-| Lektor czytający pytania (głos Piper, nagrania generowane skryptem) | zrobione, do sprawdzenia na telefonie |
-| Razem testów automatycznych | 209 |
+| Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
+| Razem testów automatycznych | 218 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, Jest (jest-expo), Piper TTS (Python, tylko do generowania nagrań).
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), Jest (jest-expo); Python tylko do przygotowania modelu głosu.
 
 ## 2. Ekran główny
 
@@ -173,20 +173,26 @@ Zegar jest wstrzykiwany, dzięki czemu w testach można użyć udawanego czasu J
 
 ### Lektor
 
-Gdy pada pytanie, lektor czyta je na głos. Głos pochodzi z modelu Piper (`voiceModel/voice.onnx`, polski, 22 050 Hz). Model nie działa na telefonie, tylko na komputerze. Skrypt `scripts/narration/generate_question_audio.py` nagrywa każde pytanie z bazy do pliku MP3 (mono, 32 kb/s) w `assets/audio/questions/`. Obok zapisuje `manifest.json` z tekstem i długością każdego nagrania oraz plik `src/narration/questionAudioSources.ts`, dzięki któremu Metro dołącza nagrania do aplikacji. 50 pytań to 147 s mowy i 586 KB. Aplikacja odtwarza gotowe pliki przez `expo-audio`, który jest w Expo Go, więc nadal nie potrzeba development builda.
+Wszystko, co mówi prowadzący (tekst w jego dymku), i każde pytanie jest czytane na żywo polskim głosem z modelu Piper (`voiceModel/voice.onnx`, 22 050 Hz). Nie ma gotowych nagrań: tekst pojawia się na ekranie i w tej samej chwili telefon zamienia go na mowę. Model działa w telefonie przez bibliotekę `react-native-sherpa-onnx` (sherpa-onnx + onnxruntime). Pierwsza wersja lektora odtwarzała nagrania przygotowane wcześniej na komputerze, ale założenie było inne: mowa ma powstawać na żywo (7.37).
 
-Po dodaniu albo zmianie pytania trzeba uruchomić skrypt ponownie. Nagrywa tylko pytania, których tekst się zmienił, i usuwa nagrania usuniętych pytań:
+Model trzeba raz przygotować na komputerze. Skrypt `scripts/narration/prepare_voice_model.py` dopisuje do modelu metadane, których szuka sherpa-onnx, robi `tokens.txt` z mapy fonemów i pobiera dane `espeak-ng-data` (zamiana tekstu na fonemy). Wtyczka `plugins/withVoiceModel.js` kopiuje gotowy folder do zasobów aplikacji przy `npx expo prebuild`:
 
 ```bash
 python -m venv scripts/narration/.venv
 scripts/narration/.venv/Scripts/python -m pip install -r scripts/narration/requirements.txt
-scripts/narration/.venv/Scripts/python scripts/narration/generate_question_audio.py          # nagraj brakujące
-scripts/narration/.venv/Scripts/python scripts/narration/generate_question_audio.py --check  # tylko sprawdź
+scripts/narration/.venv/Scripts/python scripts/narration/prepare_voice_model.py
 ```
 
-W sterowniku doszedł krok „czytanie pytania” (nakładka `reading`). Pytanie już widać, prowadzący mówi „Pytanie dla: Ola.” albo „Pytanie do wszystkich. Słuchajcie uważnie!”, przy kategorii jest ikona głośnika, a licznik i boty czekają. Czas czytania to długość nagrania plus 0,4 s marginesu. W tym czasie gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju, gdzie odpowiada się po przeczytaniu pytania. Dotknięcie ekranu pomija czytanie, a pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale lektor czyta je przed zgłoszeniami i nie powtarza go temu, kto się zgłosił. Pytanie bez nagrania (albo z nagraniem starej treści) pojawia się bez lektora, jak wcześniej.
+Model ma 63 MB, więc nie trafia do repozytorium (`.gitignore`). Sherpa-onnx to moduł natywny, którego nie ma w Expo Go: w Expo Go gra działa dalej, ale bez głosu. Lektora słychać w development buildzie albo w APK.
 
-Dźwiękiem steruje `NarrationDirector` (`src/narration/`). Słucha zmian w sterowniku i z bieżącego widoku wylicza, co ma grać. Dzięki temu pominięcie czytania, pauza, przewinięcie gry i wyjście z ekranu same wyciszają lektora. Samo odtwarzanie jest za interfejsem `NarrationPlayer`, więc w testach zamiast `expo-audio` jest atrapa, która zapisuje wywołania razem z czasem.
+Jak to działa w grze:
+
+- `hostSpeech` (`hostLine.ts`) zwraca kwestię prowadzącego jako listę zdań. W dymku są połączone w jeden tekst.
+- `NarrationDirector` słucha zmian w sterowniku i mówi każdą nową kwestię z dymku, a w czasie czytania także pytanie. Ta sama kwestia nie pada dwa razy z rzędu: w czasie czytania i podczas odpowiedzi bota dymek ma ten sam tekst („Ola, Twoje pytanie.”).
+- `sherpaVoice` syntezuje zdania po kolei i odtwarza je przez `expo-audio`; następne zdanie liczy się, gdy poprzednie gra. Silnik syntezy wczytuje się raz (ok. 2 s na emulatorze) i zostaje w pamięci.
+- Sterownik nie zna z góry długości wypowiedzi. Lektor zgłasza mu początek i koniec mowy (`setSpeaking`). Krok „czytanie pytania” (nakładka `reading`) i pauzy po wyniku, wskazaniu, zgłoszeniu i zapowiedzi trwają co najmniej swój dotychczasowy czas, a potem czekają, aż prowadzący skończy. Najdłużej czekają 20 s, na wypadek gdyby lektor się zawiesił.
+- W czasie czytania pytanie już widać, przy kategorii jest ikona głośnika, a licznik i boty czekają. Gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju. Dotknięcie ekranu pomija czytanie i każdą pauzę. Pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale przed zgłoszeniami.
+- Cyfry rzymskie po imieniu są czytane jako liczebniki („Mieszko I” → „Mieszko Pierwszy”), bo espeak czytałby je jak literę „i”. Zapowiedzi etapów są słowami („Przechodzimy do drugiego etapu!”).
 
 ## 6. Testy i analiza dynamiczna
 
@@ -199,15 +205,15 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
 | `bots-test.ts` | 25 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju |
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
-| `controller-test.ts` | 39 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, liczniki, pauzy, ruchy botów, zgłaszanie się |
-| `view-test.ts` | 12 | teksty prowadzącego, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
+| `controller-test.ts` | 45 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
+| `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
-| `narration/__tests__/questionAudio-test.ts` | 9 | czy każde pytanie ma aktualne nagranie, brak nagrań usuniętych pytań, realne długości, katalog nagrań |
-| `narration/__tests__/NarrationDirector-test.ts` | 11 | sterowanie lektorem: start, pauza, wznowienie, zmiana pytania, błąd odtwarzacza, zwolnienie |
-| `narration/__tests__/narration-integration-test.ts` | 7 | testy integracyjne lektora: całe gry na prawdziwej bazie i nagraniach, czas czytania co do ms, pauza, wyjście |
-| **Razem** | **209** | |
+| `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
+| `narration/__tests__/NarrationDirector-test.ts` | 14 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, błąd syntezy, zwolnienie |
+| `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
+| **Razem** | **218** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -220,7 +226,7 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
 
-Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController`: prawdziwą bazę, długości nagrań z manifestu Pipera, sterownik, boty i `NarrationDirector`. Jedyna atrapa to odtwarzacz. Sprawdzamy, że w całej grze lektor czyta każde zadane pytanie dokładnie raz i właściwym nagraniem, że gracz nigdy nie może odpowiadać, gdy lektor jeszcze mówi, że czytanie trwa dokładnie tyle, ile nagranie plus margines (co do milisekundy, dla każdego pytania), że pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora, a w całej grze nie ma ostrzeżeń ani błędów.
+Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
 
 ### Logi
 
@@ -233,7 +239,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[baza-pytan]` | liczba załadowanych pytań albo błąd walidacji |
 | `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
 | `[ekran-gry]` | przerwanie gry przez gracza |
-| `[lektor]` | początek czytania pytania (z długością nagrania), pauza, wznowienie i koniec czytania, pytanie bez nagrania (`warn`, raz na pytanie), błąd odtwarzacza (`error`), wyłączenie lektora |
+| `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
 Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
@@ -385,6 +391,8 @@ Przy instalacji zależności od zera `npm ci` odmówiło instalacji, bo `package
 
 ### Lektor
 
+Punkty 7.31–7.35 dotyczą pierwszej wersji lektora, z nagraniami przygotowanymi wcześniej. Tę wersję zastąpiła synteza na żywo (7.37).
+
 **7.31. Test „każde pytanie swoim nagraniem” przechodził pozornie**
 Test integracyjny lektora porównywał, które nagranie zagrało, po wartości z `require('…mp3')`. Wyszło to dopiero przy innym teście, który sprawdzał czas czytania i nie przeszedł: oczekiwał 2885 ms, a dostał 2165 ms. Okazało się, że w Jeście każdy plik mp3 zamienia się na tę samą liczbę `1`, więc test „właściwego nagrania” przechodziłby nawet przy pomylonych plikach, a test czasu brał długość niewłaściwego nagrania. W aplikacji (Metro) każdy plik ma inny numer. Rozwiązanie: test integracyjny buduje katalog z prawdziwego manifestu Pipera (te same teksty i długości), ale pliki numeruje sam (1, 2, 3…), więc da się odróżnić, które nagranie zagrało. Wniosek: atrapa środowiska (tu zasoby w Jeście) może sprawić, że test sprawdza mniej, niż się wydaje. Warto upewnić się, że test potrafi nie przejść.
 
@@ -403,10 +411,31 @@ Po instalacji `expo-audio` wszystkie testy przechodziły, a w Expo Go wszystko b
 **7.36. APK wywracał się od razu po uruchomieniu na emulatorze**
 Pierwsze testowe APK (budowane lokalnie: `npx expo prebuild --platform android`, potem `gradlew assembleRelease`) zbudowaliśmy tylko dla architektury `arm64-v8a`, żeby skrócić czas budowania. Na emulatorze x86_64 aplikacja zamykała się zaraz po starcie. Emulator przyjął instalację, bo potrafi tłumaczyć kod ARM, ale React Native szukał swoich bibliotek dla x86_64 i ich nie znalazł. Log z `adb logcat -b crash`: `SoLoaderDSONotFoundError: couldn't find DSO to load: libreactnative.so`. Błąd był w sposobie budowania, nie w kodzie gry: wywracało się, zanim ruszył JavaScript. Rozwiązanie: APK uniwersalne dla wszystkich 4 architektur (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`, domyślne ustawienie w `android/gradle.properties`). Na emulatorze sprawdziliśmy przez `adb`: ekran główny, wybór poziomu, start gry, krok czytania z ikoną głośnika, w logach `[lektor] Lektor czyta pytanie` dla kolejnych pytań, brak błędów i awarii.
 
+**7.37. Lektor miał mówić na żywo, a nie z gotowych nagrań**
+Pierwsza wersja lektora nagrywała wszystkie pytania i kwestie Piperem na komputerze (247 plików mp3), bo tak gra działała dalej w Expo Go. Założenie było jednak inne: tekst pojawia się w grze i od razu jest czytany. Model działa teraz w telefonie przez sherpa-onnx, a nagrania i skrypt nagrywający usunęliśmy. Wniosek: wybór, który zmienia sposób działania funkcji (tu: Expo Go kontra synteza na telefonie), trzeba uzgodnić przed pisaniem kodu, a nie przyjmować samemu.
+
+**7.38. sherpa-onnx nie czytał mapy fonemów**
+Pierwsza próba wczytania przygotowanego modelu (na komputerze, pythonowym `sherpa-onnx`) skończyła się błędem `Error when reading tokens at Line aɪ`. Mapa fonemów tego modelu ma 5 symboli wieloznakowych (dyftongi `aɪ`, `aʊ`, `ɔɪ`, `eɪ`, `oʊ` z domyślnej mapy Pipera), a sherpa-onnx czyta tylko jednoznakowe. Espeak dla polskiego takich sekwencji nie wytwarza, więc skrypt je pomija i zapisuje to w logu. Sprawdzenie modelu na komputerze przed budowaniem APK oszczędziło kilka cykli budowania i instalacji.
+
+**7.39. Aplikacja wywracała się przy pierwszym zdaniu (SIGSEGV)**
+Pierwsze APK z lektorem wczytywało model, a przy syntezie pierwszego zdania („Witam w grze „Jeden z Wielu”! Zaczynamy.”) padało w kodzie natywnym (`signal 11 SIGSEGV` w `libsherpa-onnx-jni.so`, `OfflineTts.generate`). Na komputerze to samo zdanie dało czytelny błąd: `Can't read dictionary file: espeak-ng-data/en_dict`. Przyczyna: żeby zmniejszyć APK, skrypt zostawiał w danych espeak tylko słownik polski, a espeak przy niektórych słowach przełącza się na angielski. Test na komputerze tego nie wykrył, bo sprawdzał zdania bez takich słów. Rozwiązanie: pełne `espeak-ng-data` (18 MB zamiast 1,1 MB) i sprawdzanie zdań z cudzysłowami i obcymi nazwami. Takiej awarii nie da się złapać w JavaScripcie, więc nie zastąpią jej testy Jesta: potrzebne było uruchomienie na emulatorze.
+
+**7.40. Po aktualizacji aplikacja używałaby starego modelu**
+Po poprawce z 7.39 zainstalowaliśmy nową wersję, ale w plikach aplikacji wciąż leżała stara, przycięta kopia modelu. Kod biblioteki pokazał, że model jest kopiowany z zasobów tylko wtedy, gdy jego folderu jeszcze nie ma. Ten sam problem dotknąłby graczy przy każdej aktualizacji modelu, a przerwane kopiowanie (ok. 80 MB) zostawiłoby niepełny model na zawsze. Rozwiązanie: wtyczka nadaje folderowi nazwę ze skrótem zawartości modelu (`vits-piper-pl-976a80a8`). Aplikacja usuwa starsze wersje, a gdy model się nie wczyta, kasuje kopię i próbuje jeszcze raz. Sprawdzone na emulatorze instalacją nowej wersji na starą.
+
+**7.41. Lektor zaczynał czytać kwestie, które zaraz znikały**
+Test integracyjny „kwestie nie są ucinane” wykazał, że po zamknięciu planszy etapu lektor zaczynał mówić „Kapitan Marek, Twoje pytanie.” i natychmiast przerywał na rzecz zapowiedzi. Sterownik w jednym kroku gry zmieniał widok kilka razy: najpierw zdejmował nakładkę, potem pokazywał nową. Lektor reagował na stan pośredni. Na telefonie oznaczałoby to zmarnowaną syntezę, która blokuje kolejkę i opóźnia właściwą kwestię. Rozwiązanie: sterownik grupuje zmiany z jednego kroku (`batch`) i powiadamia tylko o stanie końcowym.
+
+**7.42. Obietnice a udawany zegar w testach**
+W pierwszej wersji testu integracyjnego co kwestia sterownik czekał pełne 20 s na prowadzącego („Prowadzący mówi za długo”). Koniec wypowiedzi przychodzi przez obietnicę, a pętla testu przesuwała udawany zegar synchronicznie (`advanceTimersByTime`), więc obietnice nie miały kiedy się wykonać. W aplikacji wykonują się normalnie. Test używa teraz `advanceTimersByTimeAsync`, który między licznikami wykonuje też obietnice. Dopiero wtedy test oddaje zachowanie aplikacji i mógł wykryć problem z 7.41.
+
+**7.43. Rozmiar APK i miejsce na emulatorze**
+APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla `x86_64` 149 MB. Najwięcej zajmują model (58 MB po kompresji), onnxruntime (22 MB na architekturę) i dane espeak. Emulator miał 323 MB wolnego, a instalacja potrzebuje mniej więcej dwa razy tyle co APK, więc się nie zmieściła. Do testów budujemy osobne APK na architekturę (`-PreactNativeArchitectures=arm64-v8a` dla telefonów, `x86_64` dla emulatora). Do Google Play trzeba będzie wysłać paczkę AAB, z której sklep sam wybiera biblioteki dla telefonu.
+
 ## 8. Dalsze plany
 
-- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: głośność, opóźnienie startu, czy 0,4 s marginesu wystarcza).
-- Lektor przy pełnej bazie (ok. 2000 pytań, ok. 25 MB nagrań): przenieść nagrania na serwer (np. Supabase Storage) albo pobierać je paczkami. Włącznik lektora w ustawieniach.
+- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
+- Lektor: mniejszy model (kwantyzacja do int8 zmniejszyłaby go ok. 4 razy, kosztem jakości głosu — do odsłuchania), paczka AAB do Google Play, włącznik lektora w ustawieniach.
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.

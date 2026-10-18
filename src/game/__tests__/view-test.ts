@@ -1,5 +1,5 @@
 import { narratedQuestion, visibleQuestion, type SoloView } from '../controller/SoloController';
-import { hostLine } from '../controller/hostLine';
+import { hostLine, hostSpeech } from '../controller/hostLine';
 import { QUESTION_BANK } from '../questions';
 import { createRng } from '../rng';
 import { createSoloGame, HUMAN_ID } from '../solo';
@@ -118,8 +118,51 @@ describe('hostLine', () => {
     const toHuman: GameState = { ...game, pending: { kind: 'answer', playerId: HUMAN_ID, question: q, reason: 'turn', pickedBy: null } };
     const toBot: GameState = { ...game, pending: { kind: 'answer', playerId: bot.id, question: q, reason: 'picked', pickedBy: HUMAN_ID } };
     const toAll: GameState = { ...game, pending: { kind: 'buzz', question: q } };
-    expect(hostLine(view(toHuman, reading))).toBe('Pytanie dla Ciebie. Słuchaj uważnie!');
-    expect(hostLine(view(toBot, reading))).toBe(`Pytanie dla: ${bot.name}.`);
-    expect(hostLine(view(toAll, reading))).toBe('Pytanie do wszystkich. Słuchajcie uważnie!');
+    expect(hostLine(view(toHuman, reading))).toBe('Pytanie dla Ciebie.');
+    expect(hostLine(view(toBot, reading))).toBe(`${bot.name}, Twoje pytanie.`);
+    expect(hostLine(view(toAll, reading))).toBe('Pytanie do wszystkich.');
+  });
+
+  it('po przeczytaniu pytania kwestia przy odpowiedzi bota się nie zmienia (prowadzący się nie powtarza)', () => {
+    const toBot: GameState = { ...game, pending: { kind: 'answer', playerId: bot.id, question: q, reason: 'turn', pickedBy: null } };
+    expect(hostLine(view(toBot))).toBe(hostLine(view(toBot, { overlay: { kind: 'reading', question: q } })));
+  });
+});
+
+describe('hostSpeech', () => {
+  const game = solo(3);
+  const bot = game.players.find((p) => !p.isHuman)!;
+  const q = QUESTION_BANK[0];
+
+  it('hostLine to zdania z hostSpeech połączone spacją', () => {
+    const overlays: SoloView['overlay'][] = [
+      null,
+      { kind: 'banner', phase: 'stage2' },
+      { kind: 'reveal', playerId: bot.id, question: q, text: 'zle', correct: false, correctAnswer: 'X', eliminated: true },
+      { kind: 'noBuzz', question: q, correctAnswer: 'X' },
+      { kind: 'pick', chooserId: bot.id, targetId: HUMAN_ID },
+    ];
+    for (const overlay of overlays) {
+      const v = view(game, { overlay });
+      expect(hostLine(v)).toBe(hostSpeech(v).join(' '));
+    }
+  });
+
+  it('kwestie z poprawną odpowiedzią dzielą się na zdanie o graczu i zdanie z odpowiedzią', () => {
+    const out = hostSpeech(
+      view(game, { overlay: { kind: 'reveal', playerId: bot.id, question: q, text: 'zle', correct: false, correctAnswer: 'Ottawa', eliminated: true } }),
+    );
+    expect(out).toEqual([`Niestety, ${bot.name} odpada.`, 'Poprawna odpowiedź: Ottawa.']);
+    expect(hostSpeech(view(game, { overlay: { kind: 'noBuzz', question: q, correctAnswer: 'Ottawa' } }))).toEqual([
+      'Nikt się nie zgłosił.',
+      'Poprawna odpowiedź: Ottawa.',
+    ]);
+  });
+
+  it('zapowiedzi etapów nie mają cyfr rzymskich', () => {
+    for (const phase of ['stage1', 'stage2', 'final'] as const) {
+      const [line] = hostSpeech(view(game, { overlay: { kind: 'banner', phase } }));
+      expect(line).not.toMatch(/(^|\s)[IVX]+([\s.!]|$)/);
+    }
   });
 });

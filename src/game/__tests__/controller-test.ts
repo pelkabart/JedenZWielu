@@ -1,11 +1,21 @@
+import { getLogEntries, resetLog } from '@/lib/log';
+
 import { getBotProfile, type BotProfile } from '../bots/profiles';
-import { humanTurn, narratedQuestion, SoloController, visibleQuestion, type Pacing, type SoloView } from '../controller/SoloController';
-import { createGame, getPlayer } from '../engine';
+import {
+  humanTurn,
+  MAX_SPEECH_WAIT_MS,
+  narratedQuestion,
+  SoloController,
+  visibleQuestion,
+  type Pacing,
+  type SoloView,
+} from '../controller/SoloController';
+import { createGame, getPlayer, pickTargets } from '../engine';
 import { DEFAULT_RULES } from '../rules';
 import { createRng } from '../rng';
 import { HUMAN_ID } from '../solo';
 import { driveToFinal, TEST_BANK } from '../testing/fixtures';
-import type { GameState, Question } from '../types';
+import type { GameState } from '../types';
 
 const PACING: Pacing = { revealMs: 2000, bannerLockMs: 700, announceMs: 1000, introMs: 2500 };
 const BOT_IDS = ['b1', 'b2', 'b3', 'b4'];
@@ -461,18 +471,50 @@ describe('finał', () => {
   });
 });
 
+/** Sterownik z krokiem czytania pytań (jak w aplikacji z lektorem). */
+function voiced(state: GameState, profile: Partial<BotProfile> = {}) {
+  return new SoloController({
+    game: state,
+    rng: createRng(1),
+    bank: TEST_BANK,
+    pacing: PACING,
+    getProfile: () => ({ ...steadyBot, ...profile }),
+    readQuestions: true,
+  });
+}
+
+type OverlayKind = NonNullable<SoloView['overlay']>['kind'];
+
+/**
+ * Udaje lektora: gdy pojawia się nakładka danego rodzaju, prowadzący mówi przez podany czas
+ * (`Infinity` = nie kończy). Nowa kwestia przerywa poprzednią, jak w NarrationDirector.
+ */
+function speakOn(c: SoloController, durations: Partial<Record<OverlayKind, number>>) {
+  let last: SoloView['overlay'] = null;
+  let utterance = 0;
+  return c.subscribe(() => {
+    const { overlay } = c.getView();
+    if (overlay === last) return;
+    last = overlay;
+    const ms = overlay ? durations[overlay.kind] : undefined;
+    if (ms === undefined) return;
+    const mine = ++utterance;
+    c.setSpeaking(true);
+    if (ms !== Infinity) {
+      setTimeout(() => {
+        if (mine === utterance) c.setSpeaking(false);
+      }, ms);
+    }
+  });
+}
+
 describe('czytanie pytania', () => {
   const READ_MS = 3000;
 
-  function narrated(state: GameState, narrationMs: (q: Question) => number = () => READ_MS, profile: Partial<BotProfile> = {}) {
-    return new SoloController({
-      game: state,
-      rng: createRng(1),
-      bank: TEST_BANK,
-      pacing: PACING,
-      getProfile: () => ({ ...steadyBot, ...profile }),
-      narrationMs,
-    });
+  function reading(state: GameState = game(), profile: Partial<BotProfile> = {}) {
+    const c = voiced(state, profile);
+    speakOn(c, { reading: READ_MS });
+    return c;
   }
 
   function finalGame(): GameState {
@@ -480,7 +522,7 @@ describe('czytanie pytania', () => {
   }
 
   it('po zapowiedzi lektor czyta pytanie: pytanie już widać, licznik stoi', () => {
-    const c = narrated(game());
+    const c = reading();
     c.start();
     toFirstQuestion(c);
     const view = c.getView();
@@ -493,7 +535,7 @@ describe('czytanie pytania', () => {
   });
 
   it('licznik startuje dopiero po przeczytaniu, z pełnym czasem', () => {
-    const c = narrated(game());
+    const c = reading();
     c.start();
     toFirstQuestion(c);
     advance(READ_MS - 1);
@@ -508,14 +550,14 @@ describe('czytanie pytania', () => {
   });
 
   it('w czasie czytania nie można odpowiedzieć ani się zgłosić', () => {
-    const c = narrated(game());
+    const c = reading();
     c.start();
     toFirstQuestion(c);
     expect(humanTurn(c.getView())).toBeNull();
     c.submitAnswer(correctAnswer(c.getView()));
     expect(c.getView().game.events.some((e) => e.type === 'answer')).toBe(false);
 
-    const f = narrated(finalGame());
+    const f = reading(finalGame());
     f.start();
     dismissBanner(f);
     expect(f.getView().overlay?.kind).toBe('reading');
@@ -525,7 +567,7 @@ describe('czytanie pytania', () => {
   });
 
   it('bot zaczyna myśleć dopiero po przeczytaniu', () => {
-    const c = narrated(game(1, 2));
+    const c = reading(game(1, 2));
     c.start();
     toFirstQuestion(c);
     expect(c.getView().thinkingId).toBeNull();
@@ -538,7 +580,7 @@ describe('czytanie pytania', () => {
   });
 
   it('dotknięcie pomija czytanie i uruchamia licznik', () => {
-    const c = narrated(game());
+    const c = reading();
     c.start();
     toFirstQuestion(c);
     advance(500);
@@ -548,24 +590,45 @@ describe('czytanie pytania', () => {
     expect(c.getView().deadline).toBe(Date.now() + DEFAULT_RULES.answerTimeMs);
   });
 
-  it('pauza w czasie czytania zachowuje pozostały czas', () => {
-    const c = narrated(game());
+  it('pauza w czasie czytania nie przepuszcza gry dalej', () => {
+    const c = voiced(game());
+    speakOn(c, { reading: Infinity });
     c.start();
     toFirstQuestion(c);
-    advance(1000);
+    expect(c.getView().overlay?.kind).toBe('reading');
     c.pause();
     advance(60000);
     expect(c.getView().overlay?.kind).toBe('reading');
+    // Po wznowieniu lektor czyta dalej — gra czeka na koniec czytania.
     c.start();
-    advance(READ_MS - 1000 - 1);
+    advance(1000);
     expect(c.getView().overlay?.kind).toBe('reading');
-    advance(1);
+    c.setSpeaking(false);
+    expect(humanTurn(c.getView())).toBe('answer');
+  });
+
+  it('koniec czytania w czasie pauzy rusza grę dopiero po wznowieniu', () => {
+    const c = voiced(game());
+    speakOn(c, { reading: Infinity });
+    c.start();
+    toFirstQuestion(c);
+    advance(100);
+    c.pause();
+    c.setSpeaking(false);
+    expect(c.getView().overlay?.kind).toBe('reading');
+    c.start();
     expect(humanTurn(c.getView())).toBe('answer');
   });
 
   it('w finale pytanie jest czytane raz, przed zgłoszeniami', () => {
-    const narrationMs = jest.fn(() => READ_MS);
-    const c = narrated(finalGame(), narrationMs);
+    const c = reading(finalGame());
+    let readings = 0;
+    let last: SoloView['overlay'] = null;
+    c.subscribe(() => {
+      const { overlay } = c.getView();
+      if (overlay !== last && overlay?.kind === 'reading') readings++;
+      last = overlay;
+    });
     c.start();
     dismissBanner(c);
     expect(c.getView().overlay?.kind).toBe('reading');
@@ -578,11 +641,12 @@ describe('czytanie pytania', () => {
     // Po zgłoszeniu od razu odpowiedź — bez drugiego czytania tego samego pytania.
     expect(c.getView().overlay).toBeNull();
     expect(humanTurn(c.getView())).toBe('answer');
-    expect(narrationMs).toHaveBeenCalledTimes(1);
+    expect(readings).toBe(1);
   });
 
-  it('bez nagrania gra działa jak dotąd', () => {
-    const c = narrated(game(), () => 0);
+  it('bez lektora gra działa jak dotąd', () => {
+    // Krok czytania jest włączony, ale nikt nie mówi (np. model się nie wczytał) — trwa 0 ms.
+    const c = voiced(game());
     c.start();
     toFirstQuestion(c);
     expect(c.getView().overlay).toBeNull();
@@ -590,7 +654,8 @@ describe('czytanie pytania', () => {
   });
 
   it('w całej grze żadne pytanie nie jest czytane dwa razy', () => {
-    const c = narrated(game(5, 3), () => 1500);
+    const c = voiced(game(5, 3));
+    speakOn(c, { reading: 1500 });
     c.start();
     const readCursors: number[] = [];
     let last: SoloView['overlay'] = null;
@@ -607,6 +672,102 @@ describe('czytanie pytania', () => {
     }
     expect(readCursors.length).toBeGreaterThan(10);
     expect(new Set(readCursors).size).toBe(readCursors.length);
+  });
+});
+
+describe('głos prowadzącego', () => {
+  it('wynik odpowiedzi trwa, dopóki prowadzący nie skończy mówić', () => {
+    const c = voiced(game());
+    speakOn(c, { reveal: 5000 });
+    c.start();
+    toFirstQuestion(c);
+    c.submitAnswer('zupelnie zle');
+    expect(c.getView().overlay?.kind).toBe('reveal');
+    // Domyślnie wynik znika po 2 s; tu prowadzący mówi 5 s.
+    advance(5000 - 1);
+    expect(c.getView().overlay?.kind).toBe('reveal');
+    advance(1);
+    expect(c.getView().overlay).toEqual({ kind: 'intro', playerId: 'b1' });
+  });
+
+  it('krótka kwestia nie skraca pauzy poniżej domyślnej', () => {
+    const c = voiced(game());
+    speakOn(c, { reveal: 500 });
+    c.start();
+    toFirstQuestion(c);
+    c.submitAnswer(correctAnswer(c.getView()));
+    advance(PACING.revealMs - 1);
+    expect(c.getView().overlay?.kind).toBe('reveal');
+    advance(1);
+    expect(c.getView().overlay?.kind).toBe('intro');
+  });
+
+  it('wskazanie, zgłoszenie i zapowiedź też czekają na prowadzącego', () => {
+    const LONG = 7000;
+
+    const intro = voiced(game());
+    speakOn(intro, { intro: LONG });
+    intro.start();
+    dismissBanner(intro);
+    advance(LONG - 1);
+    expect(intro.getView().overlay?.kind).toBe('intro');
+    advance(1);
+    expect(humanTurn(intro.getView())).toBe('answer');
+
+    const buzz = voiced(driveToFinal(game(), ['b1', 'b3']), { eagerness: 1 });
+    speakOn(buzz, { buzz: LONG });
+    buzz.start();
+    dismissBanner(buzz);
+    buzz.buzz();
+    advance(LONG - 1);
+    expect(buzz.getView().overlay).toEqual({ kind: 'buzz', playerId: HUMAN_ID });
+    advance(1);
+    expect(humanTurn(buzz.getView())).toBe('answer');
+
+    // Etap II: człowiek odpowiada dobrze i wskazuje.
+    const pick = voiced(game(), { knowledge: 5 });
+    speakOn(pick, { pick: LONG });
+    pick.start();
+    for (let elapsed = 0; humanTurn(pick.getView()) !== 'pick'; elapsed += 50) {
+      if (elapsed > 600000) throw new Error('Człowiek nie dostał wskazywania');
+      const view = pick.getView();
+      if (view.overlay?.kind === 'banner') dismissBanner(pick);
+      else if (humanTurn(view) === 'answer') pick.submitAnswer(correctAnswer(view));
+      else advance(50);
+    }
+    pick.pick(pickTargets(pick.getView().game, HUMAN_ID)[0].id);
+    advance(LONG - 1);
+    expect(pick.getView().overlay?.kind).toBe('pick');
+    advance(1);
+    expect(pick.getView().overlay?.kind).not.toBe('pick');
+  });
+
+  it('gdy lektor nie zgłosi końca, gra po 20 s idzie dalej', () => {
+    resetLog();
+    const c = voiced(game());
+    speakOn(c, { reveal: Infinity });
+    c.start();
+    toFirstQuestion(c);
+    c.submitAnswer(correctAnswer(c.getView()));
+    advance(PACING.revealMs + MAX_SPEECH_WAIT_MS - 1);
+    expect(c.getView().overlay?.kind).toBe('reveal');
+    advance(1);
+    expect(c.getView().overlay?.kind).toBe('intro');
+    expect(getLogEntries({ tag: 'sterownik', minLevel: 'warn' })).toEqual([
+      expect.objectContaining({ message: 'Prowadzący mówi za długo, gra idzie dalej' }),
+    ]);
+  });
+
+  it('dotknięcie pomija też czekanie na prowadzącego', () => {
+    const c = voiced(game());
+    speakOn(c, { reveal: Infinity });
+    c.start();
+    toFirstQuestion(c);
+    c.submitAnswer(correctAnswer(c.getView()));
+    advance(PACING.revealMs + 1000);
+    expect(c.getView().overlay?.kind).toBe('reveal');
+    c.skip();
+    expect(c.getView().overlay?.kind).toBe('intro');
   });
 });
 

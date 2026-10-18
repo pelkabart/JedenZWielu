@@ -1,78 +1,102 @@
-# Lektor – czytanie pytań głosem (Piper)
+# Lektor – głos prowadzącego na żywo (Piper + sherpa-onnx)
 
-Moduły: `scripts/narration/generate_question_audio.py`, `src/narration/`, `src/hooks/useQuestionNarration.ts`, krok „czytanie pytania” w `src/game/controller/SoloController.ts`
-Testy: `src/narration/__tests__/questionAudio-test.ts`, `src/narration/__tests__/NarrationDirector-test.ts`, `src/game/__tests__/controller-test.ts` (blok „czytanie pytania”), `src/narration/__tests__/narration-integration-test.ts`
+Moduły: `src/narration/` (`NarrationDirector.ts`, `sherpaVoice.ts`, `pronunciation.ts`), `src/hooks/useNarration.ts`, `hostSpeech` w `src/game/controller/hostLine.ts`, krok „czytanie pytania” i czekanie na prowadzącego w `src/game/controller/SoloController.ts`, przygotowanie modelu `scripts/narration/prepare_voice_model.py`, wtyczka `plugins/withVoiceModel.js`
+Testy: `src/narration/__tests__/NarrationDirector-test.ts`, `src/narration/__tests__/pronunciation-test.ts`, `src/game/__tests__/controller-test.ts` (bloki „czytanie pytania” i „głos prowadzącego”), `src/narration/__tests__/narration-integration-test.ts`
 
-Gdy pada pytanie, lektor czyta je głosem z modelu Piper (`voiceModel/voice.onnx`, polski głos espeak `pl`, 22 050 Hz).
+Wszystko, co mówi prowadzący (tekst w jego dymku), i każde pytanie jest czytane na żywo głosem z modelu Piper (`voiceModel/voice.onnx`, polski, 22 050 Hz). Nie ma gotowych nagrań: tekst pojawia się na ekranie i w tej samej chwili telefon zamienia go na mowę.
 
-Nagrania powstają wcześniej, na komputerze. Skrypt `generate_question_audio.py` czyta każde pytanie z `src/data/questions.json` i zapisuje plik MP3 do `assets/audio/questions/`. Obok zapisuje `manifest.json` z tekstem i długością każdego nagrania. Aplikacja odtwarza gotowe pliki przez `expo-audio`, który jest w Expo Go, więc nie potrzeba development builda ani 63 MB modelu w telefonie.
+Model działa w telefonie przez `react-native-sherpa-onnx` (sherpa-onnx + onnxruntime). Skrypt `prepare_voice_model.py` układa model tak, jak oczekuje go sherpa-onnx: dopisuje metadane, robi `tokens.txt` i dokłada `espeak-ng-data` (zamiana tekstu na fonemy). Wtyczka `withVoiceModel` kopiuje gotowy folder do zasobów aplikacji przy `npx expo prebuild`. `sherpaVoice` syntezuje zdanie po zdaniu (następne liczy się, gdy poprzednie gra) i odtwarza je przez `expo-audio`.
 
-Sterownik gry ma nowy krok `reading`. Pytanie jest już widoczne, lektor je czyta, a licznik czasu startuje dopiero po przeczytaniu.
+Sterownik nie zna z góry długości wypowiedzi, więc czeka na sygnał końca: `NarrationDirector` woła `controller.setSpeaking(true/false)`. Krok `reading` (pytanie widoczne, licznik stoi) i pauzy po wyniku, wskazaniu, zgłoszeniu i zapowiedzi trwają, dopóki prowadzący nie skończy mówić.
 
 ## Co może pójść nie tak i jak to zabezpieczamy
 
 ### 1. Czytanie zjada czas na odpowiedź
 **Ryzyko:** gdyby licznik startował razem z lektorem, gracz traciłby 2–6 s z 15 s na odpowiedź (w finale z 6 s okna zgłoszeń). Boty nie słuchają, więc człowiek byłby w gorszej sytuacji niż boty.
-**Zabezpieczenie:** sterownik najpierw pokazuje nakładkę `reading` na czas trwania nagrania (plus krótki margines). Licznik i ruchy botów startują dopiero po niej. W czasie czytania człowiek nie może jeszcze odpowiedzieć ani się zgłosić (`humanTurn` zwraca `null`), tak jak w teleturnieju.
-**Test:** `controller-test.ts › czytanie pytania › licznik startuje dopiero po przeczytaniu, z pełnym czasem`, `› w czasie czytania nie można odpowiedzieć ani się zgłosić`, `› bot zaczyna myśleć dopiero po przeczytaniu`, `narration-integration-test.ts › gracz może odpowiadać dopiero, gdy lektor skończy`.
+**Zabezpieczenie:** sterownik najpierw pokazuje nakładkę `reading` i czeka, aż prowadzący skończy mówić. Licznik i ruchy botów startują dopiero potem. W czasie czytania człowiek nie może odpowiedzieć ani się zgłosić (`humanTurn` zwraca `null`), tak jak w teleturnieju.
+**Test:** `controller-test.ts › czytanie pytania › licznik startuje dopiero po przeczytaniu, z pełnym czasem`, `› w czasie czytania nie można odpowiedzieć ani się zgłosić`, `› bot zaczyna myśleć dopiero po przeczytaniu`, `narration-integration-test.ts › gdy gracz może odpowiadać, pytanie już nie jest czytane`.
 
-### 2. Nagranie nie pasuje do pytania (ktoś poprawił treść w bazie)
-**Ryzyko:** po zmianie treści pytania w `questions.json` lektor czytałby starą wersję, a na ekranie byłaby nowa.
-**Zabezpieczenie:** `manifest.json` zapisuje dokładny tekst, z którego powstało nagranie. Skrypt generuje ponownie tylko pytania, których tekst się zmienił, i usuwa nagrania pytań, których już nie ma w bazie.
-Aplikacja też porównuje tekst: nagranie ze starej treści nie jest odtwarzane (patrz punkt 3). Skrypt ma tryb `--check`, który bez modelu sprawdza, czy nagrania są aktualne.
-**Test:** `questionAudio-test.ts › każde pytanie z bazy ma nagranie zrobione z aktualnej treści` (test nie przejdzie, dopóki ktoś nie uruchomi skryptu), `› w katalogu nie ma nagrań usuniętych pytań`, `› nagranie ze starej treści nie jest używane`.
+### 2. Kwestia ucięta, bo gra poszła dalej
+**Ryzyko:** wynik odpowiedzi widać 2,2 s, a „Niestety, Kapitan Marek odpada. Poprawna odpowiedź: Maria Skłodowska-Curie.” trwa ok. 5 s. Następna kwestia przerwałaby poprzednią w połowie.
+**Zabezpieczenie:** każda pauza (wynik, brak zgłoszeń, wskazanie, zgłoszenie, zapowiedź, czytanie) trwa co najmniej swój dotychczasowy czas, a potem czeka na koniec wypowiedzi.
+**Test:** `controller-test.ts › głos prowadzącego › wynik odpowiedzi trwa, dopóki prowadzący nie skończy mówić`, `› krótka kwestia nie skraca pauzy poniżej domyślnej`, `› wskazanie, zgłoszenie i zapowiedź też czekają na prowadzącego`, `narration-integration-test.ts › kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane`.
 
-### 3. Brak nagrania dla pytania
-**Ryzyko:** nowe pytanie bez nagrania. Gra nie może się na tym zatrzymać ani wywrócić.
-**Zabezpieczenie:** `narrationMs` zwraca 0, gdy pytanie nie ma nagrania. Wtedy sterownik pomija krok czytania i gra działa jak wcześniej. W logach pojawia się jedno ostrzeżenie na pytanie (nie przy każdym losowaniu).
-**Test:** `questionAudio-test.ts › pytanie bez nagrania: 0 ms i jedno ostrzeżenie`, `› pomija wpis bez pliku albo z błędną długością`, `NarrationDirector-test.ts › pytanie bez nagrania jest pomijane po cichu`, `controller-test.ts › czytanie pytania › bez nagrania gra działa jak dotąd`.
+### 3. Gra stoi, bo lektor nie zgłosił końca
+**Ryzyko:** gdyby synteza albo odtwarzacz zawiesiły się i nie zgłosiły końca wypowiedzi, sterownik czekałby w nieskończoność.
+**Zabezpieczenie:** sterownik czeka najwyżej 20 s (`MAX_SPEECH_WAIT_MS`), potem loguje ostrzeżenie i gra idzie dalej. Błąd syntezy albo odtwarzacza dyrektor traktuje jak koniec wypowiedzi.
+**Test:** `controller-test.ts › głos prowadzącego › gdy lektor nie zgłosi końca, gra po 20 s idzie dalej`, `NarrationDirector-test.ts › błąd lektora kończy wypowiedź i trafia do logów`.
 
-### 4. Lektor gra dalej podczas pauzy albo po wyjściu z gry
-**Ryzyko:** gracz wstrzymuje grę (okno „Przerwać grę?”) albo z niej wychodzi, a głos dalej czyta pytanie. Albo po wznowieniu czytanie zaczyna się od nowa, a licznik startuje w złym momencie.
-**Zabezpieczenie:** odtwarzaniem steruje `NarrationDirector`, który wylicza z widoku sterownika, co ma grać: pytanie z nakładki `reading` i tylko wtedy, gdy gra nie jest wstrzymana. Pauza wstrzymuje dźwięk, wznowienie gra dalej od tego samego miejsca. Sterownik zapamiętuje, ile zostało z czasu czytania. Odmontowanie ekranu zatrzymuje dźwięk i zwalnia odtwarzacz (`remove()`).
-**Test:** `NarrationDirector-test.ts › pauza wstrzymuje, wznowienie gra dalej (bez wczytywania od nowa)`, `› czytanie zaczęte w czasie pauzy rusza dopiero po wznowieniu`, `› dispose zatrzymuje dźwięk, zwalnia odtwarzacz i przestaje słuchać`, `controller-test.ts › czytanie pytania › pauza w czasie czytania zachowuje pozostały czas`, `narration-integration-test.ts › pauza w czasie czytania wycisza lektora…`, `› wyjście z gry w trakcie czytania ucisza i zwalnia odtwarzacz`, `› po przewinięciu gry do wyników lektor milknie`.
+### 4. Model nie wczyta się na telefonie
+**Ryzyko:** brak modelu w APK, błąd sherpa-onnx albo za mało pamięci. Gra nie może się na tym zatrzymać ani wywrócić.
+**Zabezpieczenie:** gdy model się nie wczyta, aplikacja kasuje jego kopię w plikach aplikacji i próbuje jeszcze raz. Jeśli i to się nie uda, błąd jest logowany raz, a kolejne wypowiedzi kończą się od razu. Gra toczy się bez głosu i z domyślnymi pauzami. Bez dyrektora (np. w testach) krok czytania trwa 0 ms.
+**Test:** `NarrationDirector-test.ts › błąd lektora kończy wypowiedź i trafia do logów`, `controller-test.ts › czytanie pytania › bez lektora gra działa jak dotąd`; ręcznie: start gry na emulatorze i `adb logcat`.
 
-### 5. Gracz pomija czytanie, a głos dalej mówi
-**Ryzyko:** dotknięcie ekranu pomija czytanie (jak inne pauzy). Wtedy licznik już biegnie, a lektor nadal czyta.
-**Zabezpieczenie:** po zejściu nakładki `reading` dyrektor zatrzymuje dźwięk, bo dźwięk zawsze wynika z bieżącego widoku.
-**Test:** `controller-test.ts › czytanie pytania › dotknięcie pomija czytanie i uruchamia licznik`, `NarrationDirector-test.ts › koniec czytania zatrzymuje dźwięk (także gdy gracz pominął czytanie)`.
+### 5. Lektor gra dalej podczas pauzy albo po wyjściu z gry
+**Ryzyko:** gracz wstrzymuje grę (okno „Przerwać grę?”) albo z niej wychodzi, a głos dalej mówi. Albo po wznowieniu sterownik rusza dalej, zanim prowadzący skończy.
+**Zabezpieczenie:** dyrektor gra tylko wtedy, gdy gra nie jest wstrzymana: pauza wstrzymuje głos, a wznowienie gra dalej od tego samego miejsca. Sterownik na czas pauzy wstrzymuje też czekanie na prowadzącego. Odmontowanie ekranu zatrzymuje głos i zwalnia odtwarzacz.
+**Test:** `NarrationDirector-test.ts › pauza wstrzymuje, wznowienie gra dalej`, `› wypowiedź zaczęta w czasie pauzy rusza dopiero po wznowieniu`, `› dispose zatrzymuje głos i przestaje słuchać`, `controller-test.ts › czytanie pytania › pauza w czasie czytania nie przepuszcza gry dalej`, `narration-integration-test.ts › pauza w czasie czytania wycisza lektora; po wznowieniu gra dalej`, `› wyjście z gry w trakcie mówienia ucisza lektora`.
 
-### 6. To samo pytanie czytane dwa razy
+### 6. Gracz pomija pauzę, a głos dalej mówi
+**Ryzyko:** dotknięcie ekranu pomija czytanie albo pauzę po wyniku. Wtedy licznik już biegnie, a lektor nadal mówi.
+**Zabezpieczenie:** dotknięcie pomija też czekanie na prowadzącego. Koniec nakładki `reading` ucisza pytanie, a nowa kwestia przerywa poprzednią.
+**Test:** `controller-test.ts › czytanie pytania › dotknięcie pomija czytanie i uruchamia licznik`, `NarrationDirector-test.ts › pominięcie czytania zatrzymuje pytanie`, `› nowa kwestia przerywa poprzednią`.
+
+### 7. To samo pytanie czytane dwa razy
 **Ryzyko:** w finale pytanie pada najpierw do wszystkich (okno zgłoszeń), a potem odpowiada ten, kto się zgłosił. W etapie II przed pytaniem jest wskazanie. Lektor nie może czytać tego samego pytania po raz drugi.
 **Zabezpieczenie:** sterownik zapamiętuje, które pytanie (wg kursora talii) zostało już przeczytane, tak samo jak zapowiedź „Odpowiada: …”.
-**Test:** `controller-test.ts › czytanie pytania › w finale pytanie jest czytane raz, przed zgłoszeniami`, `› w całej grze żadne pytanie nie jest czytane dwa razy`, `narration-integration-test.ts › każde zadane pytanie jest czytane dokładnie raz, jego własnym nagraniem`.
+**Test:** `controller-test.ts › czytanie pytania › w finale pytanie jest czytane raz, przed zgłoszeniami`, `› w całej grze żadne pytanie nie jest czytane dwa razy`, `narration-integration-test.ts › każde zadane pytanie jest czytane dokładnie raz`.
 
-### 7. Błąd odtwarzacza wywraca grę
-**Ryzyko:** `expo-audio` rzuci wyjątek, np. przy uszkodzonym pliku albo gdy system zabierze dźwięk innej aplikacji. Wyjątek z dźwięku nie może przerwać ruchu w grze.
-**Zabezpieczenie:** wszystkie wywołania odtwarzacza są w `try/catch` i błąd trafia do logów (`error`). Gra toczy się dalej, bo czas czytania liczy sterownik, a nie odtwarzacz.
-**Test:** `NarrationDirector-test.ts › błąd odtwarzacza nie przerywa gry i trafia do logów`.
+### 8. Prowadzący się powtarza
+**Ryzyko:** dymek prowadzącego zmienia się przy każdym kroku gry. Gdyby lektor czytał każdy krok, gracz słyszałby np. „Pytanie dla: Ola.”, pytanie i zaraz „Odpowiada: Ola.”.
+**Zabezpieczenie:** lektor mówi tylko wtedy, gdy zmienia się tekst w dymku. W czasie czytania i podczas odpowiedzi bota dymek ma ten sam tekst („Ola, Twoje pytanie.”), więc nie pada drugi raz.
+**Test:** `NarrationDirector-test.ts › mówi tylko wtedy, gdy zmienia się kwestia`, `› po przeczytaniu pytania prowadzący nie powtarza kwestii przy odpowiedzi bota`.
 
-### 8. Nagrania puchną wraz z bazą pytań
-**Ryzyko:** WAV z Pipera to ok. 44 KB na sekundę. Przy docelowych 2000 pytań to kilkaset MB w aplikacji.
-**Zabezpieczenie:** skrypt koduje nagrania do MP3 mono 32 kb/s (ok. 4 KB na sekundę, ok. 10× mniej). Przy pełnej bazie warto przenieść nagrania na serwer (Supabase Storage). Format katalogu (id → plik, długość, tekst) na to pozwala.
-**Test:** ręcznie: rozmiar `assets/audio/questions/` po wygenerowaniu (opisany w dokumentacji postępów).
+### 9. Opóźnienie syntezy
+**Ryzyko:** na słabszym telefonie synteza zdania może trwać ułamek sekundy albo dłużej. Dłuższe kwestie (pytanie + zdanie prowadzącego) zaczynałyby się z wyraźną przerwą.
+**Zabezpieczenie:** wypowiedź jest dzielona na zdania (`hostSpeech` + pytanie), a następne zdanie syntezuje się, gdy poprzednie gra. Silnik syntezy jest wczytywany raz, przy pierwszej grze, i zostaje w pamięci. Model wczytuje się dwoma wątkami.
+**Test:** ręcznie na emulatorze: czas od pojawienia się kwestii do początku mowy w `adb logcat` (wpisy `[lektor]`).
 
-### 9. Model głosu w repozytorium
+### 10. Zła wymowa
+**Ryzyko:** espeak czyta cyfry rzymskie jak litery („Mieszko I” jako „Mieszko i”), a „Przechodzimy do etapu: Etap II!” brzmi źle i na ekranie, i z głośnika.
+**Zabezpieczenie:** przed syntezą `toSpeakable` zamienia cyfry rzymskie po imieniu na liczebniki („Mieszko Pierwszy”). Na ekranie zostaje oryginalny tekst. Zapowiedzi etapów są słowami („Przechodzimy do drugiego etapu!”).
+**Test:** `pronunciation-test.ts`; wymowę trzeba sprawdzić uchem na telefonie.
+
+### 11. Model w formacie, którego sherpa-onnx nie czyta
+**Ryzyko:** model z Pipera nie ma metadanych, których szuka sherpa-onnx, a jego mapa fonemów ma symbole wieloznakowe (dyftongi „aɪ”, „oʊ”), na których sherpa-onnx przerywa wczytywanie `tokens.txt`.
+**Zabezpieczenie:** `prepare_voice_model.py` dopisuje metadane wg skryptu konwersji sherpa-onnx i pomija symbole wieloznakowe (espeak dla polskiego ich nie wytwarza; Piper skleja je tylko z gotowych sekwencji samogłosek).
+**Test:** sprawdzone na komputerze pythonowym `sherpa-onnx`: przekonwertowany model wczytuje się i mówi po polsku (dokumentacja postępów, 7.38), potem na emulatorze Androida.
+
+### 12. Duże APK
+**Ryzyko:** model ma 61 MB (58 MB po kompresji w APK), dane espeak 18 MB, a sherpa-onnx z onnxruntime to ok. 35 MB bibliotek na każdą architekturę procesora. APK na wszystkie 4 architektury ma ok. 320 MB i nie mieści się na małym emulatorze.
+**Zabezpieczenie:** do testów budujemy osobne APK na architekturę (`-PreactNativeArchitectures=arm64-v8a` dla telefonów, `x86_64` dla emulatora). Do Google Play trzeba będzie wysyłać paczkę AAB, z której sklep wybiera biblioteki dla danego telefonu. Przycinanie `espeak-ng-data` okazało się groźne (punkt 16).
+**Test:** ręcznie: rozmiary APK w dokumentacji postępów (7.43).
+
+### 13. Model głosu w repozytorium
 **Ryzyko:** `voice.onnx` ma 63 MB. GitHub ostrzega przy plikach ponad 50 MB i odrzuca ponad 100 MB, a każda wersja modelu zostaje w historii na zawsze.
-**Zabezpieczenie:** `voiceModel/*.onnx` jest w `.gitignore`. Do repozytorium trafia tylko konfiguracja `voice.onnx.json` i gotowe nagrania. Model jest potrzebny tylko do generowania nagrań, nie do uruchomienia gry.
-**Test:** `git status` nie pokazuje `voice.onnx`.
+**Zabezpieczenie:** `voiceModel/*.onnx` i wygenerowany folder `voiceModel/vits-piper-pl/` są w `.gitignore`. Wtyczka `withVoiceModel` przerywa `expo prebuild` z instrukcją, gdy modelu brakuje, zamiast po cichu budować aplikację bez głosu.
+**Test:** `git status` nie pokazuje modelu; ręcznie: prebuild bez modelu kończy się czytelnym błędem.
 
-### 10. Głos za szybki, za cichy albo urwany
-**Ryzyko:** odtwarzacz na telefonie startuje z małym opóźnieniem. Gdyby licznik ruszał dokładnie po długości nagrania, ostatnie słowo nakładałoby się z licznikiem.
-**Zabezpieczenie:** czas czytania to długość nagrania plus 400 ms marginesu (`NARRATION_TAIL_MS`). Długość jest liczona przez skrypt z liczby próbek, a nie zgadywana z długości tekstu.
-**Test:** `questionAudio-test.ts › czas czytania = długość nagrania + margines`, `› długości nagrań są realne (ani cisza, ani urwane, ani dłuższe niż czas na odpowiedź)`, `narration-integration-test.ts › lektor gra tyle, ile trwa nagranie (+ margines), a potem rusza licznik` (co do milisekundy, dla każdego pytania w pełnej grze).
+### 14. Gra nie działa w Expo Go
+**Ryzyko:** sherpa-onnx to moduł natywny, którego nie ma w Expo Go. Import przy starcie wywróciłby aplikację w Expo Go.
+**Zabezpieczenie:** moduł natywny jest ładowany dopiero przy tworzeniu lektora, w `try/catch`. Gdy go nie ma, gra działa bez głosu. Do testów z głosem potrzebny jest development build (`npx expo run:android`) albo APK.
+**Test:** ręcznie; testy Jesta nie importują `sherpaVoice`.
 
-### 11. Aplikacja prosi o mikrofon, choć tylko odtwarza
-**Ryzyko:** wtyczka `expo-audio` domyślnie dodaje na Androidzie uprawnienie `RECORD_AUDIO` i usługę odtwarzania w tle. Gra prosiłaby o mikrofon bez powodu, a Google Play wymaga uzasadnienia takich uprawnień.
-**Zabezpieczenie:** w `app.json` wtyczka ma `recordAudioAndroid: false` i `enableBackgroundPlayback: false`. Gdy powstanie tryb Premium z odpowiedziami głosem, mikrofon włączymy świadomie.
-**Test:** przegląd `app.json`, dokumentacja wtyczki dla SDK 57.
+### 15. Aplikacja prosi o mikrofon, choć tylko odtwarza
+**Ryzyko:** wtyczka `expo-audio` domyślnie dodaje na Androidzie uprawnienie `RECORD_AUDIO` i usługę odtwarzania w tle.
+**Zabezpieczenie:** w `app.json` wtyczka ma `recordAudioAndroid: false` i `enableBackgroundPlayback: false`. Mikrofon włącza dopiero funkcja odpowiadania głosem (osobny plik `odpowiedzi-glosem.md`).
+**Test:** przegląd `app.json`.
 
-### 12. Aplikacja działa w Expo Go, a wywraca się po zbudowaniu
-**Ryzyko:** `expo-audio` wymaga zainstalowanego bezpośrednio `expo-asset` (zależność równorzędna). W Expo Go to nie przeszkadza, bo Expo Go ma ją wbudowaną, ale w zbudowanej aplikacji mogłaby się wywrócić.
-**Zabezpieczenie:** `expo-asset` zainstalowany przez `npx expo install`.
-**Test:** `npx expo-doctor` (sprawdzenie zależności równorzędnych przechodzi). `npx expo export --platform android` dołącza wszystkie pliki mp3 do paczki.
+### 16. Brakujący słownik espeak wywraca aplikację
+**Ryzyko:** espeak przy niektórych słowach przełącza się na inny język (np. angielski przy cudzysłowach i nazwach). Gdy słownika tego języka nie ma, synteza na Androidzie kończy się twardą awarią (SIGSEGV w `libsherpa-onnx-jni.so`), której nie da się złapać w JavaScripcie.
+**Zabezpieczenie:** `prepare_voice_model.py` zostawia pełne `espeak-ng-data` i sprawdza, że są w nim słowniki `pl_dict` i `en_dict`. Pierwsza wersja skryptu przycinała słowniki do polskiego i to właśnie wywróciło aplikację (dokumentacja postępów, 7.39).
+**Test:** na komputerze pythonowym `sherpa-onnx`: zdania z cudzysłowami i obcymi nazwami („Witam w grze „Jeden z Wielu”!”, „Leonardo da Vinci”, „Rio de Janeiro”); na emulatorze: pełna rozgrywka bez awarii.
 
-### 13. Nagranie brakuje na dysku, a gra o tym nie wie
-**Ryzyko:** wpis w manifeście jest, a pliku mp3 nie ma (np. ktoś nie dodał go do commita).
-**Zabezpieczenie:** mapa plików `questionAudioSources.ts` jest generowana z dosłownymi `require`. Brak pliku przerywa budowanie w Metro i import w Jeście, więc nie da się tego przeoczyć.
-**Test:** sprawdzone ręcznie: po usunięciu `his-001.mp3` cały `questionAudio-test.ts` kończy się błędem `Cannot find module '../../assets/audio/questions/his-001.mp3'`.
+### 17. Po aktualizacji aplikacji zostaje stary albo niepełny model
+**Ryzyko:** sherpa-onnx kopiuje model z zasobów do plików aplikacji tylko raz: jeśli folder już istnieje, nie sprawdza jego zawartości. Po aktualizacji z poprawionym modelem telefon używałby starej kopii, a kopiowanie przerwane w połowie (ok. 80 MB) zostawiłoby niepełny model na zawsze.
+**Zabezpieczenie:** wtyczka nadaje folderowi nazwę ze skrótem zawartości modelu (`vits-piper-pl-976a80a8`) i przekazuje ją aplikacji przez `extra.voiceModelAsset`. Nowy model to nowa nazwa, więc kopiuje się od nowa. Aplikacja usuwa kopie starszych wersji, a gdy model się nie wczyta, kasuje kopię i próbuje jeszcze raz.
+**Test:** na emulatorze: instalacja nowej wersji na starą (`adb install -r`). W logach jest „Usuwam starą wersję modelu głosu”, potem „Model głosu wczytany”, a gra mówi dalej.
+
+### 18. Lektor czyta stany pośrednie
+**Ryzyko:** sterownik w jednym kroku gry zmienia widok kilka razy, np. przy zamknięciu planszy najpierw zdejmuje nakładkę, a dopiero potem pokazuje zapowiedź. Lektor zaczynał czytać kwestię z tego chwilowego stanu i od razu ją przerywał. W telefonie to zmarnowana synteza, która blokuje kolejkę i opóźnia właściwą kwestię.
+**Zabezpieczenie:** sterownik grupuje zmiany z jednego kroku (`batch`) i wysyła słuchaczom tylko stan końcowy.
+**Test:** `narration-integration-test.ts › kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane` (ten test wykrył problem, dokumentacja postępów 7.41).

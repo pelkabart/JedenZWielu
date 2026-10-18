@@ -52,4 +52,7 @@ coverage/
 
 # Lektor: środowisko Pythona do Pipera i model głosu (63 MB, potrzebny tylko do generowania nagrań)
 scripts/narration/.venv/
+scripts/narration/__pycache__/
 voiceModel/*.onnx
+# Model przygotowany dla sherpa-onnx (prepare_voice_model.py) — 61 MB, generowany z voice.onnx
+voiceModel/vits-piper-pl/
