@@ -400,6 +400,9 @@ To samo zdanie nagrane dwa razy miało 2531 ms i 2485 ms, bo Piper dodaje do gł
 **7.35. Brakująca zależność `expo-asset`**
 Po instalacji `expo-audio` wszystkie testy przechodziły, a w Expo Go wszystko by działało. `npx expo-doctor` wykazał jednak, że `expo-audio` wymaga zainstalowanego bezpośrednio `expo-asset` i bez niego zbudowana aplikacja może się wywrócić. Doinstalowaliśmy go przez `npx expo install expo-asset`. Przy okazji wyłączyliśmy w `app.json` uprawnienie do mikrofonu i odtwarzanie w tle, które wtyczka `expo-audio` dodaje domyślnie. Paczkę Androida zbudowaliśmy próbnie (`npx expo export --platform android`) i sprawdziliśmy, że zawiera nagrania.
 
+**7.36. APK wywracał się od razu po uruchomieniu na emulatorze**
+Pierwsze testowe APK (budowane lokalnie: `npx expo prebuild --platform android`, potem `gradlew assembleRelease`) zbudowaliśmy tylko dla architektury `arm64-v8a`, żeby skrócić czas budowania. Na emulatorze x86_64 aplikacja zamykała się zaraz po starcie. Emulator przyjął instalację, bo potrafi tłumaczyć kod ARM, ale React Native szukał swoich bibliotek dla x86_64 i ich nie znalazł. Log z `adb logcat -b crash`: `SoLoaderDSONotFoundError: couldn't find DSO to load: libreactnative.so`. Błąd był w sposobie budowania, nie w kodzie gry: wywracało się, zanim ruszył JavaScript. Rozwiązanie: APK uniwersalne dla wszystkich 4 architektur (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`, domyślne ustawienie w `android/gradle.properties`). Na emulatorze sprawdziliśmy przez `adb`: ekran główny, wybór poziomu, start gry, krok czytania z ikoną głośnika, w logach `[lektor] Lektor czyta pytanie` dla kolejnych pytań, brak błędów i awarii.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: głośność, opóźnienie startu, czy 0,4 s marginesu wystarcza).
