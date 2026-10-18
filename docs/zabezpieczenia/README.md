@@ -28,3 +28,4 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [logowanie.md](logowanie.md) | logi aplikacji |
 | [testy-integracyjne.md](testy-integracyjne.md) | testy całej rozgrywki na prawdziwych modułach |
 | [lektor.md](lektor.md) | głos prowadzącego na żywo (Piper + sherpa-onnx), krok „czytanie” w sterowniku |
+| [odpowiedzi-glosem.md](odpowiedzi-glosem.md) | odpowiadanie na pytania głosem (mikrofon) |

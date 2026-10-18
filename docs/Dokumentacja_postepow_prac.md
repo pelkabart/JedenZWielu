@@ -40,7 +40,8 @@ Spis treści:
 | Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
-| Razem testów automatycznych | 218 |
+| Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
+| Razem testów automatycznych | 241 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -194,6 +195,15 @@ Jak to działa w grze:
 - W czasie czytania pytanie już widać, przy kategorii jest ikona głośnika, a licznik i boty czekają. Gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju. Dotknięcie ekranu pomija czytanie i każdą pauzę. Pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale przed zgłoszeniami.
 - Cyfry rzymskie po imieniu są czytane jako liczebniki („Mieszko I” → „Mieszko Pierwszy”), bo espeak czytałby je jak literę „i”. Zapowiedzi etapów są słowami („Przechodzimy do drugiego etapu!”).
 
+### Odpowiadanie głosem
+
+Na pytanie można odpowiedzieć na dwa sposoby: wpisać odpowiedź albo ją powiedzieć. Obok pola odpowiedzi jest przycisk z mikrofonem. Włącza on rozpoznawanie mowy Androida (`expo-speech-recognition`, język `pl-PL`). W trakcie mówienia rozpoznany tekst pojawia się w polu, a gdy gracz skończy, odpowiedź jest zatwierdzana tak samo jak wpisana. Drugie dotknięcie mikrofonu kończy mówienie od razu.
+
+- Rozpoznawanie zwraca kilka wersji tego, co usłyszało. Gra bierze pierwszą, którą sprawdzanie uznaje za poprawną, a jeśli żadna nie pasuje, najbardziej prawdopodobną. Liczebniki po imieniu wracają do zapisu z bazy („Mieszko pierwszy” → „Mieszko I”).
+- Gdy mikrofon słucha, lektor milczy, bo rozpoznawanie słyszałoby jego głos.
+- Cisza albo brak zgody na mikrofon nie kosztują szansy: gracz widzi komunikat i może spróbować jeszcze raz albo wpisać.
+- Przycisk pojawia się tylko wtedy, gdy telefon ma rozpoznawanie mowy (nie ma go w Expo Go ani na emulatorze bez usług Google). O zgodę na mikrofon gra pyta dopiero przy pierwszym dotknięciu przycisku.
+
 ## 6. Testy i analiza dynamiczna
 
 Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
@@ -205,15 +215,18 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
 | `bots-test.ts` | 25 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju |
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
-| `controller-test.ts` | 45 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
+| `controller-test.ts` | 47 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
 | `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
-| `narration/__tests__/NarrationDirector-test.ts` | 14 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, błąd syntezy, zwolnienie |
+| `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
 | `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
-| **Razem** | **218** | |
+| `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
+| `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
+| `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
+| **Razem** | **241** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -239,6 +252,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[baza-pytan]` | liczba załadowanych pytań albo błąd walidacji |
 | `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
 | `[ekran-gry]` | przerwanie gry przez gracza |
+| `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
 | `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
@@ -431,6 +445,11 @@ W pierwszej wersji testu integracyjnego co kwestia sterownik czekał pełne 20 s
 
 **7.43. Rozmiar APK i miejsce na emulatorze**
 APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla `x86_64` 149 MB. Najwięcej zajmują model (58 MB po kompresji), onnxruntime (22 MB na architekturę) i dane espeak. Emulator miał 323 MB wolnego, a instalacja potrzebuje mniej więcej dwa razy tyle co APK, więc się nie zmieściła. Do testów budujemy osobne APK na architekturę (`-PreactNativeArchitectures=arm64-v8a` dla telefonów, `x86_64` dla emulatora). Do Google Play trzeba będzie wysłać paczkę AAB, z której sklep sam wybiera biblioteki dla telefonu.
+
+### Odpowiadanie głosem
+
+**7.44. `expo install` wybrał wersję biblioteki dla innego SDK**
+`npx expo install expo-speech-recognition` zainstalował wersję 58.0.0, choć projekt jest na Expo SDK 57. Dla paczek spoza Expo `expo install` nie zna zgodności z SDK i bierze najnowszą wersję. Zauważyliśmy to, porównując wersję z tabelą zgodności w README biblioteki. Zainstalowaliśmy ręcznie gałąź `^57` (57.1.1).
 
 ## 8. Dalsze plany
 

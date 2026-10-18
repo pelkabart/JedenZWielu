@@ -771,6 +771,35 @@ describe('głos prowadzącego', () => {
   });
 });
 
+describe('mikrofon', () => {
+  it('setListening zmienia widok i nie rusza licznika', () => {
+    const c = controller(game());
+    c.start();
+    toFirstQuestion(c);
+    const { deadline } = c.getView();
+    c.setListening(true);
+    expect(c.getView().listening).toBe(true);
+    expect(humanTurn(c.getView())).toBe('answer');
+    advance(1000);
+    expect(c.getView().deadline).toBe(deadline);
+    c.submitAnswer(correctAnswer(c.getView()));
+    c.setListening(false);
+    expect(c.getView().listening).toBe(false);
+    expect(c.getView().overlay).toMatchObject({ kind: 'reveal', correct: true });
+  });
+
+  it('ten sam stan mikrofonu nie powiadamia słuchaczy', () => {
+    const c = controller(game());
+    const listener = jest.fn();
+    c.subscribe(listener);
+    c.setListening(false);
+    expect(listener).not.toHaveBeenCalled();
+    c.setListening(true);
+    c.setListening(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('cała gra', () => {
   it('kończy się dla gracza odpowiadającego zawsze dobrze', () => {
     const c = controller(game(5, 3));

@@ -72,6 +72,8 @@ export interface SoloView {
   /** Bot, który właśnie "myśli" nad odpowiedzią albo wyborem. */
   thinkingId: string | null;
   paused: boolean;
+  /** Mikrofon słucha odpowiedzi gracza (lektor wtedy milczy). Brak = nie słucha. */
+  listening?: boolean;
 }
 
 export type HumanTurn = 'answer' | 'buzz' | 'pick' | null;
@@ -224,6 +226,15 @@ export class SoloController {
       if (this.speaking === speaking) return;
       this.speaking = speaking;
       if (!speaking) this.releaseSpeechWait();
+    });
+  }
+
+  /** Panel odpowiedzi zgłasza, że mikrofon słucha (albo przestał). */
+  setListening(listening: boolean) {
+    this.batch(() => {
+      if ((this.view.listening ?? false) === listening) return;
+      log.debug(listening ? 'Mikrofon słucha' : 'Mikrofon wyłączony');
+      this.update({ listening });
     });
   }
 

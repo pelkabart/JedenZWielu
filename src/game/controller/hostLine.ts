@@ -83,7 +83,7 @@ export function hostSpeech(view: SoloView): string[] {
   const { pending } = game;
   switch (pending.kind) {
     case 'answer':
-      return [isHuman(pending.playerId) ? 'Twoja kolej! Wpisz odpowiedź.' : askLine(pending.playerId)];
+      return [isHuman(pending.playerId) ? 'Twoja kolej! Powiedz albo wpisz odpowiedź.' : askLine(pending.playerId)];
     case 'buzz':
       return ['Kto pierwszy?'];
     case 'pick':

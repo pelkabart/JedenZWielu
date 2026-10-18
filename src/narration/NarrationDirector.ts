@@ -80,6 +80,11 @@ export class NarrationDirector {
     this.lastHost = hostText;
     this.lastQuestionId = question?.id ?? null;
 
+    if (view.listening) {
+      // Mikrofon słucha odpowiedzi gracza — lektor nie może mówić, bo rozpoznawanie by go usłyszało.
+      this.end('mikrofon');
+      return;
+    }
     if (texts.length > 0) {
       // Bez zgłaszania końca: sterownik nie może ruszyć dalej w przerwie między starą a nową kwestią.
       this.end('nowa kwestia', false);

@@ -41,7 +41,14 @@
         }
       ],
       "expo-asset",
-      "./plugins/withVoiceModel"
+      "./plugins/withVoiceModel",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Gra używa mikrofonu, żeby można było odpowiadać na pytania głosem.",
+          "speechRecognitionPermission": "Gra rozpoznaje mowę, żeby można było odpowiadać na pytania głosem."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

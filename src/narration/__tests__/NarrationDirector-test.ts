@@ -207,6 +207,20 @@ describe('NarrationDirector', () => {
     expect(getLogEntries({ tag: 'lektor', minLevel: 'error' })).toHaveLength(1);
   });
 
+  it('mikrofon ucisza lektora i nie pozwala mu zacząć', async () => {
+    const { voice, views } = setup();
+    views.set({ listening: true });
+    expect(voice.actions()).toEqual(['say', 'stop']);
+    expect(views.speaking.at(-1)).toBe(false);
+    // Kwestia zmieniona w czasie słuchania nie pada — rozpoznawanie by ją usłyszało.
+    views.set({ overlay: { kind: 'banner', phase: 'final' } });
+    expect(voice.utterances()).toHaveLength(1);
+    // Po odpowiedzi mikrofon jest wyłączony, a następna kwestia (wynik) już pada.
+    views.set({ listening: false });
+    views.set({ overlay: { kind: 'pick', chooserId: HUMAN_ID, targetId: views.bot.id } });
+    expect(voice.utterances().at(-1)).toEqual([`Wskazujesz: ${views.bot.name}.`]);
+  });
+
   it('dispose zatrzymuje głos i przestaje słuchać', () => {
     const { voice, views, director } = setup();
     director.dispose();

@@ -182,6 +182,7 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
               paused={view.paused}
               compact={answering.compact}
               onSubmit={(text) => controller.submitAnswer(text)}
+              onListening={(listening) => controller.setListening(listening)}
             />
           </View>
         ) : (

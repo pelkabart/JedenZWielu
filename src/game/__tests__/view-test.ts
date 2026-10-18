@@ -82,7 +82,7 @@ describe('hostLine', () => {
 
   it('zwraca się do człowieka w drugiej osobie', () => {
     const humanTurn: GameState = { ...game, pending: { kind: 'answer', playerId: HUMAN_ID, question: q, reason: 'turn', pickedBy: null } };
-    expect(hostLine(view(humanTurn))).toBe('Twoja kolej! Wpisz odpowiedź.');
+    expect(hostLine(view(humanTurn))).toBe('Twoja kolej! Powiedz albo wpisz odpowiedź.');
     expect(hostLine(view(game, { overlay: { kind: 'pick', chooserId: bot.id, targetId: HUMAN_ID } }))).toBe(`${bot.name} wskazuje Ciebie!`);
   });
 
