@@ -56,6 +56,11 @@ export function hostLine(view: SoloView): string {
         return isHuman(overlay.playerId) ? 'Zgłaszasz się!' : `Zgłasza się ${name(overlay.playerId)}!`;
       case 'intro':
         return introLine(view, overlay.playerId);
+      case 'reading': {
+        const { pending } = game;
+        if (pending.kind !== 'answer') return 'Pytanie do wszystkich. Słuchajcie uważnie!';
+        return isHuman(pending.playerId) ? 'Pytanie dla Ciebie. Słuchaj uważnie!' : `Pytanie dla: ${name(pending.playerId)}.`;
+      }
     }
   }
 

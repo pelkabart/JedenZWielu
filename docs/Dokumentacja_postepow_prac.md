@@ -39,11 +39,12 @@ Spis treści:
 | Logi aplikacji (`src/lib/log.ts`) | zrobione |
 | Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
-| Razem testów automatycznych | 170 |
+| Lektor czytający pytania (głos Piper, nagrania generowane skryptem) | zrobione, do sprawdzenia na telefonie |
+| Razem testów automatycznych | 209 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, Jest (jest-expo).
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, Jest (jest-expo), Piper TTS (Python, tylko do generowania nagrań).
 
 ## 2. Ekran główny
 
@@ -154,7 +155,7 @@ Układ ekranu (w poziomie):
 - niżej: 5 pulpitów ułożonych w łuk; na każdym imię, 3 lampki szans, a w finale punkty; nad pulpitem pojawia się dymek z odpowiedzią gracza (zielony albo czerwony),
 - na dole: przyciski zależne od sytuacji („Zgłaszam się!”, „Biorę na siebie”, „Pomiń do wyników”).
 
-Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Licznik czasu rusza razem z pokazaniem pytania. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
+Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Pytanie czyta lektor (punkt 5, „Lektor”). Licznik czasu rusza dopiero, gdy lektor skończy czytać. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
 
 Między zdarzeniami są krótkie pauzy (wynik odpowiedzi ok. 2 s, „X wskazuje Y” ok. 2 s), żeby było widać, co się stało. Dotknięcie ekranu pomija pauzę. Plansza z zasadami etapu nie znika sama, tylko po dotknięciu, a przez pierwsze 0,7 s ignoruje dotyk, żeby nie zamknąć jej przypadkiem. Gdy gracz odpadnie, może pominąć resztę gry i od razu zobaczyć wyniki. Na końcu jest ranking z przyciskami „Zagraj ponownie” i „Menu”. Wyjście w trakcie gry (przycisk albo systemowy „wstecz”) wymaga potwierdzenia, a na czas pytania gra jest wstrzymana.
 
@@ -170,6 +171,23 @@ Silnik z etapu 3 nie wie nic o czasie. Czasem zajmuje się osobna klasa `SoloCon
 
 Zegar jest wstrzykiwany, dzięki czemu w testach można użyć udawanego czasu Jesta. Ekran (React) tylko wyświetla stan sterownika i przekazuje mu ruchy gracza.
 
+### Lektor
+
+Gdy pada pytanie, lektor czyta je na głos. Głos pochodzi z modelu Piper (`voiceModel/voice.onnx`, polski, 22 050 Hz). Model nie działa na telefonie, tylko na komputerze. Skrypt `scripts/narration/generate_question_audio.py` nagrywa każde pytanie z bazy do pliku MP3 (mono, 32 kb/s) w `assets/audio/questions/`. Obok zapisuje `manifest.json` z tekstem i długością każdego nagrania oraz plik `src/narration/questionAudioSources.ts`, dzięki któremu Metro dołącza nagrania do aplikacji. 50 pytań to 147 s mowy i 586 KB. Aplikacja odtwarza gotowe pliki przez `expo-audio`, który jest w Expo Go, więc nadal nie potrzeba development builda.
+
+Po dodaniu albo zmianie pytania trzeba uruchomić skrypt ponownie. Nagrywa tylko pytania, których tekst się zmienił, i usuwa nagrania usuniętych pytań:
+
+```bash
+python -m venv scripts/narration/.venv
+scripts/narration/.venv/Scripts/python -m pip install -r scripts/narration/requirements.txt
+scripts/narration/.venv/Scripts/python scripts/narration/generate_question_audio.py          # nagraj brakujące
+scripts/narration/.venv/Scripts/python scripts/narration/generate_question_audio.py --check  # tylko sprawdź
+```
+
+W sterowniku doszedł krok „czytanie pytania” (nakładka `reading`). Pytanie już widać, prowadzący mówi „Pytanie dla: Ola.” albo „Pytanie do wszystkich. Słuchajcie uważnie!”, przy kategorii jest ikona głośnika, a licznik i boty czekają. Czas czytania to długość nagrania plus 0,4 s marginesu. W tym czasie gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju, gdzie odpowiada się po przeczytaniu pytania. Dotknięcie ekranu pomija czytanie, a pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale lektor czyta je przed zgłoszeniami i nie powtarza go temu, kto się zgłosił. Pytanie bez nagrania (albo z nagraniem starej treści) pojawia się bez lektora, jak wcześniej.
+
+Dźwiękiem steruje `NarrationDirector` (`src/narration/`). Słucha zmian w sterowniku i z bieżącego widoku wylicza, co ma grać. Dzięki temu pominięcie czytania, pauza, przewinięcie gry i wyjście z ekranu same wyciszają lektora. Samo odtwarzanie jest za interfejsem `NarrationPlayer`, więc w testach zamiast `expo-audio` jest atrapa, która zapisuje wywołania razem z czasem.
+
 ## 6. Testy i analiza dynamiczna
 
 Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
@@ -181,12 +199,15 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
 | `bots-test.ts` | 25 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju |
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
-| `controller-test.ts` | 30 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, liczniki, pauzy, ruchy botów, zgłaszanie się |
-| `view-test.ts` | 9 | teksty prowadzącego, wybór pytania do wyświetlenia, losowe miejsce gracza |
+| `controller-test.ts` | 39 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, liczniki, pauzy, ruchy botów, zgłaszanie się |
+| `view-test.ts` | 12 | teksty prowadzącego, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
-| **Razem** | **170** | |
+| `narration/__tests__/questionAudio-test.ts` | 9 | czy każde pytanie ma aktualne nagranie, brak nagrań usuniętych pytań, realne długości, katalog nagrań |
+| `narration/__tests__/NarrationDirector-test.ts` | 11 | sterowanie lektorem: start, pauza, wznowienie, zmiana pytania, błąd odtwarzacza, zwolnienie |
+| `narration/__tests__/narration-integration-test.ts` | 7 | testy integracyjne lektora: całe gry na prawdziwej bazie i nagraniach, czas czytania co do ms, pauza, wyjście |
+| **Razem** | **209** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -199,6 +220,8 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
 
+Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController`: prawdziwą bazę, długości nagrań z manifestu Pipera, sterownik, boty i `NarrationDirector`. Jedyna atrapa to odtwarzacz. Sprawdzamy, że w całej grze lektor czyta każde zadane pytanie dokładnie raz i właściwym nagraniem, że gracz nigdy nie może odpowiadać, gdy lektor jeszcze mówi, że czytanie trwa dokładnie tyle, ile nagranie plus margines (co do milisekundy, dla każdego pytania), że pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora, a w całej grze nie ma ostrzeżeń ani błędów.
+
 ### Logi
 
 Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy wpis ma poziom (`debug`, `info`, `warn`, `error`), moduł, treść i małe dane. Wpisy trafiają do konsoli (w Expo Go widać je w terminalu z `npx expo start`) i do bufora ostatnich 500 wpisów w pamięci, z którego korzystają testy.
@@ -210,6 +233,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[baza-pytan]` | liczba załadowanych pytań albo błąd walidacji |
 | `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
 | `[ekran-gry]` | przerwanie gry przez gracza |
+| `[lektor]` | początek czytania pytania (z długością nagrania), pauza, wznowienie i koniec czytania, pytanie bez nagrania (`warn`, raz na pytanie), błąd odtwarzacza (`error`), wyłączenie lektora |
 | `[symulator]` | przekroczenie limitu kroków |
 
 Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
@@ -359,9 +383,27 @@ Pierwsza wersja testu pełnej gry czekała, aż silnik ustawi etap `finished`, i
 **7.30. Brak zainstalowanych zależności i niezgodny lockfile**
 Przy instalacji zależności od zera `npm ci` odmówiło instalacji, bo `package-lock.json` nie zawierał dwóch opcjonalnych paczek (`@emnapi/core`, `@emnapi/runtime`). Bez zależności `npx tsc` próbowało pobrać zupełnie inną paczkę o nazwie `tsc`. Rozwiązanie: `npm install`, które uzupełniło lockfile. Zmiany w lockfile nie weszły do tego commita, bo zależą od systemu.
 
+### Lektor
+
+**7.31. Test „każde pytanie swoim nagraniem” przechodził pozornie**
+Test integracyjny lektora porównywał, które nagranie zagrało, po wartości z `require('…mp3')`. Wyszło to dopiero przy innym teście, który sprawdzał czas czytania i nie przeszedł: oczekiwał 2885 ms, a dostał 2165 ms. Okazało się, że w Jeście każdy plik mp3 zamienia się na tę samą liczbę `1`, więc test „właściwego nagrania” przechodziłby nawet przy pomylonych plikach, a test czasu brał długość niewłaściwego nagrania. W aplikacji (Metro) każdy plik ma inny numer. Rozwiązanie: test integracyjny buduje katalog z prawdziwego manifestu Pipera (te same teksty i długości), ale pliki numeruje sam (1, 2, 3…), więc da się odróżnić, które nagranie zagrało. Wniosek: atrapa środowiska (tu zasoby w Jeście) może sprawić, że test sprawdza mniej, niż się wydaje. Warto upewnić się, że test potrafi nie przejść.
+
+**7.32. Brak typów Node w kompilatorze**
+Pierwsza wersja testu nagrań sprawdzała pliki na dysku przez moduły `fs` i `path`. Jest to uruchomił, ale `npx tsc --noEmit` zgłosił błąd, bo projekt nie ma `@types/node` (aplikacja działa w React Native, nie w Node). Zamiast dodawać zależność dla jednego testu, skorzystaliśmy z tego, że brak pliku i tak wywraca import mapy nagrań (Metro i Jest rozwiązują każde `require`). Sprawdziliśmy to ręcznie: po usunięciu jednego mp3 test kończy się błędem `Cannot find module`.
+
+**7.33. Polskie znaki w konsoli Windows**
+Logi skryptu generującego nagrania wyświetlały się jako „nagra�” zamiast „nagrań”, bo konsola Windows domyślnie nie używa UTF-8. Rozwiązanie: skrypt przełącza wyjście błędów (na które pisze moduł `logging`) na UTF-8.
+
+**7.34. Piper nie jest powtarzalny**
+To samo zdanie nagrane dwa razy miało 2531 ms i 2485 ms, bo Piper dodaje do głosu losowy szum (`noise_scale`), żeby brzmiał naturalniej. Dlatego długości czytania nie wyliczamy z tekstu ani nie zapisujemy na sztywno, tylko liczymy z liczby próbek w nagraniu, które naprawdę trafia do aplikacji. Skrypt nie nagrywa ponownie pytań, których tekst się nie zmienił, żeby nagrania (i ich długości) nie zmieniały się bez potrzeby.
+
+**7.35. Brakująca zależność `expo-asset`**
+Po instalacji `expo-audio` wszystkie testy przechodziły, a w Expo Go wszystko by działało. `npx expo-doctor` wykazał jednak, że `expo-audio` wymaga zainstalowanego bezpośrednio `expo-asset` i bez niego zbudowana aplikacja może się wywrócić. Doinstalowaliśmy go przez `npx expo install expo-asset`. Przy okazji wyłączyliśmy w `app.json` uprawnienie do mikrofonu i odtwarzanie w tle, które wtyczka `expo-audio` dodaje domyślnie. Paczkę Androida zbudowaliśmy próbnie (`npx expo export --platform android`) i sprawdziliśmy, że zawiera nagrania.
+
 ## 8. Dalsze plany
 
-- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie).
+- Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: głośność, opóźnienie startu, czy 0,4 s marginesu wystarcza).
+- Lektor przy pełnej bazie (ok. 2000 pytań, ok. 25 MB nagrań): przenieść nagrania na serwer (np. Supabase Storage) albo pobierać je paczkami. Włącznik lektora w ustawieniach.
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.

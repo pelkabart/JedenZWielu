@@ -49,7 +49,8 @@ function isHighlighted(view: SoloView, player: PlayerState): boolean {
   const { overlay, game } = view;
   if (overlay?.kind === 'reveal' || overlay?.kind === 'buzz' || overlay?.kind === 'intro') return overlay.playerId === player.id;
   if (overlay?.kind === 'pick') return overlay.targetId === player.id;
-  if (overlay) return false;
+  // W czasie czytania pytania wyróżniamy tego, kto będzie odpowiadał.
+  if (overlay && overlay.kind !== 'reading') return false;
   const { pending } = game;
   if (pending.kind === 'answer') return pending.playerId === player.id;
   if (pending.kind === 'pick') return pending.chooserId === player.id;
@@ -196,6 +197,7 @@ export function SoloGame({ difficulty, onPlayAgain }: Props) {
                 deadline={view.deadline}
                 totalMs={view.timerMs}
                 paused={view.paused}
+                reading={overlay?.kind === 'reading'}
               />
 
               <View style={styles.podiums}>

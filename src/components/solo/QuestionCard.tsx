@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
@@ -12,9 +13,11 @@ type Props = {
   deadline: number | null;
   totalMs: number | null;
   paused: boolean;
+  /** Lektor czyta pytanie (licznik jeszcze nie biegnie). */
+  reading?: boolean;
 };
 
-export function QuestionCard({ question, announcement, deadline, totalMs, paused }: Props) {
+export function QuestionCard({ question, announcement, deadline, totalMs, paused, reading = false }: Props) {
   if (announcement) {
     return (
       <View style={[styles.card, styles.announcementCard]}>
@@ -27,7 +30,12 @@ export function QuestionCard({ question, announcement, deadline, totalMs, paused
     <View style={[styles.card, question === null && styles.empty]}>
       {question && (
         <>
-          <Text style={styles.category}>{question.category}</Text>
+          <View style={styles.header}>
+            <Text style={styles.category}>{question.category}</Text>
+            {reading && (
+              <Ionicons name="volume-high" size={16} color={colors.sky} accessibilityLabel="Lektor czyta pytanie" />
+            )}
+          </View>
           <Text style={styles.text} numberOfLines={3}>
             {question.question}
           </Text>
@@ -60,6 +68,11 @@ const styles = StyleSheet.create({
     color: colors.outline,
     fontSize: 26,
     fontWeight: '900',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   category: {
     alignSelf: 'flex-start',

@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "questions": {
+    "his-001": {
+      "text": "W którym roku odbyła się bitwa pod Grunwaldem?",
+      "durationMs": 2485
+    },
+    "his-002": {
+      "text": "Jak miał na imię pierwszy historyczny władca Polski z dynastii Piastów?",
+      "durationMs": 4156
+    },
+    "his-003": {
+      "text": "W którym roku Polska odzyskała niepodległość po okresie zaborów?",
+      "durationMs": 3692
+    },
+    "his-004": {
+      "text": "Kto był pierwszym koronowanym królem Polski?",
+      "durationMs": 2566
+    },
+    "his-005": {
+      "text": "Który cesarz Francuzów poniósł ostateczną klęskę pod Waterloo?",
+      "durationMs": 3471
+    },
+    "his-006": {
+      "text": "W którym roku upadł mur berliński?",
+      "durationMs": 2090
+    },
+    "his-007": {
+      "text": "Pod jaką potoczną nazwą znana jest polska ustawa zasadnicza uchwalona w 1791 roku?",
+      "durationMs": 5875
+    },
+    "his-008": {
+      "text": "Który rzymski wódz przekroczył Rubikon w 49 roku p.n.e.?",
+      "durationMs": 3390
+    },
+    "geo-001": {
+      "text": "Jak nazywa się stolica Australii?",
+      "durationMs": 1985
+    },
+    "geo-002": {
+      "text": "Jak nazywa się najdłuższa rzeka w Polsce?",
+      "durationMs": 2496
+    },
+    "geo-003": {
+      "text": "Jak nazywa się najwyższy szczyt Polski?",
+      "durationMs": 2392
+    },
+    "geo-004": {
+      "text": "W którym państwie znajdują się ruiny Machu Picchu?",
+      "durationMs": 2798
+    },
+    "geo-005": {
+      "text": "Jak nazywa się największy ocean na Ziemi?",
+      "durationMs": 2601
+    },
+    "geo-006": {
+      "text": "Jak nazywa się stolica Kanady?",
+      "durationMs": 2043
+    },
+    "geo-007": {
+      "text": "Z iloma państwami graniczy Polska?",
+      "durationMs": 2264
+    },
+    "geo-008": {
+      "text": "Jak nazywa się najwyższy szczyt świata?",
+      "durationMs": 2322
+    },
+    "nau-001": {
+      "text": "Jaki jest symbol chemiczny złota?",
+      "durationMs": 1858
+    },
+    "nau-002": {
+      "text": "Ile wynosi pierwiastek kwadratowy z liczby 144?",
+      "durationMs": 3576
+    },
+    "nau-003": {
+      "text": "Która planeta Układu Słonecznego jest największa?",
+      "durationMs": 2786
+    },
+    "nau-004": {
+      "text": "Kto sformułował ogólną teorię względności?",
+      "durationMs": 2299
+    },
+    "nau-005": {
+      "text": "Ile kości ma szkielet dorosłego człowieka?",
+      "durationMs": 2380
+    },
+    "nau-006": {
+      "text": "Która polska uczona odkryła polon i rad?",
+      "durationMs": 2473
+    },
+    "nau-007": {
+      "text": "Jaki gaz rośliny pochłaniają z powietrza w procesie fotosyntezy?",
+      "durationMs": 3622
+    },
+    "nau-008": {
+      "text": "Jak nazywa się najlżejszy pierwiastek chemiczny?",
+      "durationMs": 2775
+    },
+    "nau-009": {
+      "text": "Ile stopni wynosi suma kątów wewnętrznych trójkąta?",
+      "durationMs": 3204
+    },
+    "prz-001": {
+      "text": "Jakie zwierzę jest największym ssakiem na Ziemi?",
+      "durationMs": 2635
+    },
+    "prz-002": {
+      "text": "Ile odnóży krocznych ma pająk?",
+      "durationMs": 2252
+    },
+    "prz-003": {
+      "text": "Jak nazywa się samiec kury?",
+      "durationMs": 1939
+    },
+    "prz-004": {
+      "text": "Które zwierzę lądowe jest najszybsze na świecie?",
+      "durationMs": 2566
+    },
+    "prz-005": {
+      "text": "Na jakim drzewie rosną żołędzie?",
+      "durationMs": 1927
+    },
+    "prz-006": {
+      "text": "Jak nazywa się proces przemiany gąsienicy w dorosłego motyla?",
+      "durationMs": 3471
+    },
+    "prz-007": {
+      "text": "Jaki ptak widnieje w godle Polski?",
+      "durationMs": 2009
+    },
+    "spo-001": {
+      "text": "Ilu zawodników jednej drużyny przebywa jednocześnie na boisku w piłce nożnej?",
+      "durationMs": 4714
+    },
+    "spo-002": {
+      "text": "W jakim mieście odbyły się Letnie Igrzyska Olimpijskie w 2016 roku?",
+      "durationMs": 4807
+    },
+    "spo-003": {
+      "text": "Który polski skoczek narciarski zdobył trzy indywidualne złote medale olimpijskie?",
+      "durationMs": 4377
+    },
+    "spo-004": {
+      "text": "Kto jest rekordzistą pod względem liczby goli strzelonych dla piłkarskiej reprezentacji Polski?",
+      "durationMs": 5399
+    },
+    "spo-005": {
+      "text": "Ile punktów zdobywa się w koszykówce za celny rzut zza linii 6,75 m?",
+      "durationMs": 5410
+    },
+    "spo-006": {
+      "text": "W jakiej dyscyplinie sportu rozgrywany jest turniej Wimbledon?",
+      "durationMs": 3332
+    },
+    "spo-007": {
+      "text": "Ile kilometrów liczy dystans maratonu (w pełnych kilometrach)?",
+      "durationMs": 3413
+    },
+    "kul-001": {
+      "text": "Kto napisał epopeję „Pan Tadeusz”?",
+      "durationMs": 2357
+    },
+    "kul-002": {
+      "text": "Kto namalował obraz „Bitwa pod Grunwaldem”?",
+      "durationMs": 2589
+    },
+    "kul-003": {
+      "text": "Który polski kompozytor, autor mazurków i polonezów, urodził się w Żelazowej Woli?",
+      "durationMs": 5027
+    },
+    "kul-004": {
+      "text": "Kto jest autorem powieści „Lalka”?",
+      "durationMs": 1985
+    },
+    "kul-005": {
+      "text": "Kto namalował „Mona Lisę”?",
+      "durationMs": 1672
+    },
+    "kul-006": {
+      "text": "Jak ma na imię rudowłosy najlepszy przyjaciel Harry'ego Pottera?",
+      "durationMs": 3599
+    },
+    "kul-007": {
+      "text": "Kto jest autorem sagi o wiedźminie Geralcie?",
+      "durationMs": 2543
+    },
+    "kul-008": {
+      "text": "W którym mieście znajduje się muzeum Luwr?",
+      "durationMs": 2101
+    },
+    "roz-001": {
+      "text": "Ile minut ma doba?",
+      "durationMs": 1370
+    },
+    "roz-002": {
+      "text": "Jak nazywa się waluta Japonii?",
+      "durationMs": 2032
+    },
+    "roz-003": {
+      "text": "Ile dni ma rok przestępny?",
+      "durationMs": 1765
+    }
+  }
+}

@@ -55,7 +55,9 @@ export type Overlay =
   | { kind: 'pick'; chooserId: string; targetId: string }
   | { kind: 'buzz'; playerId: string }
   /** Zapowiedź „Odpowiada: …” przed pytaniem zadawanym z kolei; pytanie jest jeszcze ukryte. */
-  | { kind: 'intro'; playerId: string };
+  | { kind: 'intro'; playerId: string }
+  /** Lektor czyta pytanie; pytanie już widać, ale licznik jeszcze nie biegnie. */
+  | { kind: 'reading'; question: Question };
 
 export interface SoloView {
   game: GameState;
@@ -74,10 +76,15 @@ export type HumanTurn = 'answer' | 'buzz' | 'pick' | null;
 /** Pytanie, które powinno być teraz widoczne na ekranie. */
 export function visibleQuestion(view: SoloView): Question | null {
   const { overlay, game } = view;
-  if (overlay?.kind === 'reveal' || overlay?.kind === 'noBuzz') return overlay.question;
+  if (overlay?.kind === 'reveal' || overlay?.kind === 'noBuzz' || overlay?.kind === 'reading') return overlay.question;
   if (overlay?.kind === 'banner' || overlay?.kind === 'pick' || overlay?.kind === 'intro') return null;
   const { pending } = game;
   return pending.kind === 'answer' || pending.kind === 'buzz' ? pending.question : null;
+}
+
+/** Pytanie, które lektor powinien teraz czytać. */
+export function narratedQuestion(view: SoloView): Question | null {
+  return view.overlay?.kind === 'reading' ? view.overlay.question : null;
 }
 
 /** Co w tej chwili może zrobić człowiek. */
@@ -98,6 +105,8 @@ export interface SoloControllerOptions {
   pacing?: Partial<Pacing>;
   /** Pozwala podmienić profile botów (np. w testach). */
   getProfile?: (botId: string) => BotProfile;
+  /** Jak długo lektor czyta pytanie; 0 = bez czytania (np. brak nagrania). */
+  narrationMs?: (question: Question) => number;
 }
 
 interface Scheduled {
@@ -119,6 +128,7 @@ export class SoloController {
   private readonly clock: Clock;
   private readonly pacing: Pacing;
   private readonly getProfile: (botId: string) => BotProfile;
+  private readonly narrationMs: (question: Question) => number;
   private timer: Scheduled | null = null;
   private pausedTimer: { fn: () => void; remaining: number; deadlineRemaining: number | null } | null = null;
   private started = false;
@@ -128,10 +138,13 @@ export class SoloController {
   private bannerShownAt = 0;
   /** Które pytanie (wg kursora talii) zostało już zapowiedziane. */
   private introducedCursor: number | null = null;
+  /** Które pytanie (wg kursora talii) lektor już przeczytał. */
+  private readCursor: number | null = null;
 
-  constructor({ game, rng, bank, clock = realClock, pacing, getProfile = getBotProfile }: SoloControllerOptions) {
+  constructor({ game, rng, bank, clock = realClock, pacing, getProfile = getBotProfile, narrationMs = () => 0 }: SoloControllerOptions) {
     this.rng = rng;
     this.getProfile = getProfile;
+    this.narrationMs = narrationMs;
     this.bank = bank;
     this.clock = clock;
     this.pacing = { ...DEFAULT_PACING, ...pacing };
@@ -258,6 +271,7 @@ export class SoloController {
           this.schedule(this.pacing.introMs, () => this.activate());
           return;
         }
+        if (this.startReading(question)) return;
         if (playerId === HUMAN_ID) {
           this.countdown(rules.answerTimeMs, rules.answerTimeMs, () => {
             log.info('Koniec czasu na odpowiedź', { playerId: HUMAN_ID });
@@ -278,6 +292,7 @@ export class SoloController {
       }
 
       case 'buzz': {
+        if (this.startReading(pending.question)) return;
         let fastest: { playerId: string; delayMs: number; answer: BotAnswer } | null = null;
         for (const player of activePlayers(game)) {
           if (player.isHuman) continue;
@@ -363,6 +378,25 @@ export class SoloController {
     } else {
       this.activate();
     }
+  }
+
+  /**
+   * Lektor czyta pytanie, zanim ruszy licznik i zanim boty zaczną odpowiadać.
+   * Każde pytanie (wg kursora talii) tylko raz — w finale nie czytamy go ponownie temu, kto się zgłosił.
+   */
+  private startReading(question: Question): boolean {
+    const { cursor } = this.view.game;
+    if (this.readCursor === cursor) return false;
+    this.readCursor = cursor;
+    const ms = this.narrationMs(question);
+    if (ms <= 0) {
+      log.debug('Pytanie bez czytania', { questionId: question.id });
+      return false;
+    }
+    log.debug('Czytanie pytania', { questionId: question.id, ms });
+    this.update({ overlay: { kind: 'reading', question } });
+    this.schedule(ms, () => this.activate());
+    return true;
   }
 
   /** Plansza etapu czeka, aż gracz ją przeczyta i dotknie ekranu. */

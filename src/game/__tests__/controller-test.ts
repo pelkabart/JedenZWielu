@@ -1,11 +1,11 @@
 import { getBotProfile, type BotProfile } from '../bots/profiles';
-import { humanTurn, SoloController, visibleQuestion, type Pacing, type SoloView } from '../controller/SoloController';
+import { humanTurn, narratedQuestion, SoloController, visibleQuestion, type Pacing, type SoloView } from '../controller/SoloController';
 import { createGame, getPlayer } from '../engine';
 import { DEFAULT_RULES } from '../rules';
 import { createRng } from '../rng';
 import { HUMAN_ID } from '../solo';
 import { driveToFinal, TEST_BANK } from '../testing/fixtures';
-import type { GameState } from '../types';
+import type { GameState, Question } from '../types';
 
 const PACING: Pacing = { revealMs: 2000, bannerLockMs: 700, announceMs: 1000, introMs: 2500 };
 const BOT_IDS = ['b1', 'b2', 'b3', 'b4'];
@@ -458,6 +458,155 @@ describe('finał', () => {
     });
     expect(getPlayer(end.game, HUMAN_ID).score).toBe(DEFAULT_RULES.finalQuestionPool * DEFAULT_RULES.pointsPerCorrect);
     expect(end.game.ranking![0]).toBe(HUMAN_ID);
+  });
+});
+
+describe('czytanie pytania', () => {
+  const READ_MS = 3000;
+
+  function narrated(state: GameState, narrationMs: (q: Question) => number = () => READ_MS, profile: Partial<BotProfile> = {}) {
+    return new SoloController({
+      game: state,
+      rng: createRng(1),
+      bank: TEST_BANK,
+      pacing: PACING,
+      getProfile: () => ({ ...steadyBot, ...profile }),
+      narrationMs,
+    });
+  }
+
+  function finalGame(): GameState {
+    return driveToFinal(game(), ['b1', 'b3']);
+  }
+
+  it('po zapowiedzi lektor czyta pytanie: pytanie już widać, licznik stoi', () => {
+    const c = narrated(game());
+    c.start();
+    toFirstQuestion(c);
+    const view = c.getView();
+    if (view.game.pending.kind !== 'answer') throw new Error('Oczekiwano pytania');
+    expect(view.overlay).toEqual({ kind: 'reading', question: view.game.pending.question });
+    expect(visibleQuestion(view)).toBe(view.game.pending.question);
+    expect(narratedQuestion(view)).toBe(view.game.pending.question);
+    expect(view.deadline).toBeNull();
+    expect(view.timerMs).toBeNull();
+  });
+
+  it('licznik startuje dopiero po przeczytaniu, z pełnym czasem', () => {
+    const c = narrated(game());
+    c.start();
+    toFirstQuestion(c);
+    advance(READ_MS - 1);
+    expect(c.getView().overlay?.kind).toBe('reading');
+
+    advance(1);
+    expect(c.getView().overlay).toBeNull();
+    expect(humanTurn(c.getView())).toBe('answer');
+    expect(c.getView().deadline).toBe(Date.now() + DEFAULT_RULES.answerTimeMs);
+    advance(DEFAULT_RULES.answerTimeMs - 1);
+    expect(humanTurn(c.getView())).toBe('answer');
+  });
+
+  it('w czasie czytania nie można odpowiedzieć ani się zgłosić', () => {
+    const c = narrated(game());
+    c.start();
+    toFirstQuestion(c);
+    expect(humanTurn(c.getView())).toBeNull();
+    c.submitAnswer(correctAnswer(c.getView()));
+    expect(c.getView().game.events.some((e) => e.type === 'answer')).toBe(false);
+
+    const f = narrated(finalGame());
+    f.start();
+    dismissBanner(f);
+    expect(f.getView().overlay?.kind).toBe('reading');
+    f.buzz();
+    expect(f.getView().game.events.some((e) => e.type === 'buzz')).toBe(false);
+    expect(f.getView().overlay?.kind).toBe('reading');
+  });
+
+  it('bot zaczyna myśleć dopiero po przeczytaniu', () => {
+    const c = narrated(game(1, 2));
+    c.start();
+    toFirstQuestion(c);
+    expect(c.getView().thinkingId).toBeNull();
+    // Bot odpowiada po 4 s od startu licznika — nie wcześniej, mimo że czytanie trwało 3 s.
+    advance(READ_MS + 4000 - 1);
+    expect(c.getView().game.events.some((e) => e.type === 'answer')).toBe(false);
+    expect(c.getView().thinkingId).toBe('b1');
+    advance(1);
+    expect(c.getView().overlay).toMatchObject({ kind: 'reveal', playerId: 'b1' });
+  });
+
+  it('dotknięcie pomija czytanie i uruchamia licznik', () => {
+    const c = narrated(game());
+    c.start();
+    toFirstQuestion(c);
+    advance(500);
+    c.skip();
+    expect(c.getView().overlay).toBeNull();
+    expect(humanTurn(c.getView())).toBe('answer');
+    expect(c.getView().deadline).toBe(Date.now() + DEFAULT_RULES.answerTimeMs);
+  });
+
+  it('pauza w czasie czytania zachowuje pozostały czas', () => {
+    const c = narrated(game());
+    c.start();
+    toFirstQuestion(c);
+    advance(1000);
+    c.pause();
+    advance(60000);
+    expect(c.getView().overlay?.kind).toBe('reading');
+    c.start();
+    advance(READ_MS - 1000 - 1);
+    expect(c.getView().overlay?.kind).toBe('reading');
+    advance(1);
+    expect(humanTurn(c.getView())).toBe('answer');
+  });
+
+  it('w finale pytanie jest czytane raz, przed zgłoszeniami', () => {
+    const narrationMs = jest.fn(() => READ_MS);
+    const c = narrated(finalGame(), narrationMs);
+    c.start();
+    dismissBanner(c);
+    expect(c.getView().overlay?.kind).toBe('reading');
+
+    advance(READ_MS);
+    expect(humanTurn(c.getView())).toBe('buzz');
+    expect(c.getView().timerMs).toBe(DEFAULT_RULES.buzzWindowMs);
+    c.buzz();
+    advance(PACING.announceMs);
+    // Po zgłoszeniu od razu odpowiedź — bez drugiego czytania tego samego pytania.
+    expect(c.getView().overlay).toBeNull();
+    expect(humanTurn(c.getView())).toBe('answer');
+    expect(narrationMs).toHaveBeenCalledTimes(1);
+  });
+
+  it('bez nagrania gra działa jak dotąd', () => {
+    const c = narrated(game(), () => 0);
+    c.start();
+    toFirstQuestion(c);
+    expect(c.getView().overlay).toBeNull();
+    expect(humanTurn(c.getView())).toBe('answer');
+  });
+
+  it('w całej grze żadne pytanie nie jest czytane dwa razy', () => {
+    const c = narrated(game(5, 3), () => 1500);
+    c.start();
+    const readCursors: number[] = [];
+    let last: SoloView['overlay'] = null;
+    for (let step = 0; !(c.getView().game.phase === 'finished' && c.getView().overlay === null); step++) {
+      if (step > 50000) throw new Error('Gra się nie skończyła');
+      const view = c.getView();
+      if (view.overlay !== last && view.overlay?.kind === 'reading') readCursors.push(view.game.cursor);
+      last = view.overlay;
+      const turn = humanTurn(view);
+      if (turn === 'answer') c.submitAnswer(correctAnswer(view));
+      else if (turn === 'buzz') c.buzz();
+      else if (turn === 'pick') c.pick(view.game.players.find((p) => !p.eliminated && !p.isHuman)!.id);
+      else tick(c, 250);
+    }
+    expect(readCursors.length).toBeGreaterThan(10);
+    expect(new Set(readCursors).size).toBe(readCursors.length);
   });
 });
 

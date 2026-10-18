@@ -1,4 +1,4 @@
-import { visibleQuestion, type SoloView } from '../controller/SoloController';
+import { narratedQuestion, visibleQuestion, type SoloView } from '../controller/SoloController';
 import { hostLine } from '../controller/hostLine';
 import { QUESTION_BANK } from '../questions';
 import { createRng } from '../rng';
@@ -59,6 +59,20 @@ describe('visibleQuestion', () => {
     const game = solo(1);
     expect(visibleQuestion(view(game, { overlay: { kind: 'intro', playerId: HUMAN_ID } }))).toBeNull();
   });
+
+  it('pokazuje pytanie, które czyta lektor', () => {
+    const game = solo(1);
+    const q = QUESTION_BANK[5];
+    const reading = view(game, { overlay: { kind: 'reading', question: q } });
+    expect(visibleQuestion(reading)).toBe(q);
+    expect(narratedQuestion(reading)).toBe(q);
+  });
+
+  it('lektor milczy poza nakładką czytania', () => {
+    const game = solo(1);
+    expect(narratedQuestion(view(game))).toBeNull();
+    expect(narratedQuestion(view(game, { overlay: { kind: 'intro', playerId: HUMAN_ID } }))).toBeNull();
+  });
 });
 
 describe('hostLine', () => {
@@ -97,5 +111,15 @@ describe('hostLine', () => {
       view(game, { overlay: { kind: 'reveal', playerId: bot.id, question: q, text: null, correct: false, correctAnswer: 'X', eliminated: false } }),
     );
     expect(timeout).toContain('Czas minął');
+  });
+
+  it('w czasie czytania mówi, do kogo jest pytanie, a nie „wpisz odpowiedź”', () => {
+    const reading = { overlay: { kind: 'reading', question: q } } as const;
+    const toHuman: GameState = { ...game, pending: { kind: 'answer', playerId: HUMAN_ID, question: q, reason: 'turn', pickedBy: null } };
+    const toBot: GameState = { ...game, pending: { kind: 'answer', playerId: bot.id, question: q, reason: 'picked', pickedBy: HUMAN_ID } };
+    const toAll: GameState = { ...game, pending: { kind: 'buzz', question: q } };
+    expect(hostLine(view(toHuman, reading))).toBe('Pytanie dla Ciebie. Słuchaj uważnie!');
+    expect(hostLine(view(toBot, reading))).toBe(`Pytanie dla: ${bot.name}.`);
+    expect(hostLine(view(toAll, reading))).toBe('Pytanie do wszystkich. Słuchajcie uważnie!');
   });
 });

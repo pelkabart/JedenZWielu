@@ -41,6 +41,12 @@ npm run test:integration  # integration tests only
 npm run test:coverage     # coverage report
 ```
 
+Question narration: each question in `src/data/questions.json` has a pre-generated Piper recording in `assets/audio/questions/` (model in `voiceModel/`, not committed). After adding or editing questions, regenerate them (otherwise `questionAudio-test.ts` fails):
+
+```bash
+scripts/narration/.venv/Scripts/python scripts/narration/generate_question_audio.py   # venv setup: see the script's docstring
+```
+
 Tests live in `__tests__` folders next to the code; any file there is treated as a test, so shared test helpers go in `src/game/testing/`. Randomness goes through a seeded `Rng` (`src/game/rng.ts`) so tests are reproducible. The `reset-project` script in `package.json` points to `scripts/reset-project.js`, which doesn't exist.
 
 Testing currently happens in Expo Go. Once a native module outside Expo Go is added, a development build will be needed (see AGENTS.md).
