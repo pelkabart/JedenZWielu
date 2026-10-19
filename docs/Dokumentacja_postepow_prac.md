@@ -222,11 +222,13 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
 | `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
+| `narration/__tests__/modelAsset-test.ts` | 4 | wybór folderu modelu, który naprawdę jest w APK (nazwa z Metro niezgodna z APK, brak modelu) |
+| `plugins/__tests__/withVoiceModel-test.js` | 1 | skrót wersji modelu taki sam na Windowsie i Linuksie (EAS) |
 | `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
-| **Razem** | **241** | |
+| **Razem** | **246** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -450,6 +452,9 @@ APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla 
 
 **7.44. `expo install` wybrał wersję biblioteki dla innego SDK**
 `npx expo install expo-speech-recognition` zainstalował wersję 58.0.0, choć projekt jest na Expo SDK 57. Dla paczek spoza Expo `expo install` nie zna zgodności z SDK i bierze najnowszą wersję. Zauważyliśmy to, porównując wersję z tabelą zgodności w README biblioteki. Zainstalowaliśmy ręcznie gałąź `^57` (57.1.1).
+
+**7.45. W development buildzie z EAS katalog modelu był pusty**
+Development build zbudowany na EAS uruchamiał się, ale lektor milczał. Logi pokazywały, że katalog `files/models/vits-piper-pl-976a80a8` istnieje, ale nie ma w nim żadnego pliku. Przyczyna: nazwa folderu zawiera skrót zawartości modelu (7.40), liczony z względnych ścieżek plików przez `path.relative`. Na Windowsie te ścieżki mają „”, na Linuksie „/”, więc Metro na komputerze podawało aplikacji `vits-piper-pl-976a80a8`, a prebuild na serwerze EAS zapisał w APK `vits-piper-pl-91b2fede`. Kod `react-native-sherpa-onnx` (0.4.4, `SherpaOnnxAssetHelper.resolveAssetPath`) dla nieistniejącego assetu tworzy pusty katalog i nie zgłasza błędu (`AssetManager.list` zwraca pustą listę), a przy kolejnych uruchomieniach zwraca istniejący katalog bez sprawdzania zawartości. Lokalne APK tego nie pokazywało, bo prebuild i Metro liczyły skrót na tym samym systemie. Rozwiązanie: skrót ze ścieżek z „/”, aplikacja wybiera folder spośród faktycznie obecnych w APK (`listAssetModels`), a niekompletną kopię usuwa przed kopiowaniem. Wniosek: wartość liczona przy budowaniu i przekazywana aplikacji osobną drogą (tu: Metro) musi wychodzić tak samo na każdej maszynie.
 
 ## 8. Dalsze plany
 

@@ -1,156 +1,629 @@
+
 import { createAudioPlayer } from 'expo-audio';
 import Constants from 'expo-constants';
 import type { GeneratedAudio, TtsEngine } from 'react-native-sherpa-onnx/tts';
 
 import { createLogger } from '@/lib/log';
 
+import { MODEL_FOLDER_PREFIX, pickModelAsset } from './modelAsset';
 import type { Voice } from './NarrationDirector';
 import { toSpeakable } from './pronunciation';
 
 const log = createLogger('lektor');
 
 /**
- * Folder z modelem w zasobach aplikacji. Nazwę z wersją modelu (np. `models/vits-piper-pl-976a80a8`)
- * nadaje wtyczka plugins/withVoiceModel.js i przekazuje ją przez `extra` w konfiguracji.
+ * Folder modelu w zasobach Androida.
+ * Nazwę generuje plugins/withVoiceModel.js.
  */
-const VOICE_MODEL_ASSET: string | null = Constants.expoConfig?.extra?.voiceModelAsset ?? null;
-/** Pliki tymczasowe z syntezy krążą po kilku nazwach — gra jeden, następny się liczy, przerwane mogą jeszcze się dopisywać. */
+const VOICE_MODEL_ASSET: string | null =
+  Constants.expoConfig?.extra?.voiceModelAsset ?? null;
+
 const TEMP_FILES = 6;
 
-/** Moduły natywne (sherpa-onnx, react-native-fs) — w Expo Go ich nie ma, więc ładujemy je dopiero tu. */
+const REQUIRED_FILES = [
+  'model.onnx',
+  'tokens.txt',
+  'espeak-ng-data',
+] as const;
+
+type NativeFs = typeof import('@dr.pogodin/react-native-fs');
+
 interface NativeTts {
   engine: TtsEngine;
   cacheDir: string;
-  saveAudioToFile: (audio: GeneratedAudio, path: string) => Promise<string>;
+  saveAudioToFile: (
+    audio: GeneratedAudio,
+    path: string
+  ) => Promise<string>;
 }
 
 let enginePromise: Promise<NativeTts | null> | null = null;
-/** Synteza po kolei: jeden silnik nie powinien liczyć dwóch zdań naraz. */
+
 let synthQueue: Promise<unknown> = Promise.resolve();
 let tempCounter = 0;
 
 /**
- * Silnik syntezy wczytywany raz (model ma ok. 60 MB) i trzymany do końca działania aplikacji.
- * Moduł natywny ładujemy dopiero tu: w Expo Go go nie ma, a gra ma wtedy działać bez głosu.
+ * Zamienia dowolny błąd na czytelny komunikat.
  */
-function loadEngine(): Promise<NativeTts | null> {
-  enginePromise ??= (async () => {
-    const started = Date.now();
-    try {
-      if (!VOICE_MODEL_ASSET) throw new Error('Brak modelu głosu w konfiguracji (voiceModelAsset)');
-      const { createTTS, saveAudioToFile } = await import('react-native-sherpa-onnx/tts');
-      const fs = await import('@dr.pogodin/react-native-fs');
-      // sherpa-onnx kopiuje model z zasobów do plików aplikacji (DocumentDirectoryPath) tylko raz.
-      const copied = `${fs.DocumentDirectoryPath}/${VOICE_MODEL_ASSET}`;
-      await removeOldModels(fs, copied);
-      const create = () =>
-        createTTS({ modelPath: { type: 'asset', path: VOICE_MODEL_ASSET }, modelType: 'vits', numThreads: 2 });
-      let engine: TtsEngine;
-      try {
-        engine = await create();
-      } catch (error) {
-        // Np. kopiowanie przerwane przy poprzednim uruchomieniu — kasujemy niepełną kopię i próbujemy raz jeszcze.
-        log.warn('Model głosu nie wczytał się, kopiuję go od nowa', { error: error instanceof Error ? error.message : String(error) });
-        await fs.unlink(copied).catch(() => undefined);
-        engine = await create();
-      }
-      log.info('Model głosu wczytany', { ms: Date.now() - started, model: VOICE_MODEL_ASSET });
-      return { engine, cacheDir: fs.CachesDirectoryPath, saveAudioToFile };
-    } catch (error) {
-      // Logujemy raz; potem prowadzący po prostu milczy.
-      log.error('Nie udało się wczytać modelu głosu, gra będzie bez lektora', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }
-  })();
-  return enginePromise;
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
-/** Usuwa kopie poprzednich wersji modelu (każda ma ok. 80 MB). */
-async function removeOldModels(fs: typeof import('@dr.pogodin/react-native-fs'), current: string) {
-  const dir = current.slice(0, current.lastIndexOf('/'));
-  if (!(await fs.exists(dir))) return;
-  for (const item of await fs.readDir(dir)) {
-    if (item.isDirectory() && item.name.startsWith('vits-piper-pl') && item.path !== current) {
-      log.info('Usuwam starą wersję modelu głosu', { name: item.name });
-      await fs.unlink(item.path).catch(() => undefined);
+/**
+ * Sprawdza rzeczywistą zawartość folderu modelu
+ * w pamięci telefonu.
+ */
+async function inspectModelFiles(
+  fs: NativeFs,
+  modelDir: string
+): Promise<boolean> {
+  log.info('Sprawdzam katalog modelu', {
+    path: modelDir,
+  });
+
+  const exists = await fs.exists(modelDir);
+
+  if (!exists) {
+    log.warn('Katalog modelu nie istnieje', {
+      path: modelDir,
+    });
+    return false;
+  }
+
+  const files = await fs.readDir(modelDir);
+
+  log.info('Zawartość katalogu modelu', {
+    files: files.map((file) => ({
+      name: file.name,
+      directory: file.isDirectory(),
+      size: file.size,
+    })),
+  });
+
+  const missing: string[] = [];
+
+  for (const name of REQUIRED_FILES) {
+    const fullPath = `${modelDir}/${name}`;
+
+    if (!(await fs.exists(fullPath))) {
+      missing.push(name);
+    }
+  }
+
+  if (missing.length > 0) {
+    log.error('Brak wymaganych plików modelu', {
+      missing,
+      modelDir,
+    });
+
+    return false;
+  }
+
+  const tokensPath = `${modelDir}/tokens.txt`;
+  const modelPath = `${modelDir}/model.onnx`;
+  const espeakPath = `${modelDir}/espeak-ng-data`;
+
+  const tokensStat = await fs.stat(tokensPath);
+  const modelStat = await fs.stat(modelPath);
+  const espeakStat = await fs.stat(espeakPath);
+
+  if (
+    Number(tokensStat.size) === 0 ||
+    Number(modelStat.size) === 0 ||
+    !espeakStat.isDirectory()
+  ) {
+    log.error('Nieprawidłowe pliki modelu', {
+      tokensSize: tokensStat.size,
+      modelSize: modelStat.size,
+      espeakIsDirectory: espeakStat.isDirectory(),
+    });
+
+    return false;
+  }
+
+  log.info('Wymagane pliki modelu istnieją', {
+    modelMB: (
+      Number(modelStat.size) /
+      1024 /
+      1024
+    ).toFixed(1),
+    tokensBytes: tokensStat.size,
+  });
+
+  return true;
+}
+
+/**
+ * Usuwa starsze wersje modelu.
+ * Nie usuwa bieżącej wersji.
+ */
+async function removeOldModels(
+  fs: NativeFs,
+  current: string
+): Promise<void> {
+  const dir = current.slice(
+    0,
+    current.lastIndexOf('/')
+  );
+
+  if (!(await fs.exists(dir))) {
+    return;
+  }
+
+  const items = await fs.readDir(dir);
+
+  for (const item of items) {
+    if (
+      item.isDirectory() &&
+      item.name.startsWith(MODEL_FOLDER_PREFIX) &&
+      item.path !== current
+    ) {
+      try {
+        log.info('Usuwam starą wersję modelu', {
+          name: item.name,
+        });
+
+        await fs.unlink(item.path);
+      } catch (error) {
+        log.warn('Nie udało się usunąć starego modelu', {
+          error: errorMessage(error),
+        });
+      }
     }
   }
 }
 
-/** Syntezuje zdanie do pliku WAV w cache aplikacji. */
-function synthesize({ engine, cacheDir, saveAudioToFile }: NativeTts, text: string): Promise<string> {
+/**
+ * Rozwiązuje ścieżkę modelu i sprawdza,
+ * czy sherpa-onnx rozpoznaje jego strukturę.
+ */
+async function diagnoseModel(
+  fs: NativeFs,
+  assetPath: string
+): Promise<void> {
+  const { resolveModelPath } = await import(
+    'react-native-sherpa-onnx'
+  );
+
+  const { detectTtsModel } = await import(
+    'react-native-sherpa-onnx/tts'
+  );
+
+  const modelPath = {
+    type: 'asset' as const,
+    path: assetPath,
+  };
+
+  log.info('Rozpoczynam diagnostykę modelu', {
+    assetPath,
+  });
+
+  let resolvedPath: string;
+
+  try {
+    resolvedPath = await resolveModelPath(modelPath);
+
+    log.info('Rozwiązana ścieżka modelu', {
+      resolvedPath,
+    });
+  } catch (error) {
+    log.error('Nie udało się rozwiązać ścieżki modelu', {
+      error: errorMessage(error),
+    });
+
+    throw error;
+  }
+
+  const filesValid = await inspectModelFiles(
+    fs,
+    resolvedPath
+  );
+
+  if (!filesValid) {
+    throw new Error(
+      `Niekompletne pliki modelu w ${resolvedPath}`
+    );
+  }
+
+  log.info('Uruchamiam wykrywanie modelu VITS');
+
+  const detection = await detectTtsModel(modelPath, {
+    modelType: 'vits',
+  });
+
+  log.info('Wynik wykrywania modelu', {
+    success: detection.success,
+    modelType: detection.modelType,
+    detectedModels: detection.detectedModels,
+    error: detection.error,
+  });
+
+  if (!detection.success) {
+    throw new Error(
+      detection.error ??
+        'Sherpa-onnx nie rozpoznał modelu VITS'
+    );
+  }
+
+  log.info('Model przeszedł diagnostykę');
+}
+
+/**
+ * Ładuje silnik TTS jeden raz.
+ *
+ * W przypadku problemu z kopiowaniem modelu
+ * usuwa lokalną kopię i próbuje ponownie.
+ */
+function loadEngine(): Promise<NativeTts | null> {
+  enginePromise ??= (async () => {
+    const started = Date.now();
+
+    try {
+      const { listAssetModels } = await import(
+        'react-native-sherpa-onnx'
+      );
+
+      const { createTTS, saveAudioToFile } =
+        await import('react-native-sherpa-onnx/tts');
+
+      const fs = await import(
+        '@dr.pogodin/react-native-fs'
+      );
+
+      /**
+       * Nazwę folderu bierzemy z APK, a nie tylko z expoConfig:
+       * w development buildzie expoConfig podaje Metro, a kopia
+       * z nieistniejącego assetu daje pusty katalog bez błędu.
+       */
+      const bundled = await listAssetModels();
+      const choice = pickModelAsset(
+        VOICE_MODEL_ASSET,
+        bundled.map((model) => model.folder)
+      );
+
+      if (!choice.asset) {
+        throw new Error(
+          `Brak modelu ${MODEL_FOLDER_PREFIX}* w assets/models aplikacji (foldery: ${bundled.length})`
+        );
+      }
+
+      if (choice.mismatch) {
+        log.warn('Folder modelu z konfiguracji nie istnieje w APK', {
+          configured: VOICE_MODEL_ASSET,
+          used: choice.asset,
+        });
+      }
+
+      const asset = choice.asset;
+
+      log.info('Inicjalizacja lektora', { asset });
+
+      const copied =
+        `${fs.DocumentDirectoryPath}/${asset}`;
+
+      const modelPath = {
+        type: 'asset' as const,
+        path: asset,
+      };
+
+      await removeOldModels(fs, copied);
+
+      /**
+       * sherpa-onnx zwraca istniejący katalog bez sprawdzania zawartości,
+       * więc pusta lub przerwana kopia zostałaby na zawsze.
+       */
+      if (
+        (await fs.exists(copied)) &&
+        !(await inspectModelFiles(fs, copied))
+      ) {
+        log.warn('Usuwam niekompletną kopię modelu', { path: copied });
+        await fs.unlink(copied);
+      }
+
+      /**
+       * Diagnostyka i inicjalizacja są wykonywane
+       * w tej samej próbie, żeby ewentualna niepełna
+       * kopia mogła zostać naprawiona.
+       */
+      const create = async (): Promise<TtsEngine> => {
+        await diagnoseModel(
+          fs,
+          asset
+        );
+
+        log.info('Tworzę silnik TTS VITS');
+
+        return createTTS({
+          modelPath,
+          modelType: 'vits',
+          numThreads: 2,
+          debug: true,
+        });
+      };
+
+      let engine: TtsEngine;
+
+      try {
+        engine = await create();
+      } catch (firstError) {
+        log.warn(
+          'Pierwsza próba ładowania modelu nieudana',
+          {
+            error: errorMessage(firstError),
+          }
+        );
+
+        log.info(
+          'Usuwam lokalną kopię modelu i ponawiam próbę'
+        );
+
+        if (await fs.exists(copied)) {
+          await fs.unlink(copied);
+        }
+
+        engine = await create();
+      }
+
+      log.info('Model głosu wczytany poprawnie', {
+        ms: Date.now() - started,
+        model: asset,
+      });
+
+      return {
+        engine,
+        cacheDir: fs.CachesDirectoryPath,
+        saveAudioToFile,
+      };
+    } catch (error) {
+      log.error(
+        'Nie udało się wczytać modelu głosu, gra będzie bez lektora',
+        {
+          error: errorMessage(error),
+          ms: Date.now() - started,
+        }
+      );
+
+      return null;
+    }
+  })();
+
+  return enginePromise;
+}
+
+/**
+ * Syntezuje tekst do pliku WAV.
+ * Kolejne zadania są wykonywane sekwencyjnie.
+ */
+function synthesize(
+  {
+    engine,
+    cacheDir,
+    saveAudioToFile,
+  }: NativeTts,
+  text: string
+): Promise<string> {
   const job = synthQueue.then(async () => {
     const started = Date.now();
-    const audio = await engine.generateSpeech(toSpeakable(text));
-    const path = `${cacheDir}/lektor-${tempCounter++ % TEMP_FILES}.wav`;
-    await saveAudioToFile(audio, path);
-    log.debug('Synteza zdania', {
-      chars: text.length,
-      audioMs: Math.round((audio.samples.length / audio.sampleRate) * 1000),
-      ms: Date.now() - started,
+
+    const speakable = toSpeakable(text);
+
+    if (!speakable.trim()) {
+      throw new Error(
+        'Próba syntezy pustego tekstu'
+      );
+    }
+
+    log.debug('Rozpoczynam syntezę', {
+      chars: speakable.length,
     });
+
+    const audio = await engine.generateSpeech(
+      speakable
+    );
+
+    if (
+      !audio.samples ||
+      audio.samples.length === 0 ||
+      audio.sampleRate <= 0
+    ) {
+      throw new Error(
+        'Silnik TTS zwrócił pusty lub nieprawidłowy dźwięk'
+      );
+    }
+
+    const path =
+      `${cacheDir}/lektor-${tempCounter++ % TEMP_FILES}.wav`;
+
+    await saveAudioToFile(audio, path);
+
+    log.debug('Synteza zakończona', {
+      chars: text.length,
+      audioMs: Math.round(
+        (audio.samples.length / audio.sampleRate) *
+          1000
+      ),
+      ms: Date.now() - started,
+      path,
+    });
+
     return path;
   });
+
   synthQueue = job.catch(() => undefined);
+
   return job;
 }
 
-/** Lektor na żywo: Piper przez sherpa-onnx, odtwarzanie przez expo-audio. Jeden na ekran gry. */
+/**
+ * Lektor dla pojedynczego ekranu gry.
+ *
+ * Synteza: Piper / sherpa-onnx
+ * Odtwarzanie: expo-audio
+ */
 export function createSherpaVoice(): Voice {
   void loadEngine();
+
   const player = createAudioPlayer(null);
-  /** Numer bieżącej wypowiedzi; `stop` go zmienia, więc przerwana wypowiedź kończy się po cichu. */
+
   let token = 0;
   let paused = false;
+  let disposed = false;
+
   let finishClip: (() => void) | null = null;
 
-  const subscription = player.addListener('playbackStatusUpdate', (status) => {
-    if (status.didJustFinish) finishClip?.();
-  });
+  /**
+   * Kończy oczekiwanie na aktualny klip.
+   */
+  const finishCurrentClip = () => {
+    const finish = finishClip;
+    finishClip = null;
+    finish?.();
+  };
 
-  const playFile = (path: string) =>
-    new Promise<void>((resolve) => {
-      finishClip = () => {
-        finishClip = null;
+  const subscription = player.addListener(
+    'playbackStatusUpdate',
+    (status) => {
+      if (status.didJustFinish) {
+        finishCurrentClip();
+      }
+    }
+  );
+
+  /**
+   * Odtwarza wygenerowany WAV.
+   */
+  const playFile = (
+    path: string
+  ): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      if (disposed) {
         resolve();
-      };
-      player.replace({ uri: `file://${path}` });
-      if (!paused) player.play();
+        return;
+      }
+
+      finishClip = resolve;
+
+      try {
+        player.replace({
+          uri: `file://${path}`,
+        });
+
+        if (!paused) {
+          player.play();
+        }
+      } catch (error) {
+        finishClip = null;
+        reject(error);
+      }
     });
 
   return {
     async say(texts) {
       const mine = ++token;
-      const tts = await loadEngine();
-      if (!tts || mine !== token || texts.length === 0) return;
-      // Następne zdanie liczy się, gdy poprzednie gra — krótsze przerwy między zdaniami.
-      let next: Promise<string> | null = synthesize(tts, texts[0]);
-      for (let i = 0; next; i++) {
-        const path = await next;
-        if (mine !== token) return;
-        next = i + 1 < texts.length ? synthesize(tts, texts[i + 1]) : null;
-        await playFile(path);
-        if (mine !== token) return;
+
+      if (disposed || texts.length === 0) {
+        return;
+      }
+
+      try {
+        const tts = await loadEngine();
+
+        if (
+          !tts ||
+          mine !== token ||
+          disposed
+        ) {
+          return;
+        }
+
+        let next: Promise<string> | null =
+          synthesize(tts, texts[0]);
+
+        for (
+          let i = 0;
+          next !== null;
+          i++
+        ) {
+          const path = await next;
+
+          if (
+            mine !== token ||
+            disposed
+          ) {
+            return;
+          }
+
+          /**
+           * Przygotowujemy następne zdanie,
+           * podczas gdy bieżące jest odtwarzane.
+           */
+          next =
+            i + 1 < texts.length
+              ? synthesize(
+                  tts,
+                  texts[i + 1]
+                )
+              : null;
+
+          await playFile(path);
+
+          if (
+            mine !== token ||
+            disposed
+          ) {
+            return;
+          }
+        }
+      } catch (error) {
+        log.error('Błąd odtwarzania lektora', {
+          error: errorMessage(error),
+        });
       }
     },
+
     pause() {
+      if (disposed) {
+        return;
+      }
+
       paused = true;
       player.pause();
     },
+
     resume() {
+      if (disposed) {
+        return;
+      }
+
       paused = false;
-      player.play();
+
+      if (finishClip) {
+        player.play();
+      }
     },
+
     stop() {
+      if (disposed) {
+        return;
+      }
+
       token++;
+      paused = false;
+
       player.pause();
-      finishClip?.();
+      finishCurrentClip();
     },
+
     dispose() {
+      if (disposed) {
+        return;
+      }
+
+      disposed = true;
       token++;
-      finishClip?.();
+
+      finishCurrentClip();
+
       subscription.remove();
       player.remove();
     },

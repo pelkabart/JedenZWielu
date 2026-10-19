@@ -11,6 +11,10 @@ const REQUIRED = ['model.onnx', 'tokens.txt', 'espeak-ng-data'];
 /**
  * Skrót zawartości modelu. Trafia do nazwy folderu w zasobach: sherpa-onnx kopiuje model do plików
  * aplikacji tylko raz i potem go nie odświeża, więc nowy model musi mieć nową nazwę folderu.
+ *
+ * Skrót musi wyjść tak samo na każdym systemie: `expo start` na Windowsie podaje aplikacji
+ * nazwę z lokalnego liczenia, a folder w APK powstaje przy prebuildzie na Linuksie (EAS).
+ * Dlatego ścieżki są zawsze z „/” (path.relative na Windowsie daje „\”).
  */
 function modelVersion(source) {
   const hash = crypto.createHash('sha1');
@@ -18,7 +22,10 @@ function modelVersion(source) {
     for (const name of fs.readdirSync(dir).sort()) {
       const file = path.join(dir, name);
       if (fs.statSync(file).isDirectory()) walk(file);
-      else hash.update(path.relative(source, file)).update(fs.readFileSync(file));
+      else {
+        const relative = path.relative(source, file).split(path.sep).join('/');
+        hash.update(relative).update(fs.readFileSync(file));
+      }
     }
   };
   walk(source);
@@ -51,3 +58,5 @@ module.exports = function withVoiceModel(config) {
     },
   ]);
 };
+
+module.exports.modelVersion = modelVersion;
