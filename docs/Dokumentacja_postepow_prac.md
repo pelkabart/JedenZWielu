@@ -47,7 +47,7 @@ Spis treści:
 | Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
 | Ekran gry w nowych zasadach (rundy 1–4) z limitem 10 s na wybór rywala | zrobione, sprawdzone w przeglądarce |
 | Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
-| Muzyka w menu głównym i wyborze poziomu (zapętlona, pauza w rozgrywce) | zrobione, sprawdzone w przeglądarce |
+| Muzyka w menu głównym i wyborze poziomu (jedna melodia bez restartu, pauza w rozgrywce) | zrobione, sprawdzone w przeglądarce |
 | Razem testów automatycznych | 305 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
