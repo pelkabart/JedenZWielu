@@ -43,8 +43,8 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 
 ### 8. Poprawna odpowiedź w finale zabiera szanse rywalom
 - **Ryzyko (po zmianie):** cios wyeliminował rywali, a gracz chciał, żeby finał był jak w „1 z 10”.
-- **Zabezpieczenie:** cios usunięty. Poprawna odpowiedź daje punkt i przywraca 1 szansę (max 3); rywale nic nie tracą. Odpadają tylko przez błędy.
-- **Test:** `potato-test.ts` › „poprawna odpowiedź: +1 punkt i +1 szansa dla siebie”; „w finale nikt nie traci szans, bo rywal odpowiedział dobrze”; „błędy odpadają w finale”.
+- **Zabezpieczenie:** cios i odnawianie szans usunięte. Poprawna odpowiedź daje punkt, bez zmiany szans; rywale nic nie tracą. Odpadają tylko przez błędy.
+- **Test:** `potato-test.ts` › „poprawna odpowiedź w finale daje tylko punkt, bez odzyskiwania szans”; „w finale nikt nie traci szans, bo rywal odpowiedział dobrze”; „błędy odpadają w finale”.
 
 ### 8a. (dawny opis ciosu — nieaktualny)
 - **Ryzyko:** poprawna odpowiedź w rundzie 4 zabiera rywalom życia w złej kolejności albo eliminuje też samego odpowiadającego.

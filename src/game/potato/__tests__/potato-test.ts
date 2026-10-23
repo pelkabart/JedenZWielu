@@ -176,10 +176,10 @@ describe('runda 4: finałowy krąg', () => {
     phase: 'duel',
   });
 
-  it('poprawna odpowiedź: +1 punkt i +1 szansa dla siebie (max 3), rywale bez zmian', () => {
+  it('poprawna odpowiedź w finale daje tylko punkt, bez odzyskiwania szans', () => {
     const s0 = withPlayers(duel(), { h: { lives: 2, points: 4 }, b3: { lives: 2 }, b4: { lives: 3 } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
-    expect(player(s, 'h')).toMatchObject({ lives: 3, points: 5 });
+    expect(player(s, 'h')).toMatchObject({ lives: 2, points: 5 });
     expect(player(s, 'b3').lives).toBe(2);
     expect(player(s, 'b4').lives).toBe(3);
   });

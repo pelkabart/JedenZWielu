@@ -13,8 +13,6 @@ export const POTATO = {
   lives: 3,
   /** Punkty osłony w rundzie 2. */
   shield: 3,
-  /** Maksymalna liczba szans w finale. */
-  maxLives: 3,
   /** Czas sprintu (runda 3). */
   sprintMs: 60_000,
   /** Kara za błąd lub brak odpowiedzi w sprincie. */
@@ -237,13 +235,12 @@ function finishSprint(s: PotatoState) {
 }
 
 /**
- * Finał: poprawna odpowiedź daje punkt i przywraca 1 szansę (max 3); rywale nic nie tracą.
+ * Finał jak w „1 z 10”: poprawna odpowiedź daje punkt, nikt nie odzyskuje szans ani ich nie traci.
  * Błąd odbiera szansę. `next` to rywal (atak) albo odpowiadający („na siebie”).
  */
 function answerDuel(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
   if (correct) {
     holder.points++;
-    holder.lives = Math.min(POTATO.maxLives, holder.lives + 1);
   } else {
     loseLife(s, holder);
   }
