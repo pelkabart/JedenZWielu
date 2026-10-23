@@ -1,6 +1,8 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { questionSetStore } from '@/categories/questionSets';
+import { DEFAULT_SET_ID } from '@/categories/types';
 import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
@@ -15,6 +17,9 @@ const OPTIONS: { difficulty: Difficulty; color: string; baseColor: string }[] = 
 ];
 
 export default function DifficultyScreen() {
+  const { set = DEFAULT_SET_ID } = useLocalSearchParams<{ set?: string }>();
+  const chosen = questionSetStore.getSet(set);
+
   return (
     <View style={styles.container}>
       <CartoonBackground />
@@ -22,6 +27,7 @@ export default function DifficultyScreen() {
 
       <View style={styles.content}>
         <Text style={styles.title}>Wybierz poziom trudności</Text>
+        {chosen && !chosen.builtIn && <Text style={styles.subtitle}>Kategoria: {chosen.name}</Text>}
         <View style={styles.menu}>
           {OPTIONS.map(({ difficulty, color, baseColor }) => (
             <MenuButton
@@ -29,7 +35,7 @@ export default function DifficultyScreen() {
               label={DIFFICULTY_PRESETS[difficulty].label}
               color={color}
               baseColor={baseColor}
-              onPress={() => router.push({ pathname: '/solo/game', params: { difficulty } })}
+              onPress={() => router.push({ pathname: '/solo/game', params: { difficulty, set } })}
             />
           ))}
         </View>
@@ -56,6 +62,12 @@ const styles = StyleSheet.create({
     textShadowColor: colors.outline,
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 1,
+  },
+  subtitle: {
+    color: colors.starYellow,
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: -14,
   },
   menu: {
     gap: 12,

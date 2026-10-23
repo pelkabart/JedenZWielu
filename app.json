@@ -48,7 +48,8 @@
           "microphonePermission": "Gra używa mikrofonu, żeby można było odpowiadać na pytania głosem.",
           "speechRecognitionPermission": "Gra rozpoznaje mowę, żeby można było odpowiadać na pytania głosem."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

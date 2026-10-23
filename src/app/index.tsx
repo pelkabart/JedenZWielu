@@ -1,15 +1,30 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { questionSetStore } from '@/categories/questionSets';
+import { soloEntryRoute } from '@/categories/soloEntry';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { colors } from '@/constants/theme';
+import { useQuestionSets } from '@/hooks/useQuestionSets';
+
+/** Poniżej tej wysokości (telefon w poziomie) cztery przyciski i tytuł muszą się ścisnąć. */
+const COMPACT_HEIGHT = 400;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const compact = height - insets.top - insets.bottom < COMPACT_HEIGHT;
+  // Wczytuje kategorie już na ekranie głównym, żeby wybór trybu jednoosobowego ich nie czekał.
+  useQuestionSets();
+
+  const openSolo = async () => {
+    await questionSetStore.load();
+    router.push(soloEntryRoute(questionSetStore.getSets()));
+  };
 
   return (
     <View style={styles.container}>
@@ -29,18 +44,24 @@ export default function HomeScreen() {
         <Ionicons name="settings-sharp" size={26} color={colors.outline} />
       </Pressable>
 
-      <View style={[styles.content, { paddingLeft: insets.left, paddingRight: insets.right }]}>
-        <Text style={styles.title}>Jeden z Wielu</Text>
+      <View style={[styles.content, compact && styles.contentCompact, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+        <Text style={[styles.title, compact && styles.titleCompact]}>Jeden z Wielu</Text>
 
-        <View style={styles.menu}>
+        <View style={[styles.menu, compact && styles.menuCompact]}>
           <MenuButton
             label="Tryb Jednoosobowy"
             color={colors.solo}
             baseColor={colors.soloBase}
-            onPress={() => router.push('/solo')}
+            onPress={openSolo}
           />
           <MenuButton label="MultiPlayer" color={colors.multi} baseColor={colors.multiBase} />
           <MenuButton label="Dodatki" color={colors.extras} baseColor={colors.extrasBase} />
+          <MenuButton
+            label="Kategorie"
+            color={colors.categories}
+            baseColor={colors.categoriesBase}
+            onPress={() => router.push('/categories')}
+          />
         </View>
       </View>
     </View>
@@ -58,6 +79,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 22,
   },
+  contentCompact: {
+    gap: 10,
+  },
   title: {
     color: colors.white,
     fontSize: 54,
@@ -67,9 +91,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 5 },
     textShadowRadius: 1,
   },
+  titleCompact: {
+    fontSize: 42,
+  },
   menu: {
     gap: 12,
     alignItems: 'center',
+  },
+  menuCompact: {
+    gap: 6,
   },
   settings: {
     position: 'absolute',

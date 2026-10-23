@@ -13,4 +13,9 @@ export const colors = {
   multiBase: '#1E8FA8',
   extras: '#FF7A9C',
   extrasBase: '#C2456A',
+  categories: '#8BE07A',
+  categoriesBase: '#4E9E3F',
+
+  danger: '#FF5A5A',
+  panel: 'rgba(5, 11, 36, 0.72)',
 };

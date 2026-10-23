@@ -9,14 +9,21 @@ type Props = {
   color: string;
   baseColor: string;
   width?: number;
+  disabled?: boolean;
   onPress?: () => void;
 };
 
-export function MenuButton({ label, color, baseColor, width = 320, onPress }: Props) {
+export function MenuButton({ label, color, baseColor, width = 320, disabled = false, onPress }: Props) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+    >
       {({ pressed }) => (
-        <View style={[styles.base, { width, backgroundColor: baseColor }]}>
+        <View style={[styles.base, { width, backgroundColor: baseColor }, disabled && styles.disabled]}>
           <View
             style={[
               styles.face,
@@ -59,6 +66,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.white,
     opacity: 0.35,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   label: {
     color: colors.outline,
