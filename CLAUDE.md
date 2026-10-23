@@ -24,6 +24,7 @@ Current state: home screen, difficulty selection and a playable solo mode (human
 3. Add **unit tests** and **integration tests** (`src/game/__tests__/integration-test.ts` wires the same modules as the app, on Jest fake timers).
 4. Update `docs/Dokumentacja_postepow_prac.md` (state table, tests table, and section 7 for problems that actually happened).
 5. Before finishing: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
+6. After changes to the app, build a release APK and put it in `androidApk/` (see "Building the APK" below).
 
 ## Commands
 
@@ -49,7 +50,24 @@ scripts/narration/.venv/Scripts/python scripts/narration/prepare_voice_model.py 
 
 Tests live in `__tests__` folders next to the code; any file there is treated as a test, so shared test helpers go in `src/game/testing/`. Randomness goes through a seeded `Rng` (`src/game/rng.ts`) so tests are reproducible. The `reset-project` script in `package.json` points to `scripts/reset-project.js`, which doesn't exist.
 
-The game still runs in Expo Go, but silently: sherpa-onnx is a native module, so the host voice needs a development build (`npx expo run:android`) or an APK (`npx expo prebuild --platform android`, then `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a` in `android/`; use `x86_64` for the emulator — a universal APK is ~320 MB). Prebuild rewrites `package.json` scripts and adds a placeholder package name to `app.json`; don't commit those changes.
+The game still runs in Expo Go, but silently: sherpa-onnx is a native module, so the host voice needs a development build (`npx expo run:android`) or an APK.
+
+## Building the APK
+
+The APK is built locally (no EAS; there is no `eas.json`): Expo prebuild generates the native `android/` project, then Gradle from the Android SDK builds it. Both `android/` and `androidApk/` are git-ignored.
+
+```bash
+# 1. Generate android/ — needed the first time and after changes to app.json, plugins/, native dependencies
+#    or the voice model; JS/TS-only changes can skip it, assembleRelease bundles the current JS.
+npx expo prebuild --platform android
+# 2. Build (in android/; on Windows ./gradlew.bat). arm64-v8a for a phone, x86_64 for the emulator.
+#    Don't build a universal APK (~320 MB, much slower).
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+# 3. Copy the result to androidApk/ in the project root (create the folder if missing), overwriting the old one.
+mkdir -p androidApk && cp android/app/build/outputs/apk/release/app-release.apk androidApk/JedenZWielu-arm64-v8a.apk
+```
+
+Prebuild rewrites `package.json` scripts and adds a placeholder package name to `app.json`; revert those changes and don't commit them. An `arm64-v8a` APK crashes on start on an x86_64 emulator (see section 7 of the progress log).
 
 ## Configuration notes
 

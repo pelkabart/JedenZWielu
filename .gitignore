@@ -44,6 +44,9 @@ yarn-error.*
 /ios/
 /android/
 
+# Zbudowane APK (kopiowane z android/app/build/outputs/apk/release/)
+/androidApk/
+
 # Pliki blokady Worda/Office (powstają, gdy dokument jest otwarty)
 ~$*
 
