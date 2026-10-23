@@ -11,8 +11,8 @@ Funkcjonalność: muzyka w tle na ekranie głównym i na ekranie wyboru poziomu 
 
 ### 2. Muzyka zagłusza lektora
 - **Ryzyko:** zbyt głośny utwór utrudni słuchanie prowadzącego.
-- **Zabezpieczenie:** stała `MENU_VOLUME = 0.4`, ustawiana przy odtwarzaczu.
-- **Test:** ręcznie: głośność 0,4 w odtwarzaczu (sprawdzone w przeglądarce).
+- **Zabezpieczenie:** stała `MENU_VOLUME = 0.3`, ustawiana przy odtwarzaczu.
+- **Test:** ręcznie: głośność 0,3 w odtwarzaczu (sprawdzone w przeglądarce).
 
 ### 3. Ustawienia odtwarzacza w renderze
 - **Ryzyko:** zmiana właściwości zwracanej z hooka w renderze jest błędem dla React Compiler.

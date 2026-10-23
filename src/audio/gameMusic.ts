@@ -6,8 +6,8 @@ import { isMusicMuted, subscribeMusicMuted } from './musicMute';
  * Głośność muzyki w rozgrywce. Lektor mówi na pełnej głośności, więc muzyka jest cicho,
  * a na czas czytania spada jeszcze bardziej (`DUCKED_VOLUME`).
  */
-const GAME_VOLUME = 0.2;
-const DUCKED_VOLUME = 0.06;
+const GAME_VOLUME = 0.22;
+const DUCKED_VOLUME = 0.066;
 
 let player: AudioPlayer | null = null;
 let ducked = false;

@@ -6,8 +6,8 @@ Funkcjonalność: muzyka w tle rozgrywki (`assets/audio/gra.mp3`), cichsza niż 
 
 ### 1. Muzyka zagłusza lektora
 - **Ryzyko:** lektor mówi na pełnej głośności, więc muzyka na stałym poziomie utrudni słuchanie pytań.
-- **Zabezpieczenie:** głośność 0,2 w grze, a na czas wypowiedzi lektora 0,06 (`DUCKED_VOLUME`). Stan „lektor mówi” idzie z kontrolera (`speaking` w widoku).
-- **Test:** przeglądarka sprawdza głośność 0,2 i pauzę (`gamemusic-probe`). Przyciszanie wymaga lektora, a w przeglądarce go nie ma; do sprawdzenia na telefonie.
+- **Zabezpieczenie:** głośność 0,22 w grze, a na czas wypowiedzi lektora 0,066 (`DUCKED_VOLUME`). Stan „lektor mówi” idzie z kontrolera (`speaking` w widoku).
+- **Test:** przeglądarka sprawdza głośność 0,22 i pauzę (`gamemusic-probe`). Przyciszanie wymaga lektora, a w przeglądarce go nie ma; do sprawdzenia na telefonie.
 
 ### 2. Muzyka gra, gdy gra stoi
 - **Ryzyko:** po pauzie („Przerwać grę?”) muzyka dalej gra.

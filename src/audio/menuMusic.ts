@@ -7,7 +7,7 @@ import { isMusicMuted, subscribeMusicMuted } from './musicMute';
 const log = createLogger('muzyka');
 
 /** Głośność muzyki w menu (0–1). Nie za głośno, żeby nie zagłuszała lektora w grze. */
-const MENU_VOLUME = 0.4;
+const MENU_VOLUME = 0.3;
 /** Zwłoka przed pauzą: przejście między ekranami menu nie przerywa melodii. */
 const PAUSE_DELAY_MS = 400;
 
