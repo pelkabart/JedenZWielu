@@ -1,7 +1,7 @@
 import { createLogger } from '@/lib/log';
 
 import { CategoryError } from './errors';
-import { generateQuestionSet, type FetchLike } from './openaiGenerator';
+import { generateQuestionSet, NO_API_KEY_MESSAGE, type FetchLike } from './openaiGenerator';
 import { validateSetName, type QuestionSetStore } from './QuestionSetStore';
 import { describeSourceFileProblem, mimeTypeFor, validateSourceFiles, type PickedFile, type SourceFile } from './sourceFiles';
 import { MAX_CUSTOM_SETS, type QuestionSet } from './types';
@@ -14,6 +14,7 @@ export interface CreateQuestionSetDeps {
   store: QuestionSetStore;
   /** Zwraca zawartość pliku w base64. */
   readFile: (file: PickedFile) => Promise<string>;
+  /** Klucz z ustawień; pusty = błąd `no-api-key` przed czytaniem plików. */
   apiKey: string;
   fetch?: FetchLike;
   onProgress?: (step: CreationStep) => void;
@@ -36,6 +37,7 @@ export async function createQuestionSet(
   if (!name.ok) throw new CategoryError('name', name.reason);
   const problem = validateSourceFiles(input.files);
   if (problem) throw new CategoryError('files', describeSourceFileProblem(problem));
+  if (apiKey.trim() === '') throw new CategoryError('no-api-key', NO_API_KEY_MESSAGE);
 
   log.info('Tworzę kategorię', { files: input.files.length, bytes: input.files.reduce((sum, f) => sum + f.size, 0) });
 

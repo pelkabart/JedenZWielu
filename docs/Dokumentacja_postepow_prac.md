@@ -42,7 +42,8 @@ Spis treści:
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
 | Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
-| Razem testów automatycznych | 361 |
+| Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
+| Razem testów automatycznych | 393 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -50,7 +51,7 @@ Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native
 
 ## 2. Ekran główny
 
-Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, cztery przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki, Kategorie) i ikona ustawień w prawym górnym rogu. Na niskich ekranach (telefon w poziomie, poniżej 400 punktów wysokości) tytuł i odstępy są mniejsze, żeby zmieściły się wszystkie przyciski.
+Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, cztery przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki, Kategorie) i ikona ustawień w prawym górnym rogu. Zębatka otwiera ekran „Ustawienia”, na razie z kluczem API OpenAI (rozdział 5, „Kategorie pytań”). Na niskich ekranach (telefon w poziomie, poniżej 400 punktów wysokości) tytuł i odstępy są mniejsze, żeby zmieściły się wszystkie przyciski.
 
 Na tym etapie nie chcieliśmy używać zewnętrznych grafik, więc tło jest narysowane w kodzie jako SVG: ciemnoniebieski gradient, promienie jak w studiu telewizyjnym, gwiazdki z grubym obrysem i znaki zapytania. Przyciski mają efekt „wciskania” (przesuwają się w dół po naciśnięciu), żeby pasowały do komiksowego stylu.
 
@@ -211,15 +212,17 @@ Przycisk „Kategorie” na dole menu otwiera listę zestawów pytań. Pierwsza 
 
 Nowa kategoria powstaje z plików gracza:
 
-1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) i wpisuje swój klucz API OpenAI.
+1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) Klucz API OpenAI jest brany z ustawień; gdy go brak, przycisk „Utwórz kategorię” jest wyłączony, a ekran pokazuje przycisk „Ustawienia”.
 2. Gra sprawdza wszystko, co da się sprawdzić bez internetu (nazwa, limit kategorii, pliki), zanim cokolwiek wyśle – zapytanie do OpenAI kosztuje.
 3. Pliki idą do OpenAI Responses API jako `input_file` (base64), razem z opisem formatu teleturnieju: odpowiedzi otwarte, krótkie, z kilkoma akceptowanymi zapisami, daty i liczby cyframi, pomyłki dla botów. Model musi odpowiedzieć zgodnie ze schematem JSON (Structured Outputs, `strict: true`), w którym dziedziny i typy odpowiedzi to dokładnie wartości z gry.
 4. Każde pytanie przechodzi przez tę samą walidację co baza domyślna (`parseQuestion`, wydzielone z `parseQuestionBank`). Złe pytania są odrzucane pojedynczo, powtórzenia pomijane. Prosimy o 60 pytań; poniżej 20 poprawnych kategoria nie powstaje.
 5. Zestaw jest zapisywany w pliku JSON w pamięci telefonu (`expo-file-system`), a klucz API w szyfrowanym magazynie systemu (`expo-secure-store`). Klucza nie ma w kodzie ani w APK.
 
+Klucz API wpisuje się raz, na ekranie „Ustawienia” (zębatka na ekranie głównym). Gra sprawdza go przed zapisem (bez spacji, zaczyna się od `sk-`, rozsądna długość), więc wklejony fragment albo spacja na końcu wychodzi od razu, a nie po kilku minutach generowania. Na Androidzie `expo-secure-store` trzyma klucz w `SharedPreferences` zaszyfrowanych kluczem z Android Keystore; wtyczka w `app.json` wyłącza ten magazyn z kopii zapasowej. Klucz zostaje po zamknięciu gry i po aktualizacji APK (ta sama nazwa wpisu co wcześniej). Ekran pokazuje go tylko zamaskowany (`sk-…abcd`) i pozwala go zmienić albo usunąć. Logika jest w `src/settings/ApiKeyStore.ts` (magazyn wstrzykiwany, w testach w pamięci), a ekrany czytają klucz przez `useSyncExternalStore` (`useApiKey`), więc po powrocie z ustawień ekran „Nowa kategoria” od razu go widzi.
+
 Gdy oprócz domyślnej jest choć jedna własna kategoria, „Tryb Jednoosobowy” pokazuje najpierw listę kategorii. Pytania w grze są losowane tylko z wybranej; z niej biorą też pomyłki boty. Bez własnych kategorii gra od razu przechodzi do wyboru poziomu.
 
-Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis, klucz). W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
+Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis), klucz API w `src/settings/`. W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
 
 Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy (commit z testami, które jeszcze nie przechodziły), potem kod.
 
@@ -250,8 +253,10 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/openaiGenerator-test.ts` | 24 | kategorie: zapytanie do Responses API (pliki, schemat), błędy HTTP, sieć, odmowa, ucięta odpowiedź, limit czasu, klucz poza logami |
 | `categories/__tests__/QuestionSetStore-test.ts` | 34 | kategorie: domyślna nieusuwalna, limit 3, jednoczesne dodania, zapis i uszkodzony zapis, nazwy |
 | `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
-| `categories/__tests__/categories-integration-test.ts` | 14 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików |
-| **Razem** | **361** | |
+| `categories/__tests__/categories-integration-test.ts` | 16 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza) |
+| `settings/__tests__/ApiKeyStore-test.ts` | 25 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz poza logami |
+| `settings/__tests__/settings-integration-test.ts` | 5 | testy integracyjne: klucz z ustawień w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
+| **Razem** | **393** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -264,7 +269,7 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
 
-Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI. Sprawdzamy, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie albo złych plikach gra nie czyta plików i nie wysyła zapytania.
+Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI. Sprawdzamy, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
 
 Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
 
@@ -281,6 +286,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[ekran-gry]` | przerwanie gry przez gracza |
 | `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
 | `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
+| `[ustawienia]` | wczytanie ustawień i zapis albo usunięcie klucza API – tylko czy klucz jest, nigdy jaki; błędy magazynu (`warn`/`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
 Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.

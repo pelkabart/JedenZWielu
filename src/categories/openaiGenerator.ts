@@ -11,6 +11,8 @@ export const QUESTIONS_TO_REQUEST = 60;
 /** Mniej poprawnych pytań nie wystarczy na sensowną grę (gra zużywa ich kilkadziesiąt). */
 export const MIN_QUESTIONS = 20;
 export const REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
+/** Komunikat, gdy w ustawieniach nie ma klucza; odsyła gracza do ekranu „Ustawienia”. */
+export const NO_API_KEY_MESSAGE = 'Brak klucza API OpenAI. Dodaj go w Ustawieniach (zębatka na ekranie głównym).';
 const MAX_OUTPUT_TOKENS = 32_000;
 
 const log = createLogger('openai');
@@ -105,7 +107,7 @@ function requestBody(files: SourceFile[], setName: string, model: string) {
 }
 
 const HTTP_ERRORS: { test: (status: number) => boolean; kind: CategoryErrorKind; message: string }[] = [
-  { test: (s) => s === 401 || s === 403, kind: 'auth', message: 'OpenAI odrzuciło klucz API. Sprawdź, czy jest poprawny i aktywny.' },
+  { test: (s) => s === 401 || s === 403, kind: 'auth', message: 'OpenAI odrzuciło klucz API. Sprawdź w Ustawieniach, czy jest poprawny i aktywny.' },
   { test: (s) => s === 429, kind: 'rate-limit', message: 'Przekroczono limit zapytań albo środków na koncie OpenAI. Spróbuj później.' },
   { test: (s) => s >= 500, kind: 'server', message: 'Serwery OpenAI mają problem. Spróbuj ponownie za chwilę.' },
 ];
@@ -145,7 +147,7 @@ export async function generateQuestionSet(options: GenerateOptions): Promise<{ q
   const { apiKey, files, setName, setId, model = OPENAI_MODEL, timeoutMs = REQUEST_TIMEOUT_MS } = options;
   const fetchFn: FetchLike = options.fetch ?? ((url, init) => fetch(url, init));
 
-  if (apiKey.trim() === '') throw new CategoryError('no-api-key', 'Podaj klucz API OpenAI.');
+  if (apiKey.trim() === '') throw new CategoryError('no-api-key', NO_API_KEY_MESSAGE);
   if (files.length === 0 || files.length > MAX_SOURCE_FILES) {
     throw new CategoryError('files', `Wybierz od 1 do ${MAX_SOURCE_FILES} plików.`);
   }

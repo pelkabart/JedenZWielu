@@ -35,6 +35,7 @@ export default function HomeScreen() {
         accessibilityRole="button"
         accessibilityLabel="Ustawienia"
         hitSlop={10}
+        onPress={() => router.push('/settings')}
         style={({ pressed }) => [
           styles.settings,
           { top: insets.top + 16, right: insets.right + 20 },

@@ -1,11 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createQuestionSet, type CreationStep } from '@/categories/createQuestionSet';
-import { loadApiKey, saveApiKey } from '@/categories/device/apiKeyStorage';
 import { pickSourceFiles, readFileBase64 } from '@/categories/device/pickSourceFiles';
 import { CategoryError } from '@/categories/errors';
 import { questionSetStore } from '@/categories/questionSets';
@@ -22,7 +21,9 @@ import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { colors } from '@/constants/theme';
+import { useApiKey } from '@/hooks/useApiKey';
 import { createLogger } from '@/lib/log';
+import { maskApiKey } from '@/settings/ApiKeyStore';
 
 const log = createLogger('ekran-kategorii');
 
@@ -38,19 +39,16 @@ export default function NewCategoryScreen() {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [files, setFiles] = useState<PickedFile[]>([]);
-  const [apiKey, setApiKey] = useState('');
+  // Klucz z ekranu „Ustawienia”; po powrocie stamtąd odświeża się sam.
+  const apiKey = useApiKey();
   const [step, setStep] = useState<CreationStep | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Dwa szybkie stuknięcia w jednej klatce widzą jeszcze stary stan — bez tego poszłyby dwa płatne zapytania.
   const submitting = useRef(false);
 
-  useEffect(() => {
-    void loadApiKey().then((saved) => setApiKey((current) => current || saved));
-  }, []);
-
   const busy = step !== null;
   const problem = files.length > 0 ? validateSourceFiles(files) : null;
-  const canSubmit = !busy && name.trim() !== '' && apiKey.trim() !== '' && files.length > 0 && problem === null;
+  const canSubmit = !busy && name.trim() !== '' && apiKey !== '' && files.length > 0 && problem === null;
 
   const addFiles = async () => {
     try {
@@ -73,7 +71,6 @@ export default function NewCategoryScreen() {
         { name, files },
         { store: questionSetStore, readFile: readFileBase64, apiKey, onProgress: setStep },
       );
-      await saveApiKey(apiKey);
       log.info('Utworzono kategorię z ekranu', { setId: set.id, questions: set.questions.length });
       router.back();
     } catch (e) {
@@ -114,18 +111,27 @@ export default function NewCategoryScreen() {
             />
 
             <Text style={styles.label}>Klucz API OpenAI</Text>
-            <TextInput
-              style={styles.input}
-              value={apiKey}
-              onChangeText={setApiKey}
-              placeholder="sk-…"
-              placeholderTextColor={colors.sky}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!busy}
-            />
-            <Text style={styles.hint}>Klucz zostaje tylko na tym telefonie (szyfrowany magazyn systemu).</Text>
+            {apiKey !== '' ? (
+              <View style={styles.keyStatus}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.categories} />
+                <Text style={styles.keyText}>Z ustawień: {maskApiKey(apiKey)}</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.keyStatus}>
+                  <Ionicons name="alert-circle" size={20} color={colors.starYellow} />
+                  <Text style={styles.keyText}>Brak klucza – dodaj go w ustawieniach.</Text>
+                </View>
+                <MenuButton
+                  label="Ustawienia"
+                  color={colors.solo}
+                  baseColor={colors.soloBase}
+                  width={200}
+                  disabled={busy}
+                  onPress={() => router.push('/settings')}
+                />
+              </>
+            )}
           </View>
 
           <View style={styles.column}>
@@ -241,6 +247,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 16,
     color: colors.outline,
+  },
+  keyStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  keyText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
   hint: {
     color: colors.sky,

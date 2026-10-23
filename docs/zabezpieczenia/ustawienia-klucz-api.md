@@ -41,4 +41,4 @@ Klucz API OpenAI wpisuje się raz, na ekranie „Ustawienia” (zębatka w prawy
 ### 7. Stary zapis z poprzedniej wersji gry
 **Ryzyko:** wcześniejsza wersja zapisywała klucz z ekranu „Nowa kategoria”. Po aktualizacji gracz musiałby wpisywać go od nowa.
 **Zabezpieczenie:** adapter używa tej samej nazwy wpisu w `SecureStore` (`openai_api_key`), więc stary klucz jest od razu widoczny w ustawieniach.
-**Test:** ręcznie (aktualizacja APK na emulatorze z zapisanym kluczem).
+**Test:** ręcznie: APK z ustawieniami zainstalowany na emulatorze na wersję, w której klucz wpisano na ekranie „Nowa kategoria” – ustawienia od razu pokazały zapisany klucz (`sk-…` + 4 ostatnie znaki), a log `[ustawienia] Wczytano ustawienia {"saved":true}`.
