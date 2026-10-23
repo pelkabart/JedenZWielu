@@ -1,6 +1,6 @@
 # Kategorie pytań (własne zestawy z OpenAI)
 
-Moduły: `src/categories/` (`sourceFiles.ts`, `generatedQuestions.ts`, `openaiGenerator.ts`, `QuestionSetStore.ts`, `soloEntry.ts`, adaptery `fileStorage.ts`, `pickSourceFiles.ts`, `apiKeyStorage.ts`, wspólna instancja `questionSets.ts`), `parseQuestion` w `src/game/questions.ts`, ekrany `src/app/categories/`, `src/app/solo/categories.tsx`
+Moduły: `src/categories/` (`sourceFiles.ts`, `generatedQuestions.ts`, `openaiGenerator.ts`, `QuestionSetStore.ts`, `soloEntry.ts`, adaptery `fileStorage.ts`, `pickSourceFiles.ts`, wspólna instancja `questionSets.ts`), `parseQuestion` w `src/game/questions.ts`, ekrany `src/app/categories/`, `src/app/solo/categories.tsx`
 Testy: `src/categories/__tests__/sourceFiles-test.ts`, `generatedQuestions-test.ts`, `openaiGenerator-test.ts`, `QuestionSetStore-test.ts`, `soloEntry-test.ts`, `categories-integration-test.ts`
 Logi: `[kategorie]` (magazyn zestawów), `[openai]` (generowanie), `[ekran-kategorii]` (ekrany).
 
@@ -32,7 +32,7 @@ W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej 
 
 ### 5. Klucz API wycieka
 **Ryzyko:** klucz wpisany w kod albo w `EXPO_PUBLIC_…` trafiłby do APK, z którego każdy może go wyciągnąć. Klucz w logach trafiłby na ekran albo do raportu.
-**Zabezpieczenie:** klucza nie ma w repozytorium ani w APK – gracz wpisuje własny klucz na ekranie dodawania kategorii; jest zapamiętywany w `expo-secure-store` (szyfrowany magazyn systemu). Logi zawierają tylko liczby i nazwy plików, nigdy klucza ani treści plików.
+**Zabezpieczenie:** klucza nie ma w repozytorium ani w APK – gracz wpisuje własny klucz w ustawieniach gry; jest zapamiętywany w `expo-secure-store` (szyfrowany magazyn systemu, szczegóły w [ustawienia-klucz-api.md](ustawienia-klucz-api.md)). Logi zawierają tylko liczby i nazwy plików, nigdy klucza ani treści plików.
 **Test:** `openaiGenerator-test.ts › klucz nie trafia do logów`.
 
 ### 6. Więcej niż 3 własne kategorie albo usunięcie domyślnej

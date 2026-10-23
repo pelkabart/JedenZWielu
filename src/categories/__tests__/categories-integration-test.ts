@@ -179,6 +179,20 @@ describe('zabezpieczenia przed wysłaniem plików', () => {
     expect(storage.writes).toBe(0);
   });
 
+  it.each([
+    ['pusty', ''],
+    ['same spacje', '   '],
+  ])('bez klucza API (%s): błąd przed czytaniem plików, z odesłaniem do ustawień', async (_, apiKey) => {
+    const { store, storage, openai, readFile, deps } = setup();
+    await store.load();
+    const error = await errorOf(createQuestionSet({ name: 'A', files: [picked('a.pdf')] }, { ...deps, apiKey }));
+    expect(error.kind).toBe('no-api-key');
+    expect(error.message).toContain('Ustawienia');
+    expect(readFile).not.toHaveBeenCalled();
+    expect(openai.calls).toHaveLength(0);
+    expect(storage.writes).toBe(0);
+  });
+
   it('nie da się odczytać pliku: błąd file-read z nazwą pliku', async () => {
     const { store, openai, deps } = setup();
     await store.load();
