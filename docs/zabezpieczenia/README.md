@@ -29,3 +29,4 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [testy-integracyjne.md](testy-integracyjne.md) | testy całej rozgrywki na prawdziwych modułach |
 | [lektor.md](lektor.md) | głos prowadzącego na żywo (Piper + sherpa-onnx), krok „czytanie” w sterowniku |
 | [odpowiedzi-glosem.md](odpowiedzi-glosem.md) | odpowiadanie na pytania głosem (mikrofon) |
+| [kategorie-pytan.md](kategorie-pytan.md) | kategorie: własne zestawy pytań generowane przez OpenAI z plików, wybór kategorii w trybie jednoosobowym |
