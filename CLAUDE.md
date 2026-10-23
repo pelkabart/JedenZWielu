@@ -67,6 +67,8 @@ cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 mkdir -p androidApk && cp android/app/build/outputs/apk/release/app-release.apk androidApk/JedenZWielu-arm64-v8a.apk
 ```
 
+Prebuild recreates `android/` from scratch, deleting `android/local.properties`, and `ANDROID_HOME` is not set on this machine, so Gradle fails with "SDK location not found". After every prebuild write `sdk.dir=C:/Users/dpietek/AppData/Local/Android/Sdk` to `android/local.properties` (forward slashes — in a `.properties` file `\U` is an escape and breaks the path).
+
 Prebuild rewrites `package.json` scripts and adds a placeholder package name to `app.json`; revert those changes and don't commit them. An `arm64-v8a` APK crashes on start on an x86_64 emulator (see section 7 of the progress log).
 
 ## Configuration notes
