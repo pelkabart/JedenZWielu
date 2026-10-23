@@ -45,6 +45,8 @@ export interface PotatoView {
   sprintEndsAt: number | null;
   /** Gra wstrzymana (okno „Przerwać grę?”). */
   paused: boolean;
+  /** Lektor właśnie mówi (muzyka w tle cichnie). */
+  speaking: boolean;
 }
 
 /** Krok z licznikiem: `fire` to czas do wykonania, `bar` to pasek widoczny dla gracza (tylko przy licznikach). */
@@ -109,6 +111,7 @@ export class PotatoController {
       choices: null,
       sprintEndsAt: null,
       paused: false,
+      speaking: false,
     };
   }
 
@@ -167,6 +170,7 @@ export class PotatoController {
   /** Lektor zgłasza, że mówi (`true`) albo skończył (`false`). Liczniki startują dopiero po ciszy. */
   setSpeaking(speaking: boolean) {
     this.speaking = speaking;
+    this.update({ speaking });
     if (!speaking) this.flushWaiting();
   }
 

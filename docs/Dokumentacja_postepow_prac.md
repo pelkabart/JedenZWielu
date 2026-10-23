@@ -49,6 +49,7 @@ Spis treści:
 | Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
 | Muzyka w menu głównym i wyborze poziomu (jedna melodia bez restartu, pauza w rozgrywce) | zrobione, sprawdzone w przeglądarce |
 | Wyciszanie muzyki (ikonka w prawym dolnym rogu, wspólna na wszystkich ekranach) | zrobione, sprawdzone w przeglądarce |
+| Muzyka w rozgrywce (cichsza niż lektor, przyciszana podczas mówienia) | zrobione; przyciszanie do sprawdzenia na telefonie |
 | Razem testów automatycznych | 305 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |

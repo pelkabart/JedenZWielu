@@ -68,6 +68,7 @@ function view(patch: Partial<PotatoView>): PotatoView {
     choices: null,
     sprintEndsAt: null,
     paused: false,
+    speaking: false,
     ...patch,
   };
 }

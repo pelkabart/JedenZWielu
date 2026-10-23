@@ -20,6 +20,7 @@ import { legendFor, PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { setGameMusicDucked, startGameMusic, stopGameMusic } from '@/audio/gameMusic';
 import { usePotatoController } from '@/hooks/usePotatoController';
 
 const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
@@ -127,6 +128,19 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
   useEffect(() => {
     if (!humanTurn) Keyboard.dismiss();
   }, [humanTurn]);
+
+  // Muzyka gry: gra razem z rozgrywką, pauzuje się z grą, a przy wyjściu się zatrzymuje.
+  useEffect(() => {
+    if (view.paused) stopGameMusic();
+    else startGameMusic();
+  }, [view.paused]);
+
+  useEffect(() => () => stopGameMusic(), []);
+
+  // Lektor mówi: muzyka cichnie, żeby nie zagłuszać pytań.
+  useEffect(() => {
+    setGameMusicDucked(view.speaking);
+  }, [view.speaking]);
 
   // Rozmiary liczone z ekranu, jak w grze z poprzednich zasad: prowadzący ma szerokość środkowego pulpitu.
   const usableWidth = width - insets.left - insets.right - 24;

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSyncExternalStore } from 'react';
 
-import { isMusicMuted, subscribeMusicMuted, toggleMusicMuted } from '@/audio/menuMusic';
+import { isMusicMuted, subscribeMusicMuted, toggleMusicMuted } from '@/audio/musicMute';
 import { colors } from '@/constants/theme';
 
 /** Przycisk wyciszania muzyki w prawym dolnym rogu. Stan jest wspólny dla wszystkich ekranów. */
@@ -23,7 +23,7 @@ export function MusicToggle() {
         pressed && styles.pressed,
       ]}
     >
-      <Ionicons name={muted ? 'mic-off' : 'mic'} size={24} color={colors.outline} />
+      <Ionicons name={muted ? 'musical-notes-outline' : 'musical-notes'} size={24} color={colors.outline} />
     </Pressable>
   );
 }
