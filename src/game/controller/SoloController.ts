@@ -1,8 +1,10 @@
 import { createLogger } from '@/lib/log';
 
+import { buildChoices, CHOICE_COUNT } from '../choices';
 import { decideAnswer, decideBuzz, decidePickDelay, decideTarget, type BotAnswer, type BotContext } from '../bots/brain';
 import { getBotProfile, type BotProfile } from '../bots/profiles';
 import { activePlayers, getPlayer, pickTargets, reduce } from '../engine';
+import { DIFFICULTY_PRESETS } from '../rules';
 import type { Rng } from '../rng';
 import { simulateGame } from '../simulate';
 import { HUMAN_ID } from '../solo';
@@ -74,6 +76,8 @@ export interface SoloView {
   paused: boolean;
   /** Mikrofon słucha odpowiedzi gracza (lektor wtedy milczy). Brak = nie słucha. */
   listening?: boolean;
+  /** Opcje A–D na pytanie, na które gracz teraz odpowiada. Brak albo inne pytanie = odpowiedź pisemna. */
+  choices?: { questionId: string; options: string[] } | null;
 }
 
 export type HumanTurn = 'answer' | 'buzz' | 'pick' | null;
@@ -329,6 +333,7 @@ export class SoloController {
         }
         if (this.startReading(question)) return;
         if (playerId === HUMAN_ID) {
+          this.prepareChoices(question);
           this.countdown(rules.answerTimeMs, rules.answerTimeMs, () => {
             log.info('Koniec czasu na odpowiedź', { playerId: HUMAN_ID });
             this.answer(HUMAN_ID, null);
@@ -557,6 +562,18 @@ export class SoloController {
       this.clock.clearTimeout(this.timer.handle);
       this.timer = null;
     }
+  }
+
+  /** Na poziomach z wyborem ABCD układa opcje na pytanie gracza. Za mało pomyłek = pisemnie, z ostrzeżeniem. */
+  private prepareChoices(question: Question) {
+    if (DIFFICULTY_PRESETS[this.view.game.difficulty].answerFormat !== 'choice') return;
+    const options = buildChoices(question, this.bank);
+    if (options.length < CHOICE_COUNT) {
+      log.warn('Za mało opcji ABCD, pytanie będzie pisemne', { questionId: question.id, options: options.length });
+      return;
+    }
+    log.debug('Opcje ABCD gotowe', { questionId: question.id });
+    this.update({ choices: { questionId: question.id, options } });
   }
 
   private botContext(playerId: string): BotContext {

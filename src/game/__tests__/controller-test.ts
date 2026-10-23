@@ -1,4 +1,5 @@
 import { getLogEntries, resetLog } from '@/lib/log';
+import { DECISION_TIME } from '../bots/brain';
 
 import { getBotProfile, type BotProfile } from '../bots/profiles';
 import {
@@ -271,7 +272,7 @@ describe('zapowiedź przed pytaniem', () => {
 
     advance(PACING.introMs);
     expect(c.getView().deadline).toBe(Date.now() + DEFAULT_RULES.answerTimeMs);
-    // Pełne 15 s od pokazania pytania, a nie od zapowiedzi.
+    // Pełny czas odpowiedzi od pokazania pytania, a nie od zapowiedzi.
     advance(DEFAULT_RULES.answerTimeMs - 1);
     expect(humanTurn(c.getView())).toBe('answer');
   });
@@ -319,8 +320,8 @@ describe('ruchy botów', () => {
 
     const elapsed = advanceUntil(c, (v) => v.overlay !== null);
     expect(c.getView().overlay).toMatchObject({ kind: 'reveal', playerId: 'b1' });
-    expect(elapsed).toBeGreaterThanOrEqual(4000);
-    expect(elapsed).toBeLessThanOrEqual(DEFAULT_RULES.answerTimeMs);
+    expect(elapsed).toBeGreaterThanOrEqual(DECISION_TIME.choice.min);
+    expect(elapsed).toBeLessThanOrEqual(DECISION_TIME.choice.max);
   });
 
   it('skip pomija pauzę po wyniku', () => {
@@ -571,11 +572,11 @@ describe('czytanie pytania', () => {
     c.start();
     toFirstQuestion(c);
     expect(c.getView().thinkingId).toBeNull();
-    // Bot odpowiada po 4 s od startu licznika — nie wcześniej, mimo że czytanie trwało 3 s.
-    advance(READ_MS + 4000 - 1);
+    // Bot odpowiada dopiero po czytaniu, czyli nie wcześniej niż po najkrótszym czasie decyzji.
+    advance(READ_MS + DECISION_TIME.choice.min - 1);
     expect(c.getView().game.events.some((e) => e.type === 'answer')).toBe(false);
     expect(c.getView().thinkingId).toBe('b1');
-    advance(1);
+    advanceUntil(c, (v) => v.overlay !== null);
     expect(c.getView().overlay).toMatchObject({ kind: 'reveal', playerId: 'b1' });
   });
 

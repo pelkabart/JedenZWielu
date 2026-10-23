@@ -23,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (18.10.2026)
+## 1. Stan projektu (23.10.2026)
 
 | Element | Stan |
 |---|---|
@@ -41,7 +41,9 @@ Spis treści:
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
-| Razem testów automatycznych | 241 |
+| Formaty odpowiedzi: ABCD na poziomach Łatwy i Normalny, pisemnie na Ekspercie | zrobione |
+| Czas decyzji botów z rozkładu Gaussa (wg PDF „Quiz Frenzy”) | zrobione |
+| Razem testów automatycznych | 256 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -144,7 +146,18 @@ Kiedy bot się myli, podaje odpowiedź tego samego rodzaju co poprawna (pole `an
 
 Czasem bot też po prostu nie zdąży odpowiedzieć.
 
+**Czas decyzji bota** losujemy z rozkładu Gaussa, zależnie od formatu odpowiedzi na danym poziomie (z PDF „Quiz Frenzy”):
+
+| Format | Średnia | Odchylenie | Zakres |
+|---|---|---|---|
+| ABCD (Łatwy, Normalny) | 1,5 s | 0,35 s | 1,0–2,5 s |
+| pisemnie (Ekspert) | 3,5 s | 0,8 s | 2,0–5,0 s |
+
+Mnożnik tempa poziomu (`speedFactor`) nadal działa: na Łatwym boty są wolniejsze, na Ekspercie szybsze. Osobowości botów nie zmieniają już czasu odpowiedzi (wcześniej profile miały różne zakresy), zostają w zgłoszeniach w finale i w skuteczności.
+
 ## 5. Ekran rozgrywki
+
+**Formaty odpowiedzi.** Na poziomach Łatwy i Normalny gracz wybiera jedną z czterech opcji A–D. Opcje to poprawna odpowiedź i trzy pomyłki tego samego rodzaju, losowane z tej samej puli co pomyłki botów (`src/game/choices.ts`). Losowanie idzie z osobnego generatora zasianego id pytania, więc to samo pytanie zawsze ma te same opcje. Na poziomie Ekspert gracz wpisuje odpowiedź (albo mówi ją, jeśli działa mikrofon). W trybie ABCD mikrofon jest wyciszony, a przycisk mikrofonu ukryty.
 
 Po wybraniu poziomu trudności zaczyna się gra. Na razie wszystko jest narysowane prostymi kształtami. Grafiki postaci i pulpitów podmienimy, kiedy będą gotowe.
 
@@ -164,7 +177,7 @@ Między zdarzeniami są krótkie pauzy (wynik odpowiedzi ok. 2 s, „X wskazuje 
 
 Silnik z etapu 3 nie wie nic o czasie. Czasem zajmuje się osobna klasa `SoloController` (`src/game/controller/SoloController.ts`):
 
-- odlicza czas na odpowiedź (15 s) i na zgłoszenie się w finale (6 s),
+- odlicza czas na odpowiedź (12 s) i na zgłoszenie się w finale (6 s),
 - wykonuje ruchy botów z opóźnieniem, żeby wyglądało, że „myślą” i piszą,
 - w finale rozstrzyga, kto zgłosił się pierwszy (gracz czy któryś bot),
 - robi pauzy między zdarzeniami i pozwala je pomijać,
@@ -219,6 +232,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
+| `answer-format-test.ts` | 10 | opcje ABCD dla każdego pytania w bazie (4 różne, w tym poprawna), format odpowiedzi na poziomach, czas decyzji botów w przedziałach, średnia rozkładu Gaussa |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
 | `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
@@ -228,7 +242,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
-| **Razem** | **246** | |
+| **Razem** | **256** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -396,6 +410,14 @@ W tej samej grze dwa boty przez wiele pytań wskazywały tylko siebie nawzajem i
 
 **7.28. Klawiatura zasłaniała pole odpowiedzi**
 Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie widać, co się wpisuje. W Expo SDK 57 aplikacja na Androidzie działa w trybie edge-to-edge, więc okno nie zmniejsza się po otwarciu klawiatury, tylko klawiatura je przykrywa. W poziomie zajmuje ona 60–70% wysokości ekranu, a panel odpowiedzi razem z paskiem etapu był wyższy niż miejsce, które zostawało nad klawiaturą. Na zrzucie ekranu w przeglądarce problemu nie było widać, bo tam nie ma klawiatury ekranowej. Rozwiązanie: aplikacja nasłuchuje zdarzeń klawiatury i zna jej wysokość (`useKeyboardHeight`). Przy otwartej klawiaturze panel ustawia się tuż nad nią, pasek etapu się chowa, a przy małej ilości miejsca panel przechodzi w tryb kompaktowy. Obliczenia układu są w osobnej czystej funkcji `answerLayout`, która ma 4 testy (bez klawiatury, z klawiaturą, mało miejsca, wycięcie ekranu). Panel jest ten sam przy otwartej i zamkniętej klawiaturze, zmienia się tylko styl, dzięki czemu pole nie traci fokusu ani wpisanego tekstu. Układ sprawdziliśmy na zrzucie z tymczasowej wersji, w której wysokość klawiatury była ustawiona na stałe na 230 dp. Ostateczne potwierdzenie wymaga testu na telefonie.
+
+### Formaty odpowiedzi i czas botów
+
+**7.29. Za mało pomyłek do opcji ABCD w pytaniach o datach**
+W bazie jest tylko 3 pytania o datach, więc dla większości z nich nie ma skąd wziąć trzech pomyłek tego samego rodzaju. Test całej bazy pokazał to przy pierwszym uruchomieniu: zamiast 4 opcji były 3, a integracyjne testy gier, które nie pozwalają na ostrzeżenia, zgłaszały ostrzeżenie „Za mało opcji ABCD”. Rozwiązanie: dla dat i liczb opcje dopełniamy liczbami obok poprawnej, tak jak robią to boty. Tę logikę przenieśliśmy do `choices.ts`, żeby nie było dwóch kopii. Test `każde pytanie w bazie dostaje 4 różne opcje` pilnuje tego dla całej bazy.
+
+**7.30. Testy czasu botów zakładały stare zakresy**
+Po zmianie na rozkład z PDF trzy testy w `controller-test.ts` oczekiwały, że bot odpowie po co najmniej 4 s (stary zakres profilu). To była zamierzona zmiana, więc testy zmieniliśmy: korzystają z tej samej stałej `DECISION_TIME`, co kod, zamiast wpisywanych na sztywno liczb. Pozostałe testy sterownika i gier przeszły bez zmian.
 
 ### Logi i testy integracyjne
 
