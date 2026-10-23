@@ -24,7 +24,7 @@ Current state: home screen, difficulty selection and a playable solo mode (human
 3. Add **unit tests** and **integration tests** (`src/game/__tests__/integration-test.ts` wires the same modules as the app, on Jest fake timers).
 4. Update `docs/Dokumentacja_postepow_prac.md` (state table, tests table, and section 7 for problems that actually happened).
 5. Before finishing: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
-6. After changes to the app, build a release APK and put it in `androidApk/` (see "Building the APK" below).
+6. Don't build the APK as part of this workflow. Build it only when the user explicitly asks; then follow "Building the APK" below and put the result in `androidApk/`.
 
 ## Commands
 
