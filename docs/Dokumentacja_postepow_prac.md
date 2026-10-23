@@ -43,7 +43,9 @@ Spis treści:
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
 | Formaty odpowiedzi: ABCD na poziomach Łatwy i Normalny, pisemnie na Ekspercie | zrobione |
 | Czas decyzji botów z rozkładu Gaussa (wg PDF „Quiz Frenzy”) | zrobione |
-| Razem testów automatycznych | 256 |
+| Silnik rund „Gorący Ziemniak” (runda 1–4, czysty, bez UI) | zrobione, bez podłączenia do ekranu |
+| Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
+| Razem testów automatycznych | 279 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -217,6 +219,19 @@ Na pytanie można odpowiedzieć na dwa sposoby: wpisać odpowiedź albo ją powi
 - Cisza albo brak zgody na mikrofon nie kosztują szansy: gracz widzi komunikat i może spróbować jeszcze raz albo wpisać.
 - Przycisk pojawia się tylko wtedy, gdy telefon ma rozpoznawanie mowy (nie ma go w Expo Go ani na emulatorze bez usług Google). O zgodę na mikrofon gra pyta dopiero przy pierwszym dotknięciu przycisku.
 
+## 5a. Rundy „Gorący Ziemniak” (silnik, gałąź `nowe_solo`)
+
+Przebieg z dokumentu „Quiz Frenzy” w silniku `src/game/potato/engine.ts`. Silnik nie losuje i nie loguje: losowe decyzje (kto dostaje ziemniak po błędzie, cel bota) podaje wywołujący w akcji.
+
+| Runda | Co się dzieje | Zasady przyjęte przy wdrożeniu |
+|---|---|---|
+| 1 (5 → 4) | 3 życia; poprawna odpowiedź przekazuje ziemniaka wybranemu rywalowi; błąd lub brak odpowiedzi to −1 życie i reset ziemniaka do wskazanego gracza; odbicie w ciemno raz na gracza, bez utraty życia; pierwsze odpadnięcie kończy rundę | odbicie wykonuje się przed pytaniem, nie po błędzie |
+| 2 (4 → 3) | 3 punkty osłony; poprawna odpowiedź podnosi mnożnik ×1→×2→×3 i przekazuje bombę; błąd to wybuch: odejmuje mnożnik od osłony i resetuje go do ×1; 0 osłony odpada | po wybuchu bombę dostaje gracz wskazany przez wywołującego |
+| 3 (sprint, 60 s) | wszyscy zachowują awans; +1 punkt za dobrą odpowiedź, −1 s za błąd lub brak; ziemniak rotuje | remis punktów: mniej błędów, potem miejsce przy stole |
+| 4 (finał, 3 → mistrz) | nagrody sprintu: 1. miejsce 3 szanse i pierwszy atak, 2. miejsce 2 szanse, 3. miejsce 1 szansa; poprawna odpowiedź: +1 szansa (max 3) dla siebie i −1 każdemu rywalowi; „atak” = przekazanie rywalowi, „na siebie” = kolejne pytanie dla siebie; błąd −1; wygrywa ostatni zostający | po błędzie w finale następny gracz wskazany przez wywołującego |
+
+Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Silnik rund nie jest jeszcze podłączony do kontrolera ani ekranu, więc w grze nadal działa stary przebieg etapów I–II i finał.
+
 ## 6. Testy i analiza dynamiczna
 
 Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
@@ -242,7 +257,8 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
-| **Razem** | **256** | |
+| `potato/__tests__/potato-test.ts` | 23 | rundy 1–4 gry „Gorący Ziemniak”: przekazania, odbicie w ciemno, bomba i mnożnik, sprint z czasem i nagrodami, finał, boty wybierają cel, pełna gra zaskryptowana |
+| **Razem** | **279** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -418,6 +434,12 @@ W bazie jest tylko 3 pytania o datach, więc dla większości z nich nie ma ską
 
 **7.30. Testy czasu botów zakładały stare zakresy**
 Po zmianie na rozkład z PDF trzy testy w `controller-test.ts` oczekiwały, że bot odpowie po co najmniej 4 s (stary zakres profilu). To była zamierzona zmiana, więc testy zmieniliśmy: korzystają z tej samej stałej `DECISION_TIME`, co kod, zamiast wpisywanych na sztywno liczb. Pozostałe testy sterownika i gier przeszły bez zmian.
+
+**7.31. Test lektora zależał od długości pytania**
+Po zmianie losowania botów w grze lektora trafiło się dłuższe pytanie i czytanie trwało dłużej niż 20 s, którego test oczekiwał. Sprawdziliśmy, że czytanie kończy się samo (test przechodzi z 120 s), i zwiększyliśmy czas oczekiwania w teście. Zmiana nie dotyczy kodu lektora.
+
+**7.32. Błędne oczekiwania w testach rund**
+Dwa z pierwszych testów rund były napisane źle: zakładały rundę 2 po odpadnięciu, które w grze przechodzi do sprintu (przy 4 graczach odpadnięcie daje 3), oraz kolejność rankingu bez uwzględnienia dat odpadnięcia. Poprawiliśmy oczekiwania do reguł z dokumentu, a jeden test usunęliśmy, bo opisywał sytuację, której w grze nie ma (runda 2 zaczyna się z 4 graczami).
 
 ### Logi i testy integracyjne
 
