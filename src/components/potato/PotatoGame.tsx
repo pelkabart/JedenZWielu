@@ -243,7 +243,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
                     width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
                     highlighted={game.holderId === player.id}
                     selectable={targets.includes(player.id)}
-                    showScore={phase === 'sprint' || phase === 'finished'}
+                    showScore={phase === 'sprint' || phase === 'duel' || phase === 'finished'}
                     bubble={bubbleFor(view, player.id)}
                     onPress={() => onPickPlayer(player.id)}
                   />

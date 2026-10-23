@@ -41,7 +41,12 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Zabezpieczenie:** przy równych punktach wygrywa mniej błędów, potem miejsce przy stole (`seat`). Zasada zapisana w dokumencie.
 - **Test:** `potato-test.ts` › „remis punktów rozstrzyga błędy, potem miejsce”.
 
-### 8. Cios w finale eliminuje za dużo
+### 8. Poprawna odpowiedź w finale zabiera szanse rywalom
+- **Ryzyko (po zmianie):** cios wyeliminował rywali, a gracz chciał, żeby finał był jak w „1 z 10”.
+- **Zabezpieczenie:** cios usunięty. Poprawna odpowiedź daje punkt i przywraca 1 szansę (max 3); rywale nic nie tracą. Odpadają tylko przez błędy.
+- **Test:** `potato-test.ts` › „poprawna odpowiedź: +1 punkt i +1 szansa dla siebie”; „w finale nikt nie traci szans, bo rywal odpowiedział dobrze”; „błędy odpadają w finale”.
+
+### 8a. (dawny opis ciosu — nieaktualny)
 - **Ryzyko:** poprawna odpowiedź w rundzie 4 zabiera rywalom życia w złej kolejności albo eliminuje też samego odpowiadającego.
 - **Zabezpieczenie:** odpowiadający dostaje +1 życie (max 3), każdy rywal −1; eliminacja w kolejności miejsc; odpowiadający nie może odpaść od własnego ciosu.
 - **Test:** `potato-test.ts` › „poprawna odpowiedź w finale: +1 dla siebie, −1 dla rywali”.

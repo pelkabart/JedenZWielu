@@ -176,12 +176,19 @@ describe('runda 4: finałowy krąg', () => {
     phase: 'duel',
   });
 
-  it('poprawna odpowiedź: +1 życie dla siebie (max 3) i −1 dla każdego rywala', () => {
-    const s0 = withPlayers(duel(), { h: { lives: 2 }, b3: { lives: 2 }, b4: { lives: 3 } });
+  it('poprawna odpowiedź: +1 punkt i +1 szansa dla siebie (max 3), rywale bez zmian', () => {
+    const s0 = withPlayers(duel(), { h: { lives: 2, points: 4 }, b3: { lives: 2 }, b4: { lives: 3 } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
-    expect(player(s, 'h').lives).toBe(3);
-    expect(player(s, 'b3').lives).toBe(1);
-    expect(player(s, 'b4').lives).toBe(2);
+    expect(player(s, 'h')).toMatchObject({ lives: 3, points: 5 });
+    expect(player(s, 'b3').lives).toBe(2);
+    expect(player(s, 'b4').lives).toBe(3);
+  });
+
+  it('w finale nikt nie traci szans, bo rywal odpowiedział dobrze', () => {
+    const s0 = withPlayers(duel(), { h: { lives: 1 }, b3: { lives: 1 }, b4: { lives: 1 } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
+    expect(activePlayers(s)).toHaveLength(3);
+    expect(player(s, 'b4').lives).toBe(1);
   });
 
   it('„na siebie”: odpowiadający bierze kolejne pytanie', () => {
@@ -190,14 +197,13 @@ describe('runda 4: finałowy krąg', () => {
     expect(s.phase).toBe('duel');
   });
 
-  it('cios odpowiadającego eliminuje rywala z 1 życiem, a ostatni zostający wygrywa', () => {
-    const s0 = withPlayers(duel(), { h: { lives: 1 }, b3: { lives: 1 }, b4: { lives: 3 } });
-    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b4' });
-    expect(player(s, 'b3').eliminated).toBe(true);
-    expect(player(s, 'b4').eliminated).toBe(false);
-    expect(s.phase).toBe('duel');
-    const end = withPlayers(s0, { b4: { lives: 1 } });
-    const finished = reducePotato(end, { type: 'answer', playerId: 'h', text: OK, next: 'b4' });
+  it('błędy odpadają w finale, a ostatni zostający wygrywa', () => {
+    const s0 = withPlayers(duel(), { h: { lives: 1 }, b3: { lives: 1 }, b4: { lives: 1 } });
+    const s1 = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
+    const s2 = reducePotato(s1, { type: 'answer', playerId: 'b3', text: BAD, next: 'b4' });
+    expect(player(s2, 'b3').eliminated).toBe(true);
+    expect(s2.phase).toBe('duel');
+    const finished = reducePotato(s2, { type: 'answer', playerId: 'b4', text: BAD, next: 'h' });
     expect(finished.phase).toBe('finished');
     // Zwycięzca pierwszy, potem odpadający: ostatnio odpadły wyżej. Bez daty odpadnięcia (ustawionej w teście) — kolejność przy stole.
     expect(finished.ranking).toEqual(['h', 'b4', 'b3', 'b1', 'b2']);
@@ -241,7 +247,8 @@ describe('pełna gra zaskryptowana od początku do końca', () => {
       }
       const holder = s.holderId!;
       const others = activePlayers(s).filter((p) => p.id !== holder);
-      const correct = s.cursor % 3 !== 0;
+      // W finale skrypt zawsze się myli, żeby szanse się wyczerpały; w poprzednich rundach co trzecia odpowiedź jest zła.
+      const correct = s.phase === 'duel' ? false : s.cursor % 3 !== 0;
       const next = others[0].id;
       s = reducePotato(s, { type: 'answer', playerId: holder, text: correct ? OK : BAD, next });
     }

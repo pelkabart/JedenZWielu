@@ -237,15 +237,13 @@ function finishSprint(s: PotatoState) {
 }
 
 /**
- * Finał: poprawna odpowiedź daje +1 życie (max 3) i −1 każdemu rywalowi. `next` to rywal (atak) albo
- * odpowiadający („na siebie”). Błąd kosztuje życie, a ziemniak idzie do wskazanego aktywnego gracza.
+ * Finał: poprawna odpowiedź daje punkt i przywraca 1 szansę (max 3); rywale nic nie tracą.
+ * Błąd odbiera szansę. `next` to rywal (atak) albo odpowiadający („na siebie”).
  */
 function answerDuel(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
   if (correct) {
+    holder.points++;
     holder.lives = Math.min(POTATO.maxLives, holder.lives + 1);
-    for (const rival of activePlayers(s)) {
-      if (rival.id !== holder.id) loseLife(s, rival);
-    }
   } else {
     loseLife(s, holder);
   }

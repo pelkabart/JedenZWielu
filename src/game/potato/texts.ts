@@ -14,7 +14,7 @@ export const PHASE_RULE: Record<PotatoPhase, string> = {
   round1: 'Każdy błąd kosztuje życie. Kto straci wszystkie, odpada.',
   round2: 'Każda dobra odpowiedź podnosi mnożnik. Błąd to wybuch: tracisz osłonę równą mnożnikowi.',
   sprint: '60 sekund na punkty. Dobra odpowiedź to punkt, błąd to 1 sekunda mniej.',
-  duel: 'Dobra odpowiedź daje Ci szansę i odbiera szansę rywalom. Zostaje ostatni gracz.',
+  duel: 'Dobra odpowiedź daje punkt i przywraca szansę. Błąd odbiera szansę. Zostaje ostatni gracz.',
   finished: '',
 };
 
@@ -28,7 +28,7 @@ export function legendFor(phase: PotatoPhase, multiplier: number): string {
     case 'sprint':
       return 'Liczba przy graczu to punkty w sprincie.';
     case 'duel':
-      return 'Kropki to szanse. Odpadasz przy 0.';
+      return 'Kropki to szanse, odpadasz przy 0. Liczba przy graczu to punkty.';
     case 'finished':
       return '';
   }
