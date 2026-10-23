@@ -60,7 +60,9 @@ The APK is built locally (no EAS; there is no `eas.json`): Expo prebuild generat
 # 1. Generate android/ — needed the first time and after changes to app.json, plugins/, native dependencies
 #    or the voice model; JS/TS-only changes can skip it, assembleRelease bundles the current JS.
 npx expo prebuild --platform android
-# 2. Build (in android/; on Windows ./gradlew.bat). arm64-v8a for a phone, x86_64 for the emulator.
+# 2. Build (in android/; on Windows ./gradlew.bat). The target is a regular Android 15 phone; arm64-v8a is
+#    its CPU architecture (practically every current phone), not a special device. minSdk 24 / targetSdk 36,
+#    so Android 15 (API 35) is covered. Use x86_64 only for the PC emulator.
 #    Don't build a universal APK (~320 MB, much slower).
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 # 3. Copy the result to androidApk/ in the project root (create the folder if missing), overwriting the old one.
