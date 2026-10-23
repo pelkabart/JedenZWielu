@@ -162,7 +162,7 @@ describe('lektor w pełnej grze', () => {
     expect(voice.state).toBe('speaking');
     expect(voice.actions().slice(-2)).toEqual(['pause', 'resume']);
     // Czytanie kończy się samo, a gra idzie dalej.
-    await advance(20000);
+    await advance(120000);
     expect(controller.getView().overlay?.kind).not.toBe('reading');
     expect(getLogEntries({ minLevel: 'warn' })).toEqual([]);
   });

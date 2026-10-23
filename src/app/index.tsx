@@ -8,8 +8,10 @@ import { questionSetStore } from '@/categories/questionSets';
 import { soloEntryRoute } from '@/categories/soloEntry';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { MusicToggle } from '@/components/home/MusicToggle';
 import { colors } from '@/constants/theme';
 import { useQuestionSets } from '@/hooks/useQuestionSets';
+import { useMenuMusic } from '@/hooks/useMenuMusic';
 
 /** Poniżej tej wysokości (telefon w poziomie) cztery przyciski i tytuł muszą się ścisnąć. */
 const COMPACT_HEIGHT = 400;
@@ -18,6 +20,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const compact = height - insets.top - insets.bottom < COMPACT_HEIGHT;
+  useMenuMusic();
   // Wczytuje kategorie już na ekranie głównym, żeby wybór trybu jednoosobowego ich nie czekał.
   useQuestionSets();
 
@@ -30,6 +33,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
       <CartoonBackground />
+      <MusicToggle />
 
       <Pressable
         accessibilityRole="button"

@@ -1,4 +1,4 @@
-import type { Difficulty, Rules } from './types';
+import type { AnswerFormat, Difficulty, Rules } from './types';
 
 export const DEFAULT_RULES: Rules = {
   lives: 3,
@@ -7,7 +7,7 @@ export const DEFAULT_RULES: Rules = {
   finalLives: 3,
   finalQuestionPool: 50,
   pointsPerCorrect: 10,
-  answerTimeMs: 15000,
+  answerTimeMs: 12000,
   buzzWindowMs: 6000,
   maxQuestionsWithoutHuman: 4,
 };
@@ -22,12 +22,16 @@ export interface DifficultyPreset {
   speedFactor: number;
   /** Szansa, że bot zagra zgodnie ze swoją osobowością, a nie losowo. */
   strategicness: number;
+  /** Format odpowiedzi gracza: wybór A–D albo pisemnie. */
+  answerFormat: AnswerFormat;
+  /** Czas gracza na odpowiedź (wg PDF „Quiz Frenzy”). */
+  answerTimeMs: number;
 }
 
 export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyPreset> = {
-  easy: { label: 'Łatwy', knowledgeOffset: -0.2, speedFactor: 1.3, strategicness: 0.5 },
-  normal: { label: 'Normalny', knowledgeOffset: 0, speedFactor: 1, strategicness: 0.8 },
-  expert: { label: 'Ekspert', knowledgeOffset: 0.15, speedFactor: 0.75, strategicness: 1 },
+  easy: { label: 'Łatwy', knowledgeOffset: -0.2, speedFactor: 1.3, strategicness: 0.5, answerFormat: 'choice', answerTimeMs: 7000 },
+  normal: { label: 'Normalny', knowledgeOffset: 0, speedFactor: 1, strategicness: 0.8, answerFormat: 'choice', answerTimeMs: 5000 },
+  expert: { label: 'Ekspert', knowledgeOffset: 0.15, speedFactor: 0.75, strategicness: 1, answerFormat: 'text', answerTimeMs: 10000 },
 };
 
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'expert'];

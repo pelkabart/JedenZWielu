@@ -1,8 +1,9 @@
 import { isCorrectAnswer } from '../answers';
+import { nearbyNumber } from '../choices';
 import { getPlayer, pickTargets } from '../engine';
 import { DIFFICULTY_PRESETS } from '../rules';
-import { pickRandom, randomInt, type Rng } from '../rng';
-import type { Difficulty, GameState, PlayerState, Question, QuestionDifficulty, Rules } from '../types';
+import { gaussian, pickRandom, randomInt, type Rng } from '../rng';
+import type { AnswerFormat, Difficulty, GameState, PlayerState, Question, QuestionDifficulty, Rules } from '../types';
 import type { BotProfile } from './profiles';
 
 export interface BotContext {
@@ -27,6 +28,11 @@ export interface BotBuzz {
 }
 
 const QUESTION_DIFFICULTY_MODIFIER: Record<QuestionDifficulty, number> = { 1: 0.12, 2: 0, 3: -0.15 };
+/** Czas decyzji wg formatu odpowiedzi (PDF „Quiz Frenzy”: rozkład Gaussa wokół 1,5 s dla ABCD i 3,5 s dla pisemnego). */
+export const DECISION_TIME: Record<AnswerFormat, { mean: number; sd: number; min: number; max: number }> = {
+  choice: { mean: 1500, sd: 350, min: 1000, max: 2500 },
+  text: { mean: 3500, sd: 800, min: 2000, max: 5000 },
+};
 const TIMEOUT_CHANCE_WHEN_UNSURE = 0.3;
 
 export function correctChance(profile: BotProfile, question: Question, difficulty: Difficulty): number {
@@ -42,16 +48,12 @@ function scaled(ctx: BotContext, [min, max]: [number, number]) {
   return Math.round(randomInt(ctx.rng, min, max) * DIFFICULTY_PRESETS[ctx.difficulty].speedFactor);
 }
 
-/** Liczba "obok" poprawnej: rok przesunięty o kilka–kilkadziesiąt lat, liczba o kilkadziesiąt procent. */
-function nearbyNumber(ctx: BotContext, question: Question): string | null {
-  const correct = Number(question.answers[0]);
-  const spread = question.answerType === 'data' ? 40 : Math.max(2, Math.round(correct * 0.3));
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const delta = randomInt(ctx.rng, 1, spread) * (ctx.rng() < 0.5 ? -1 : 1);
-    const candidate = String(correct + delta < 0 ? correct - delta : correct + delta);
-    if (!isCorrectAnswer(candidate, question.answers)) return candidate;
-  }
-  return null;
+/** Czas decyzji bota: rozkład Gaussa dla formatu poziomu, przycięty do zakresu i pomnożony przez tempo poziomu. */
+function decisionDelay(ctx: BotContext, latest: number): number {
+  const preset = DIFFICULTY_PRESETS[ctx.difficulty];
+  const { mean, sd, min, max } = DECISION_TIME[preset.answerFormat];
+  const base = Math.min(max, Math.max(min, gaussian(ctx.rng, mean, sd)));
+  return Math.min(latest, Math.round(base * preset.speedFactor));
 }
 
 /**
@@ -65,7 +67,7 @@ export function wrongAnswer(ctx: BotContext, question: Question): string | null 
   const own = (question.wrongAnswers ?? []).filter(notCorrect);
   if (own.length > 0) return pickRandom(ctx.rng, own);
 
-  if (question.answerType === 'data' || question.answerType === 'liczba') return nearbyNumber(ctx, question);
+  if (question.answerType === 'data' || question.answerType === 'liczba') return nearbyNumber(ctx.rng, question);
 
   const sameType = (ctx.bank ?? []).filter((q) => q.id !== question.id && q.answerType === question.answerType);
   const sameCategory = sameType.filter((q) => q.category === question.category);
@@ -82,11 +84,11 @@ export function decideAnswer(ctx: BotContext, question: Question, rules: Rules, 
   const latest = rules.answerTimeMs - 300;
 
   if (willKnow) {
-    return { text: pickRandom(ctx.rng, question.answers), delayMs: Math.min(latest, scaled(ctx, ctx.profile.answerTimeMs)) };
+    return { text: pickRandom(ctx.rng, question.answers), delayMs: decisionDelay(ctx, latest) };
   }
   const decoy = ctx.rng() < TIMEOUT_CHANCE_WHEN_UNSURE ? null : wrongAnswer(ctx, question);
   if (decoy === null) return { text: null, delayMs: rules.answerTimeMs };
-  return { text: decoy, delayMs: Math.min(latest, Math.round(scaled(ctx, ctx.profile.answerTimeMs) * 1.2)) };
+  return { text: decoy, delayMs: decisionDelay(ctx, latest) };
 }
 
 export function decideBuzz(ctx: BotContext, question: Question, rules: Rules): BotBuzz {

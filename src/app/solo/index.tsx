@@ -6,8 +6,10 @@ import { DEFAULT_SET_ID } from '@/categories/types';
 import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { MusicToggle } from '@/components/home/MusicToggle';
 import { colors } from '@/constants/theme';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
+import { useMenuMusic } from '@/hooks/useMenuMusic';
 import type { Difficulty } from '@/game/types';
 
 const OPTIONS: { difficulty: Difficulty; color: string; baseColor: string }[] = [
@@ -19,11 +21,12 @@ const OPTIONS: { difficulty: Difficulty; color: string; baseColor: string }[] = 
 export default function DifficultyScreen() {
   const { set = DEFAULT_SET_ID } = useLocalSearchParams<{ set?: string }>();
   const chosen = questionSetStore.getSet(set);
-
+  useMenuMusic();
   return (
     <View style={styles.container}>
       <CartoonBackground />
       <BackButton />
+      <MusicToggle />
 
       <View style={styles.content}>
         <Text style={styles.title}>Wybierz poziom trudności</Text>

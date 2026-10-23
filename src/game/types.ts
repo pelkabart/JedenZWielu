@@ -34,6 +34,9 @@ export interface Question {
 
 export type Difficulty = 'easy' | 'normal' | 'expert';
 
+/** Jak gracz podaje odpowiedź: wybór A–D albo wpisanie tekstu. */
+export type AnswerFormat = 'choice' | 'text';
+
 export type Phase = 'stage1' | 'stage2' | 'final' | 'finished';
 
 export interface Rules {

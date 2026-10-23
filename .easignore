@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Expo example project
+/example/
+
+# Generated native folders
+/ios/
+/android/
+
+# Office temporary files
+~$*
+
+# Test coverage
+coverage/
+
+# Python environment and cache
+scripts/narration/.venv/
+scripts/narration/__pycache__/
+
+# Local EAS archive inspection copy
+/eas-inspect/
+
+# IMPORTANT: Do NOT exclude voiceModel/vits-piper-pl/ here.
+# Expo EAS needs these generated sherpa-onnx files for withVoiceModel.js:
+# voiceModel/vits-piper-pl/model.onnx
+# voiceModel/vits-piper-pl/tokens.txt
+# voiceModel/vits-piper-pl/espeak-ng-data/

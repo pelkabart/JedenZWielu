@@ -13,7 +13,8 @@ export function BackButton() {
       accessibilityRole="button"
       accessibilityLabel="Wróć"
       hitSlop={10}
-      onPress={() => router.back()}
+      // Ekran wyboru poziomu zawsze wraca do menu głównego. Nie zależy to od historii, bo strona może być otwarta bezpośrednio.
+      onPress={() => router.replace('/')}
       style={({ pressed }) => [
         styles.button,
         { top: insets.top + 16, left: insets.left + 20 },

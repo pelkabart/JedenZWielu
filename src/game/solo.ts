@@ -1,6 +1,6 @@
 import { pickOpponents } from './bots/profiles';
 import { createGame } from './engine';
-import { SOLO_PLAYER_COUNT } from './rules';
+import { DIFFICULTY_PRESETS, SOLO_PLAYER_COUNT } from './rules';
 import { randomInt, type Rng } from './rng';
 import type { Difficulty, GameState, PlayerSetup, Question, Rules } from './types';
 
@@ -25,5 +25,7 @@ export function createSoloGame({ difficulty, humanName, questions, rng, rules }:
   // Gracz siada na losowym miejscu, więc nie zawsze odpowiada pierwszy.
   const players: PlayerSetup[] = [...bots];
   players.splice(randomInt(rng, 0, bots.length), 0, { id: HUMAN_ID, name: humanName, isHuman: true });
-  return createGame({ players, difficulty, questions, rng, rules });
+  // Czas odpowiedzi zależy od poziomu; jawnie podane `rules` go nadpisują.
+  const timed = { answerTimeMs: DIFFICULTY_PRESETS[difficulty].answerTimeMs, ...rules };
+  return createGame({ players, difficulty, questions, rng, rules: timed });
 }

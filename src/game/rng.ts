@@ -17,6 +17,13 @@ export function randomInt(rng: Rng, min: number, max: number) {
   return min + Math.floor(rng() * (max - min + 1));
 }
 
+/** Liczba z rozkładu normalnego (metoda Boxa–Mullera), ze średnią `mean` i odchyleniem `sd`. */
+export function gaussian(rng: Rng, mean: number, sd: number): number {
+  const u = Math.max(rng(), Number.EPSILON);
+  const v = rng();
+  return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
 export function pickRandom<T>(rng: Rng, items: readonly T[]): T {
   if (items.length === 0) throw new Error('pickRandom: pusta lista');
   return items[Math.floor(rng() * items.length)];

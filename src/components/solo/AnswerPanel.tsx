@@ -18,18 +18,23 @@ type Props = {
   onSubmit: (text: string) => void;
   /** Mikrofon zaczął albo przestał słuchać (sterownik ucisza wtedy lektora). */
   onListening?: (listening: boolean) => void;
+  /** Opcje A–D; brak = odpowiedź wpisywana albo mówiona. */
+  choices?: string[] | null;
 };
+
+const LETTERS = ['A', 'B', 'C', 'D'];
 
 /**
  * Widok na czas odpowiedzi: wpisanej albo powiedzianej (mikrofon). W poziomie klawiatura zasłania
  * ok. połowę ekranu, więc wszystko, co potrzebne, mieści się w górnej części.
  */
-export function AnswerPanel({ question, deadline, totalMs, paused, compact = false, onSubmit, onListening }: Props) {
+export function AnswerPanel({ question, deadline, totalMs, paused, compact = false, onSubmit, onListening, choices }: Props) {
   const [text, setText] = useState('');
   const submit = () => {
     if (text.trim() !== '') onSubmit(text);
   };
-  const voice = useVoiceAnswer(question, paused, {
+  // Przy wyborze A–D mikrofon nie nasłuchuje, bo odpowiedź to jeden z przycisków.
+  const voice = useVoiceAnswer(question, paused || choices != null, {
     onTranscript: setText,
     onAnswer: onSubmit,
     onListening: (listening) => onListening?.(listening),
@@ -46,6 +51,24 @@ export function AnswerPanel({ question, deadline, totalMs, paused, compact = fal
       <Text style={[styles.question, compact && styles.questionCompact]} numberOfLines={2}>
         {question.question}
       </Text>
+      {choices ? (
+        <View style={styles.choices}>
+          {choices.map((option, i) => (
+            <Pressable
+              key={option}
+              onPress={() => onSubmit(option)}
+              accessibilityRole="button"
+              accessibilityLabel={`${LETTERS[i]}: ${option}`}
+              style={({ pressed }) => [styles.choice, pressed && styles.submitPressed]}
+            >
+              <Text style={styles.choiceLetter}>{LETTERS[i]}</Text>
+              <Text style={styles.choiceText} numberOfLines={2}>
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
       <View style={styles.row}>
         <TextInput
           style={styles.input}
@@ -83,6 +106,7 @@ export function AnswerPanel({ question, deadline, totalMs, paused, compact = fal
           <Text style={styles.submitLabel}>OK</Text>
         </Pressable>
       </View>
+      )}
       {voice.message && <Text style={styles.message}>{voice.message}</Text>}
       <TimerBar deadline={deadline} totalMs={totalMs} paused={paused} />
     </View>
@@ -134,6 +158,44 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 8,
+  },
+  choices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  choice: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: colors.outline,
+    backgroundColor: colors.navy,
+  },
+  choiceLetter: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: colors.outline,
+    backgroundColor: colors.starYellow,
+    color: colors.outline,
+    textAlign: 'center',
+    lineHeight: 22,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  choiceText: {
+    flex: 1,
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '800',
   },
   input: {
     flex: 1,

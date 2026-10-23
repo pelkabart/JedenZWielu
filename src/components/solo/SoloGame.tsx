@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Alert, BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
@@ -28,7 +28,9 @@ import { Results } from './Results';
 const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
 /** Przesunięcie pulpitów w pionie — układają się w łuk. */
 const ARC = [16, 6, 0, 6, 16];
-const PODIUM_GAP = 8;
+const PODIUM_GAP = 22;
+/** Szerokość pulpitu wg miejsca: skrajne są największe, środkowy najmniejszy (efekt perspektywy). */
+const SEAT_SCALE = [1, 0.92, 0.84, 0.92, 1];
 
 const log = createLogger('ekran-gry');
 
@@ -73,34 +75,35 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
   const targets = turn === 'pick' ? pickTargets(game, HUMAN_ID).map((p) => p.id) : [];
   const allowSelf = game.pending.kind === 'pick' && game.pending.allowSelf;
 
+  // Własne okno zamiast Alert.alert: na webie Alert nic nie pokazuje, a gra zostawała zatrzymana.
+  const [exitAsked, setExitAsked] = useState(false);
+
   const confirmExit = () => {
     if (finished) {
       router.dismissAll();
       return;
     }
     controller.pause();
-    Alert.alert(
-      'Przerwać grę?',
-      'Postęp tej rozgrywki zostanie utracony.',
-      [
-        { text: 'Graj dalej', style: 'cancel', onPress: () => controller.start() },
-        {
-          text: 'Wyjdź',
-          style: 'destructive',
-          onPress: () => {
-            log.info('Gracz przerwał grę', { phase: game.phase });
-            router.dismissAll();
-          },
-        },
-      ],
-      { cancelable: true, onDismiss: () => controller.start() },
-    );
+    setExitAsked(true);
+  };
+
+  const stayInGame = () => {
+    setExitAsked(false);
+    controller.start();
+  };
+
+  const leaveGame = () => {
+    log.info('Gracz przerwał grę', { phase: game.phase });
+    // Po odświeżeniu strony gra jest jedynym ekranem w stosie, więc dismissAll nie ma dokąd wrócić.
+    if (router.canDismiss()) router.dismissAll();
+    else router.replace('/');
   };
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (finished) return false;
-      confirmExit();
+      if (exitAsked) stayInGame();
+      else confirmExit();
       return true;
     });
     return () => subscription.remove();
@@ -113,12 +116,18 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
   // Rozmiary liczone z ekranu, żeby scena zmieściła się na niskich telefonach w poziomie.
   const usableWidth = width - insets.left - insets.right - 24;
   const usableHeight = height - insets.top - insets.bottom - 16;
-  const hostWidth = Math.min(170, usableWidth * 0.2);
-  const stageWidth = usableWidth - hostWidth - 12;
-  const podiumWidth = Math.max(
+  // Prowadzący ma szerokość środkowego pulpitu. Rząd jest wyśrodkowany, a po obu stronach zostaje miejsce na prowadzącego.
+  const scaleSum = SEAT_SCALE.reduce((sum, scale) => sum + scale, 0);
+  const centerScale = SEAT_SCALE[Math.floor(SEAT_SCALE.length / 2)];
+  const podiumUnit = Math.max(
     64,
-    Math.min((stageWidth - PODIUM_GAP * 4) / 5, (usableHeight - 230) / 1.35, 130),
+    Math.min(
+      (usableWidth - 24 - PODIUM_GAP * (SEAT_SCALE.length - 1)) / (scaleSum + 2 * centerScale),
+      (usableHeight - 230) / 1.35,
+      160,
+    ),
   );
+  const hostWidth = podiumUnit * centerScale;
 
   const answering = answerLayout({ windowHeight: height, keyboardHeight, safeTop: insets.top });
 
@@ -185,11 +194,12 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
               compact={answering.compact}
               onSubmit={(text) => controller.submitAnswer(text)}
               onListening={(listening) => controller.setListening(listening)}
+              choices={view.choices?.questionId === question.id ? view.choices.options : null}
             />
           </View>
         ) : (
           <Pressable style={styles.stage} onPress={() => controller.skip()} accessible={false}>
-            <View style={{ width: hostWidth }}>
+            <View style={[styles.hostSlot, { width: hostWidth }]}>
               <Host line={hostLine(view)} size={hostWidth * 0.42} />
             </View>
 
@@ -203,13 +213,13 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
                 reading={overlay?.kind === 'reading'}
               />
 
-              <View style={styles.podiums}>
+              <View style={[styles.podiums, { paddingHorizontal: hostWidth + 12, paddingTop: 36 + usableHeight * 0.07 }]}>
                 {game.players.map((player) => (
                   <View key={player.id} style={{ transform: [{ translateY: ARC[player.seat] ?? 0 }] }}>
                     <Podium
                       player={player}
                       color={SEAT_COLORS[player.seat % SEAT_COLORS.length]}
-                      width={podiumWidth}
+                      width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
                       highlighted={isHighlighted(view, player)}
                       selectable={targets.includes(player.id)}
                       showScore={game.phase === 'final' || (game.phase === 'finished' && player.finalist)}
@@ -254,6 +264,19 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
       </View>
 
       {overlay?.kind === 'banner' && <PhaseBanner phase={overlay.phase} onPress={() => controller.skip()} />}
+      {exitAsked && (
+        // Dotknięcie tła poza okienkiem wznawia grę; samo okienko pochłania dotknięcia.
+        <Pressable style={styles.exitBackdrop} onPress={stayInGame} accessible={false}>
+          <Pressable style={styles.exitCard} onPress={() => {}} accessible={false}>
+            <Text style={styles.exitTitle}>Przerwać grę?</Text>
+            <Text style={styles.exitText}>Postęp tej rozgrywki zostanie utracony.</Text>
+            <View style={styles.exitActions}>
+              <MenuButton label="Graj dalej" color={colors.solo} baseColor={colors.soloBase} width={170} onPress={stayInGame} />
+              <MenuButton label="Wyjdź" color={colors.multi} baseColor={colors.multiBase} width={170} onPress={leaveGame} />
+            </View>
+          </Pressable>
+        </Pressable>
+      )}
       {finished && <Results game={game} onPlayAgain={onPlayAgain} onMenu={() => router.dismissAll()} />}
     </View>
   );
@@ -308,17 +331,21 @@ const styles = StyleSheet.create({
   },
   stage: {
     flex: 1,
-    flexDirection: 'row',
-    gap: 12,
+  },
+  hostSlot: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
   },
   main: {
     flex: 1,
     justifyContent: 'space-between',
   },
   podiums: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     gap: PODIUM_GAP,
     paddingTop: 36,
   },
@@ -333,5 +360,39 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '800',
+  },
+  exitBackdrop: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(5, 11, 36, 0.6)',
+  },
+  exitCard: {
+    maxWidth: 460,
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderRadius: 22,
+    borderWidth: 4,
+    borderColor: colors.outline,
+    backgroundColor: colors.white,
+  },
+  exitTitle: {
+    color: colors.outline,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  exitText: {
+    color: colors.outline,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  exitActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
   },
 });
