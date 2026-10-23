@@ -115,6 +115,12 @@ describe('runda 2: bomba', () => {
     expect(s.phase).toBe('round2');
   });
 
+  it('odpadający w rundzie 2 nie ma żadnych kropek (osłona i życia na zero)', () => {
+    const s0 = withPlayers({ ...round2(), multiplier: 2 }, { h: { shield: 2, lives: 2 } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
+    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: 0, lives: 0 });
+  });
+
   it('osłona spadająca do 0 odpada; przy 3 graczach zaczyna się sprint', () => {
     const s0 = withPlayers({ ...round2(), multiplier: 2 }, { h: { shield: 2 } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });

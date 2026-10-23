@@ -15,7 +15,7 @@ import { TimerBar } from '@/components/solo/TimerBar';
 import { colors } from '@/constants/theme';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { activePlayers, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
-import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
+import { legendFor, PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -41,7 +41,8 @@ function toPodium(p: PotatoPlayer, phase: PotatoPhase): PlayerState {
     isHuman: p.isHuman,
     botId: p.botId,
     seat: p.seat,
-    lives: phase === 'round2' ? p.shield : p.lives,
+    // Odpadający pokazują zero kropek; w rundzie 2 kropki to osłona, w pozostałych życia.
+    lives: p.eliminated ? 0 : phase === 'round2' ? p.shield : p.lives,
     score: p.points,
     eliminated: p.eliminated,
     eliminatedOrder: p.eliminatedAt,
@@ -68,7 +69,7 @@ function hostLine(view: PotatoView): string {
     const name = game.players.find((p) => p.id === overlay.playerId)?.name ?? '';
     return overlay.correct ? `Dobrze, ${name}!` : `Niestety. Poprawna odpowiedź: ${overlay.correctAnswer}`;
   }
-  if (awaitingPick) return 'Komu podajesz ziemniaka?';
+  if (awaitingPick) return 'Komu przekazujesz pytanie?';
   if (thinkingId) return 'Czekamy na odpowiedź…';
   return 'Gramy dalej.';
 }
@@ -184,8 +185,14 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
             </Pressable>
             <Text style={styles.phase}>{PHASE_TITLE[phase]}</Text>
             <Text style={styles.meta}>
-              {[phase === 'round2' ? `×${game.multiplier}` : null, difficultyLabel].filter(Boolean).join('  •  ')}
+              {difficultyLabel}
             </Text>
+          </View>
+        )}
+
+        {!(humanTurn && answering.keyboardOpen) && legendFor(phase, game.multiplier) !== '' && (
+          <View style={styles.legend}>
+            <Text style={styles.legendText}>{legendFor(phase, game.multiplier)}</Text>
           </View>
         )}
 
@@ -247,7 +254,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
             <View style={styles.actions}>
               {awaitingPick ? (
                 <>
-                  <Text style={styles.hint}>Dotknij gracza, któremu podajesz ziemniaka</Text>
+                  <Text style={styles.hint}>Dotknij gracza, którego wybierasz</Text>
                   {awaitingPick.allowSelf && (
                     <MenuButton
                       label="Biorę na siebie"
@@ -260,7 +267,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
                 </>
               ) : blindOn ? (
                 <>
-                  <Text style={styles.hint}>Dotknij, komu odbijasz ziemniak</Text>
+                  <Text style={styles.hint}>Dotknij, komu odbijasz pytanie</Text>
                   <MenuButton label="Anuluj" color={colors.multi} baseColor={colors.multiBase} width={160} onPress={() => setBlindMode(false)} />
                 </>
               ) : blindAvailable ? (
@@ -355,6 +362,20 @@ const styles = StyleSheet.create({
   meta: {
     marginLeft: 'auto',
     color: colors.sky,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  legend: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.outline,
+    backgroundColor: colors.navyDeep,
+  },
+  legendText: {
+    color: colors.starYellow,
     fontSize: 13,
     fontWeight: '800',
   },

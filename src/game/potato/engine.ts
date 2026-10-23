@@ -317,6 +317,9 @@ function loseLife(s: PotatoState, player: PotatoPlayer) {
 }
 
 function eliminate(s: PotatoState, player: PotatoPlayer) {
+  // Odpadający nie ma już żadnych kropek (życia ani osłony), żeby ekran pokazywał zero.
+  player.lives = 0;
+  player.shield = 0;
   player.eliminated = true;
   s.eliminations++;
   player.eliminatedAt = s.eliminations;

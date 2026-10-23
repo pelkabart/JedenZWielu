@@ -24,7 +24,7 @@ export function narrationFor(view: PotatoView): string[] {
   if (overlay?.kind === 'reveal') {
     return overlay.correct ? ['Brawo, dobrze!'] : ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
   }
-  if (awaitingPick) return ['Komu podajesz ziemniaka?'];
+  if (awaitingPick) return ['Komu przekazujesz pytanie?'];
   if (overlay !== null || game.question === null || game.holderId === null) return [];
   const holder = game.players.find((p) => p.id === game.holderId);
   const who = holder?.isHuman ? 'Odpowiadasz Ty!' : `Odpowiada: ${holder?.name ?? ''}.`;

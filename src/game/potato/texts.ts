@@ -9,10 +9,27 @@ export const PHASE_TITLE: Record<PotatoPhase, string> = {
   finished: 'Koniec gry',
 };
 
+/** Krótki opis rundy: pokazywany na początku rundy i czytany przez lektora. */
 export const PHASE_RULE: Record<PotatoPhase, string> = {
-  round1: 'Dobra odpowiedź przekazuje ziemniaka. Zła kosztuje życie.',
-  round2: 'Każde dobre podanie podnosi mnożnik. Wybuch zabiera osłonę.',
-  sprint: '60 sekund. Dobra odpowiedź to punkt, błąd to −1 s.',
-  duel: 'Dobra odpowiedź: +1 szansa dla Ciebie, −1 dla rywali.',
+  round1: 'Każdy błąd kosztuje życie. Kto straci wszystkie, odpada.',
+  round2: 'Każda dobra odpowiedź podnosi mnożnik. Błąd to wybuch: tracisz osłonę równą mnożnikowi.',
+  sprint: '60 sekund na punkty. Dobra odpowiedź to punkt, błąd to 1 sekunda mniej.',
+  duel: 'Dobra odpowiedź daje Ci szansę i odbiera szansę rywalom. Zostaje ostatni gracz.',
   finished: '',
 };
+
+/** Legenda na pasku: co oznaczają kropki i liczby oraz jaki jest aktualny mnożnik. */
+export function legendFor(phase: PotatoPhase, multiplier: number): string {
+  switch (phase) {
+    case 'round1':
+      return 'Kropki to życia. Odpadasz przy 0.';
+    case 'round2':
+      return `Mnożnik: ×${multiplier}. Kropki to osłona. Odpadasz przy 0.`;
+    case 'sprint':
+      return 'Liczba przy graczu to punkty w sprincie.';
+    case 'duel':
+      return 'Kropki to szanse. Odpadasz przy 0.';
+    case 'finished':
+      return '';
+  }
+}

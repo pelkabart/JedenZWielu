@@ -47,7 +47,7 @@ Spis treści:
 | Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
 | Ekran gry w nowych zasadach (rundy 1–4) z limitem 10 s na wybór rywala | zrobione, sprawdzone w przeglądarce |
 | Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
-| Razem testów automatycznych | 303 |
+| Razem testów automatycznych | 304 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -263,7 +263,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `potato/__tests__/controller-test.ts` | 11 | sterownik rund na udawanym zegarze: tury człowieka i botów, wskazywanie rywala, czas, odbicie, sprint z zegarem, pełna gra sterowana zegarem |
 | `potato/__tests__/controller-test.ts` (dodatkowo 4 testy: limit 10 s, opcje ABCD, koniec sprintu) | 15 | sterownik rund: tury, wskazywanie, limit 10 s z losowym wyborem, czas, odbicie, sprint, opcje ABCD |
 | `narration/__tests__/potato-narrator-test.ts` | 6 | lektor rund: co mówi w każdym widoku, licznik czeka na ciszę, pauza wstrzymuje głos, błąd syntezy nie blokuje gry |
-| **Razem** | **303** | |
+| **Razem** | **304** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -445,6 +445,9 @@ Po zmianie losowania botów w grze lektora trafiło się dłuższe pytanie i czy
 
 **7.32. Błędne oczekiwania w testach rund**
 Dwa z pierwszych testów rund były napisane źle: zakładały rundę 2 po odpadnięciu, które w grze przechodzi do sprintu (przy 4 graczach odpadnięcie daje 3), oraz kolejność rankingu bez uwzględnienia dat odpadnięcia. Poprawiliśmy oczekiwania do reguł z dokumentu, a jeden test usunęliśmy, bo opisywał sytuację, której w grze nie ma (runda 2 zaczyna się z 4 graczami).
+
+**7.33. Odpadający pokazywali kropki**
+Po pierwszej grze w nowych zasadach gracz, który odpadł w rundzie 2, nadal miał na pulpicie dwie kropki. Pulpit liczył kropki z osłony, a odpadający nie miał jej zerowanej. Rozwiązanie: silnik zeruje życia i osłonę przy odpadnięciu (test `odpadający w rundzie 2 nie ma żadnych kropek`), a pulpit dla odpadających pokazuje zero. Przy okazji opisy rund były pisane językiem projektu („ziemniak”), więc przepisaliśmy je na zwykły opis zasad, a na pasku pod nagłówkiem pojawiła się legenda z aktualnym mnożnikiem.
 
 ### Logi i testy integracyjne
 
