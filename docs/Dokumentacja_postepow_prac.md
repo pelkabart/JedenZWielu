@@ -45,7 +45,7 @@ Spis treści:
 | Czas decyzji botów z rozkładu Gaussa (wg PDF „Quiz Frenzy”) | zrobione |
 | Silnik rund „Gorący Ziemniak” (runda 1–4, czysty, bez UI) | zrobione, bez podłączenia do ekranu |
 | Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
-| Razem testów automatycznych | 279 |
+| Razem testów automatycznych | 290 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -230,7 +230,7 @@ Przebieg z dokumentu „Quiz Frenzy” w silniku `src/game/potato/engine.ts`. Si
 | 3 (sprint, 60 s) | wszyscy zachowują awans; +1 punkt za dobrą odpowiedź, −1 s za błąd lub brak; ziemniak rotuje | remis punktów: mniej błędów, potem miejsce przy stole |
 | 4 (finał, 3 → mistrz) | nagrody sprintu: 1. miejsce 3 szanse i pierwszy atak, 2. miejsce 2 szanse, 3. miejsce 1 szansa; poprawna odpowiedź: +1 szansa (max 3) dla siebie i −1 każdemu rywalowi; „atak” = przekazanie rywalowi, „na siebie” = kolejne pytanie dla siebie; błąd −1; wygrywa ostatni zostający | po błędzie w finale następny gracz wskazany przez wywołującego |
 
-Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Silnik rund nie jest jeszcze podłączony do kontrolera ani ekranu, więc w grze nadal działa stary przebieg etapów I–II i finał.
+Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Sterownik rund (`potato/controller/PotatoController.ts`) prowadzi grę na udawanym zegarze: tury człowieka i botów, czas, wskazywanie rywala po poprawnej odpowiedzi, odbicie w ciemno i sprint na zegarze. Nie ma jeszcze ekranu ani pauzy; w grze nadal działa stary przebieg etapów I–II i finał.
 
 ## 6. Testy i analiza dynamiczna
 
@@ -258,7 +258,8 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
 | `potato/__tests__/potato-test.ts` | 23 | rundy 1–4 gry „Gorący Ziemniak”: przekazania, odbicie w ciemno, bomba i mnożnik, sprint z czasem i nagrodami, finał, boty wybierają cel, pełna gra zaskryptowana |
-| **Razem** | **279** | |
+| `potato/__tests__/controller-test.ts` | 11 | sterownik rund na udawanym zegarze: tury człowieka i botów, wskazywanie rywala, czas, odbicie, sprint z zegarem, pełna gra sterowana zegarem |
+| **Razem** | **290** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 

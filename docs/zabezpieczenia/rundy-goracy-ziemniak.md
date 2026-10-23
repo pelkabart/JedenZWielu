@@ -55,3 +55,30 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** bot wskazuje siebie albo odpadniętego, albo zawsze tego samego gracza.
 - **Zabezpieczenie:** `pickTarget` losuje wyłącznie z aktywnych innych (lub wszystkich aktywnych przy resecie), priorytet lider 60% / rywal o najmniejszym zasobie 40%, z awaryjnym losowaniem.
 - **Test:** `potato-test.ts` › „bot wybiera tylko aktywnych rywali”.
+
+## Sterownik rund (`src/game/potato/controller/PotatoController.ts`)
+
+### 11. Dwa kroki gry działają naraz (podwójna tura, podwójna odpowiedź)
+- **Ryzyko:** timer tury, nakładka i odpowiedź człowieka odpalają się razem; bot odpowiada dwa razy albo tura przeskakuje.
+- **Zabezpieczenie:** jeden slot `timer` na kolejny krok gry (`schedule` i `clearMain` go zastępują); odpowiedź najpierw zdejmuje licznik.
+- **Test:** `potato/__tests__/controller-test.ts` › „poprawna odpowiedź czeka na wskazanie rywala, potem przechodzi dalej”; „brak odpowiedzi w czasie liczy się jak błąd”.
+
+### 12. Zegar sprintu rozjeżdża się z karami
+- **Ryzyko:** czas liczony na zegarze i kary −1 s w silniku dają podwójne odjęcie albo sprint nie kończy się w 0.
+- **Zabezpieczenie:** przed każdą odpowiedzią i po upływie zaplanowanego końca zegar wysyła `tick` z czasem od ostatniej synchronizacji; kary odejmuje silnik, zegar liczy tylko upływ czasu.
+- **Test:** `controller-test.ts` › „po upływie czasu sprint kończy się i gracze dostają szanse 3/2/1”; „kara za błąd odejmuje czas od zegara na bieżąco”.
+
+### 13. Człowiek zostaje w zawieszeniu po poprawnej odpowiedzi
+- **Ryzyko:** gracz odpowiedział poprawnie, a gra czeka na wskazanie bez końca albo wskazanie przechodzi bez kontroli.
+- **Zabezpieczenie:** stan `awaitingPick` z osobą wskazującą; `pick` sprawdza, że cel jest aktywny i nie jest sobą (poza finałem). Czekanie bez limitu jest świadomie zostawione do decyzji o UI.
+- **Test:** `controller-test.ts` › „nie można wskazać siebie w rundzie 1”.
+
+### 14. Odrzucony ruch psuje stan
+- **Ryzyko:** błąd zasad w silniku zostawia częściowo zmieniony stan albo wywala grę.
+- **Zabezpieczenie:** silnik zwraca nowy obiekt albo rzuca `PotatoRuleError`; sterownik łapie go, loguje `warn` i nie zmienia widoku.
+- **Test:** pokryte przez testy zasad (`potato-test.ts`); w sterowniku błędy są logowane (`ziemniak`).
+
+### 15. Gracz rozpoznawany po id zamiast po fladze
+- **Ryzyko:** stała `HUMAN_ID` z solo nie pasuje do gier wieloosobowych i do gracza o innym id.
+- **Zabezpieczenie:** sterownik używa `player.isHuman`; nie ma sztywnego id człowieka.
+- **Test:** `controller-test.ts` (gracz o id `h`).
