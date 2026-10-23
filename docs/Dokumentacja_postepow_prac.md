@@ -46,7 +46,8 @@ Spis treści:
 | Silnik rund „Gorący Ziemniak” (runda 1–4, czysty, bez UI) | zrobione, bez podłączenia do ekranu |
 | Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
 | Ekran gry w nowych zasadach (rundy 1–4) z limitem 10 s na wybór rywala | zrobione, sprawdzone w przeglądarce |
-| Razem testów automatycznych | 294 |
+| Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
+| Razem testów automatycznych | 303 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -231,7 +232,7 @@ Przebieg z dokumentu „Quiz Frenzy” w silniku `src/game/potato/engine.ts`. Si
 | 3 (sprint, 60 s) | wszyscy zachowują awans; +1 punkt za dobrą odpowiedź, −1 s za błąd lub brak; ziemniak rotuje | remis punktów: mniej błędów, potem miejsce przy stole |
 | 4 (finał, 3 → mistrz) | nagrody sprintu: 1. miejsce 3 szanse i pierwszy atak, 2. miejsce 2 szanse, 3. miejsce 1 szansa; poprawna odpowiedź: +1 szansa (max 3) dla siebie i −1 każdemu rywalowi; „atak” = przekazanie rywalowi, „na siebie” = kolejne pytanie dla siebie; błąd −1; wygrywa ostatni zostający | po błędzie w finale następny gracz wskazany przez wywołującego |
 
-Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Sterownik rund (`potato/controller/PotatoController.ts`) prowadzi grę na udawanym zegarze: tury człowieka i botów, czas, wskazywanie rywala po poprawnej odpowiedzi (10 s, potem losowo), odbicie w ciemno i sprint na zegarze. Ekran rund (`components/potato/PotatoGame.tsx`) jest podpięty pod trasę `solo/game`, więc gra solo idzie nowymi zasadami. Brakuje pauzy (wyjście przerywa grę od razu, bez pytania) i lektora w nowym ekranie.
+Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Sterownik rund (`potato/controller/PotatoController.ts`) prowadzi grę na udawanym zegarze: tury człowieka i botów, czas, wskazywanie rywala po poprawnej odpowiedzi (10 s, potem losowo), odbicie w ciemno i sprint na zegarze. Ekran rund (`components/potato/PotatoGame.tsx`) jest podpięty pod trasę `solo/game`, więc gra solo idzie nowymi zasadami. Pauza i lektor działają w nowym ekranie; okno „Przerwać grę?” wstrzymuje grę, a „Wyjdź” wraca do menu.
 
 ## 6. Testy i analiza dynamiczna
 
@@ -261,7 +262,8 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `potato/__tests__/potato-test.ts` | 23 | rundy 1–4 gry „Gorący Ziemniak”: przekazania, odbicie w ciemno, bomba i mnożnik, sprint z czasem i nagrodami, finał, boty wybierają cel, pełna gra zaskryptowana |
 | `potato/__tests__/controller-test.ts` | 11 | sterownik rund na udawanym zegarze: tury człowieka i botów, wskazywanie rywala, czas, odbicie, sprint z zegarem, pełna gra sterowana zegarem |
 | `potato/__tests__/controller-test.ts` (dodatkowo 4 testy: limit 10 s, opcje ABCD, koniec sprintu) | 15 | sterownik rund: tury, wskazywanie, limit 10 s z losowym wyborem, czas, odbicie, sprint, opcje ABCD |
-| **Razem** | **294** | |
+| `narration/__tests__/potato-narrator-test.ts` | 6 | lektor rund: co mówi w każdym widoku, licznik czeka na ciszę, pauza wstrzymuje głos, błąd syntezy nie blokuje gry |
+| **Razem** | **303** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 

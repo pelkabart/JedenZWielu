@@ -262,3 +262,53 @@ describe('limit 10 s na wybór i opcje ABCD', () => {
     expect(controller.getView().sprintEndsAt).toBe(1000 + 10000 - 1000 - POTATO.sprintPenaltyMs);
   });
 });
+
+describe('pauza i lektor', () => {
+  it('pauza zamraża licznik tury, a wznowienie daje resztę czasu', () => {
+    const { controller, advance } = setup();
+    controller.start();
+    advance(2000);
+    controller.pause();
+    advance(60_000);
+    expect(controller.getView().game.holderId).toBe('h');
+    expect(controller.getView().overlay).toBeNull();
+    controller.unpause();
+    advance(NORMAL_TIME - 2000 - 1);
+    expect(controller.getView().overlay).toBeNull();
+    advance(1);
+    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', text: null });
+  });
+
+  it('pauza zamraża sprint: czas nie leci, gdy gra stoi', () => {
+    const game = started('h', {
+      phase: 'sprint',
+      sprintMsLeft: 10000,
+      players: started().players.map((p) => (p.id === 'b1' || p.id === 'b2' ? { ...p, eliminated: true } : p)),
+    });
+    const { controller, advance } = setup(game);
+    controller.start();
+    advance(1000);
+    controller.pause();
+    advance(30_000);
+    controller.unpause();
+    expect(controller.getView().game.phase).toBe('sprint');
+    // Start o 0 s, pauza po 1 s (zostaje 9 s), wznowienie po 31 s: koniec sprintu o 40 s.
+    expect(controller.getView().sprintEndsAt).toBe(40_000);
+    expect(controller.getView().game.sprintMsLeft).toBe(9000);
+    // Zegar sprintu rusza od nowa: bez zmian w trakcie pauzy.
+    expect(controller.getView().game.phase).toBe('sprint');
+  });
+
+  it('licznik nie rusza, dopóki lektor mówi; startuje po ciszy', () => {
+    const { controller, advance } = setup();
+    controller.setSpeaking(true);
+    controller.start();
+    expect(controller.getView().deadline).toBeNull();
+    advance(NORMAL_TIME * 2);
+    expect(controller.getView().overlay).toBeNull();
+    controller.setSpeaking(false);
+    expect(controller.getView().deadline).toBe(NORMAL_TIME * 2 + NORMAL_TIME);
+    advance(NORMAL_TIME);
+    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', text: null });
+  });
+});

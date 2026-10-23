@@ -97,3 +97,18 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** tryb „odbicia” pozostaje aktywny, gdy tura się zmieni, i kliknięcie w pulpit wykonuje przypadkowy ruch.
 - **Zabezpieczenie:** tryb działa tylko wtedy, gdy odbicie jest dostępne (`blindOn = blindMode && blindAvailable`), bez efektu do resetowania.
 - **Test:** ręcznie w przeglądarce (tryb pokazuje się tylko na turze człowieka w rundzie 1).
+
+### 19. Pauza nie zatrzymuje czasu albo gubi resztę licznika
+- **Ryzyko:** w czasie pauzy tura gracza albo sprint dalej odliczają, albo po wznowieniu licznik startuje od zera.
+- **Zabezpieczenie:** `pause` zamraża krok (`freezeMain`: zapamiętuje resztę czasu i paska) i sprint (synchronizacja przed zatrzymaniem); `unpause` wznawia z tą resztą.
+- **Test:** `potato/__tests__/controller-test.ts` › „pauza zamraża licznik tury, a wznowienie daje resztę czasu”; „pauza zamraża sprint”.
+
+### 20. Licznik startuje, zanim gracz usłyszy pytanie
+- **Ryzyko:** gracz traci czas na pytanie, którego lektor jeszcze nie przeczytał.
+- **Zabezpieczenie:** kroki z licznikiem czekają na ciszę lektora (`setSpeaking`); pasek startuje dopiero po jej zakończeniu.
+- **Test:** `controller-test.ts` › „licznik nie rusza, dopóki lektor mówi; startuje po ciszy”; `narration/__tests__/potato-narrator-test.ts` › „licznik czeka, aż lektor skończy czytać pytanie”.
+
+### 21. Błąd syntezy blokuje grę
+- **Ryzyko:** wyjątek lub odrzucona obietnica lektora zostawia grę w miejscu czekania na ciszę.
+- **Zabezpieczenie:** narrator łapie błąd, loguje go i zwalnia `setSpeaking(false)`.
+- **Test:** `potato-narrator-test.ts` › „błąd syntezy nie blokuje gry”.

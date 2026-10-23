@@ -43,6 +43,17 @@ export interface PotatoView {
   choices: { questionId: string; options: string[] } | null;
   /** Kiedy (wg zegara) kończy się sprint; `null` poza sprintem. */
   sprintEndsAt: number | null;
+  /** Gra wstrzymana (okno „Przerwać grę?”). */
+  paused: boolean;
+}
+
+/** Krok z licznikiem: `fire` to czas do wykonania, `bar` to pasek widoczny dla gracza (tylko przy licznikach). */
+interface MainStep {
+  fn: () => void;
+  fire: number;
+  bar?: { total: number; left: number };
+  /** Kiedy krok został uruchomiony (`null` = czeka na ciszę albo na koniec pauzy). */
+  armedAt: number | null;
 }
 
 export interface PotatoControllerOptions {
@@ -69,6 +80,11 @@ export class PotatoController {
   private readonly rules: Rules;
   /** Jeden slot na kolejny krok gry (odpowiedź, nakładka, tura). */
   private timer: unknown = null;
+  /** Krok gry czekający na upływ czasu (albo na ciszę lektora / koniec pauzy). */
+  private mainStep: MainStep | null = null;
+  /** Akcja odłożona, aż lektor skończy mówić i gra nie jest wstrzymana. */
+  private waiting: (() => void) | null = null;
+  private speaking = false;
   private sprintTimer: unknown = null;
   private sprintSyncAt = 0;
   /** Poprawna odpowiedź człowieka czeka, aż wskaże, komu przekazać ziemniaka. */
@@ -92,6 +108,7 @@ export class PotatoController {
       awaitingPick: null,
       choices: null,
       sprintEndsAt: null,
+      paused: false,
     };
   }
 
@@ -119,7 +136,38 @@ export class PotatoController {
       return;
     }
     if (game.phase === 'sprint' && this.sprintTimer === null) this.startSprintClock();
-    this.resume();
+    this.resumeStep();
+  }
+
+  /** Wstrzymuje grę: zamraża czas kroku i sprintu. Ponownie wywołana nic nie robi. */
+  pause() {
+    if (this.view.paused || !this.running) return;
+    if (this.view.game.phase === 'sprint') this.syncSprint();
+    this.freezeMain();
+    this.clearSprintTimer();
+    this.update({ paused: true });
+    log.info('Pauza');
+  }
+
+  /** Wznawia grę po pauzie z tym, ile czasu zostało. */
+  unpause() {
+    if (!this.view.paused) return;
+    this.update({ paused: false });
+    log.info('Wznowienie');
+    const game = this.view.game;
+    if (game.phase === 'sprint') {
+      this.sprintSyncAt = this.clock.now();
+      this.update({ sprintEndsAt: this.clock.now() + game.sprintMsLeft });
+      this.scheduleSprintEnd();
+    }
+    if (this.mainStep && this.mainStep.armedAt === null) this.whenReady(() => this.arm());
+    this.flushWaiting();
+  }
+
+  /** Lektor zgłasza, że mówi (`true`) albo skończył (`false`). Liczniki startują dopiero po ciszy. */
+  setSpeaking(speaking: boolean) {
+    this.speaking = speaking;
+    if (!speaking) this.flushWaiting();
   }
 
   /** Zatrzymuje wszystkie zegary (wyjście z ekranu albo odmontowanie). */
@@ -129,7 +177,7 @@ export class PotatoController {
     this.clearSprintTimer();
   }
 
-  private resume() {
+  private resumeStep() {
     const { game, overlay, awaitingPick } = this.view;
     if (game.phase === 'finished') {
       this.update({ overlay: { kind: 'finished' } });
@@ -321,6 +369,7 @@ export class PotatoController {
 
   private scheduleSprintEnd() {
     if (this.sprintTimer !== null) this.clock.clearTimeout(this.sprintTimer);
+    if (this.view.paused) return;
     this.sprintTimer = this.clock.setTimeout(() => this.syncSprint(), this.view.game.sprintMsLeft);
   }
 
@@ -371,22 +420,66 @@ export class PotatoController {
     this.update({ sprintEndsAt: game.phase === 'sprint' ? this.clock.now() + game.sprintMsLeft : null });
   }
 
+  /** Licznik gracza albo bota: pasek startuje od pokazania, a krok wykonuje się po `fireInMs`. */
   private countdown(totalMs: number, fireInMs: number, fn: () => void) {
-    this.update({ deadline: this.clock.now() + totalMs, timerMs: totalMs });
-    this.schedule(fireInMs, fn);
+    this.clearMain();
+    this.mainStep = { fn, fire: fireInMs, bar: { total: totalMs, left: totalMs }, armedAt: null };
+    this.whenReady(() => this.arm());
   }
 
   private schedule(ms: number, fn: () => void) {
     this.clearMain();
+    this.mainStep = { fn, fire: ms, armedAt: null };
+    this.whenReady(() => this.arm());
+  }
+
+  /** Uruchamia zaplanowany krok: pasek i zegar startują razem. */
+  private arm() {
+    const step = this.mainStep;
+    if (!step || step.armedAt !== null) return;
+    const now = this.clock.now();
+    step.armedAt = now;
+    if (step.bar) this.update({ deadline: now + step.bar.left, timerMs: step.bar.total });
     this.timer = this.clock.setTimeout(() => {
       this.timer = null;
-      fn();
-    }, ms);
+      this.mainStep = null;
+      step.fn();
+    }, step.fire);
+  }
+
+  /** Pauza: zapamiętuje, ile czasu zostało, i zatrzymuje zegar. */
+  private freezeMain() {
+    const step = this.mainStep;
+    if (!step || step.armedAt === null) return;
+    const elapsed = this.clock.now() - step.armedAt;
+    step.fire = Math.max(0, step.fire - elapsed);
+    if (step.bar) step.bar.left = Math.max(0, step.bar.left - elapsed);
+    step.armedAt = null;
+    if (this.timer !== null) this.clock.clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  /** Wykonuje akcję od razu, jeśli gra gra i lektor milczy; inaczej odkłada ją do ciszy albo wznowienia. */
+  private whenReady(fn: () => void) {
+    if (this.view.paused || this.speaking) {
+      this.waiting = fn;
+      return;
+    }
+    fn();
+  }
+
+  private flushWaiting() {
+    if (this.view.paused || this.speaking || this.waiting === null) return;
+    const fn = this.waiting;
+    this.waiting = null;
+    fn();
   }
 
   private clearMain() {
     if (this.timer !== null) this.clock.clearTimeout(this.timer);
     this.timer = null;
+    this.mainStep = null;
+    this.waiting = null;
   }
 
   private update(patch: Partial<PotatoView>) {

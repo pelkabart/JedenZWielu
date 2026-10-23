@@ -15,6 +15,7 @@ import { TimerBar } from '@/components/solo/TimerBar';
 import { colors } from '@/constants/theme';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { activePlayers, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
+import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -26,22 +27,6 @@ const ARC = [16, 6, 0, 6, 16];
 const PODIUM_GAP = 22;
 /** Szerokość pulpitu wg miejsca: skrajne największe, środkowy najmniejszy (efekt perspektywy). */
 const SEAT_SCALE = [1, 0.92, 0.84, 0.92, 1];
-
-const PHASE_TITLE: Record<PotatoPhase, string> = {
-  round1: 'Runda 1 · Odsiew',
-  round2: 'Runda 2 · Bomba',
-  sprint: 'Runda 3 · Sprint',
-  duel: 'Runda 4 · Finał',
-  finished: 'Koniec gry',
-};
-
-const PHASE_RULE: Record<PotatoPhase, string> = {
-  round1: 'Dobra odpowiedź przekazuje ziemniaka. Zła kosztuje życie.',
-  round2: 'Każde dobre podanie podnosi mnożnik. Wybuch zabiera osłonę.',
-  sprint: '60 sekund. Dobra odpowiedź to punkt, błąd to −1 s.',
-  duel: 'Dobra odpowiedź: +1 szansa dla Ciebie, −1 dla rywali.',
-  finished: '',
-};
 
 type Props = {
   difficulty: Difficulty;
@@ -104,21 +89,38 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
   const blindOn = blindMode && blindAvailable;
   const finished = overlay?.kind === 'finished';
 
-  const exit = () => {
+  const [exitAsked, setExitAsked] = useState(false);
+
+  /** Wyjście z gry: zatrzymuje zegary i wraca do menu. */
+  const leave = () => {
     controller.stop();
     if (router.canDismiss()) router.dismissAll();
     else router.replace('/');
   };
 
+  /** X: wstrzymuje grę i pyta, czy na pewno wyjść (po zakończeniu gry wychodzi od razu). */
+  const askExit = () => {
+    if (finished) {
+      leave();
+      return;
+    }
+    controller.pause();
+    setExitAsked(true);
+  };
+
+  const stayInGame = () => {
+    setExitAsked(false);
+    controller.unpause();
+  };
+
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      exit();
+      if (exitAsked) stayInGame();
+      else askExit();
       return true;
     });
     return () => subscription.remove();
-    // `exit` zależy tylko od sterownika, który jest stały przez cały ekran.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controller]);
+  });
 
   useEffect(() => {
     if (!humanTurn) Keyboard.dismiss();
@@ -172,7 +174,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
         {!(humanTurn && answering.keyboardOpen) && (
           <View style={styles.topBar}>
             <Pressable
-              onPress={exit}
+              onPress={askExit}
               accessibilityRole="button"
               accessibilityLabel="Przerwij grę"
               hitSlop={10}
@@ -278,7 +280,21 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
         </View>
       )}
 
-      {finished && <Finish game={game} onPlayAgain={onPlayAgain} onMenu={exit} />}
+      {exitAsked && (
+        // Dotknięcie tła poza okienkiem wznawia grę; samo okienko pochłania dotknięcia.
+        <Pressable style={styles.backdrop} onPress={stayInGame} accessible={false}>
+          <Pressable style={styles.card} onPress={() => {}} accessible={false}>
+            <Text style={styles.title}>Przerwać grę?</Text>
+            <Text style={styles.rule}>Postęp tej rozgrywki zostanie utracony.</Text>
+            <View style={styles.actions}>
+              <MenuButton label="Graj dalej" color={colors.solo} baseColor={colors.soloBase} width={170} onPress={stayInGame} />
+              <MenuButton label="Wyjdź" color={colors.multi} baseColor={colors.multiBase} width={170} onPress={leave} />
+            </View>
+          </Pressable>
+        </Pressable>
+      )}
+
+      {finished && <Finish game={game} onPlayAgain={onPlayAgain} onMenu={leave} />}
     </View>
   );
 }
