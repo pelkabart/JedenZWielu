@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { MusicToggle } from '@/components/home/MusicToggle';
 import { colors } from '@/constants/theme';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import { useMenuMusic } from '@/hooks/useMenuMusic';
@@ -21,6 +22,7 @@ export default function DifficultyScreen() {
     <View style={styles.container}>
       <CartoonBackground />
       <BackButton />
+      <MusicToggle />
 
       <View style={styles.content}>
         <Text style={styles.title}>Wybierz poziom trudności</Text>

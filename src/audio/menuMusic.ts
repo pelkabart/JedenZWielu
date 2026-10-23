@@ -16,14 +16,40 @@ const PAUSE_DELAY_MS = 400;
 let player: AudioPlayer | null = null;
 let activeScreens = 0;
 let pauseTimer: ReturnType<typeof setTimeout> | null = null;
+/** Wyciszenie muzyki dla całej aplikacji (także dla przyszłej muzyki w grze). */
+let muted = false;
+const muteListeners = new Set<() => void>();
+
+function currentVolume(): number {
+  return muted ? 0 : MENU_VOLUME;
+}
 
 function getPlayer(): AudioPlayer {
   if (player === null) {
     player = createAudioPlayer(require('../../assets/audio/menu.mp3'));
     player.loop = true;
-    player.volume = MENU_VOLUME;
+    player.volume = currentVolume();
   }
   return player;
+}
+
+export function isMusicMuted(): boolean {
+  return muted;
+}
+
+/** Przełącza wyciszenie. Melodia dalej płynie na zerowej głośności, więc po włączeniu gra od tego samego miejsca. */
+export function toggleMusicMuted() {
+  muted = !muted;
+  if (player !== null) player.volume = currentVolume();
+  log.info('Muzyka', { muted });
+  for (const listener of muteListeners) listener();
+}
+
+export function subscribeMusicMuted(listener: () => void): () => void {
+  muteListeners.add(listener);
+  return () => {
+    muteListeners.delete(listener);
+  };
 }
 
 /** Ekran menu jest na wierzchu: muzyka gra (wznawia się tam, gdzie była). */

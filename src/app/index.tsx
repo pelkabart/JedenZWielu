@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { MusicToggle } from '@/components/home/MusicToggle';
 import { colors } from '@/constants/theme';
 import { useMenuMusic } from '@/hooks/useMenuMusic';
 
@@ -17,6 +18,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
       <CartoonBackground />
+      <MusicToggle />
 
       <Pressable
         accessibilityRole="button"

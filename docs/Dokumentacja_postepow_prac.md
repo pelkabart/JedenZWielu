@@ -48,6 +48,7 @@ Spis treści:
 | Ekran gry w nowych zasadach (rundy 1–4) z limitem 10 s na wybór rywala | zrobione, sprawdzone w przeglądarce |
 | Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
 | Muzyka w menu głównym i wyborze poziomu (jedna melodia bez restartu, pauza w rozgrywce) | zrobione, sprawdzone w przeglądarce |
+| Wyciszanie muzyki (ikonka w prawym dolnym rogu, wspólna na wszystkich ekranach) | zrobione, sprawdzone w przeglądarce |
 | Razem testów automatycznych | 305 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |

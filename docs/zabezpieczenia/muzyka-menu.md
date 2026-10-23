@@ -23,3 +23,8 @@ Funkcjonalność: muzyka w tle na ekranie głównym i na ekranie wyboru poziomu 
 - **Ryzyko:** zmiana nazwy lub usunięcie pliku zepsuje ekrany menu.
 - **Zabezpieczenie:** plik w repozytorium pod stałą nazwą `assets/audio/menu.mp3`; zmiana nazwy wymaga zmiany w `useMenuMusic.ts`.
 - **Test:** `npx tsc --noEmit` (ścieżka `require` jest sprawdzana przy bundlowaniu).
+
+### 5. Wyciszenie nie działa po zmianie ekranu
+- **Ryzyko:** stan wyciszenia zapisany tylko w ekranie znika przy przejściu do innego ekranu.
+- **Zabezpieczenie:** stan jest w module muzyki (`src/audio/menuMusic.ts`) i jest wspólny dla wszystkich ekranów; przycisk czyta go przez `useSyncExternalStore`.
+- **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie na ekranie głównym utrzymuje się na wyborze poziomu i w grze.

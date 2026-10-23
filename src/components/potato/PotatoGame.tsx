@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { MusicToggle } from '@/components/home/MusicToggle';
 import { AnswerPanel } from '@/components/solo/AnswerPanel';
 import { answerLayout, KEYBOARD_GAP } from '@/components/solo/answerLayout';
 import { Host } from '@/components/solo/Host';
@@ -170,6 +171,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
   return (
     <View style={styles.container}>
       <CartoonBackground />
+      <MusicToggle />
 
       <View style={[styles.content, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8, paddingLeft: insets.left + 12, paddingRight: insets.right + 12 }]}>
         {!(humanTurn && answering.keyboardOpen) && (
