@@ -6,6 +6,7 @@ import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { colors } from '@/constants/theme';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
+import { useMenuMusic } from '@/hooks/useMenuMusic';
 import type { Difficulty } from '@/game/types';
 
 const OPTIONS: { difficulty: Difficulty; color: string; baseColor: string }[] = [
@@ -15,6 +16,7 @@ const OPTIONS: { difficulty: Difficulty; color: string; baseColor: string }[] = 
 ];
 
 export default function DifficultyScreen() {
+  useMenuMusic();
   return (
     <View style={styles.container}>
       <CartoonBackground />

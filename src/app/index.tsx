@@ -7,9 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { colors } from '@/constants/theme';
+import { useMenuMusic } from '@/hooks/useMenuMusic';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  useMenuMusic();
 
   return (
     <View style={styles.container}>
