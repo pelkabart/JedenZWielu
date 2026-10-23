@@ -82,3 +82,18 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** stała `HUMAN_ID` z solo nie pasuje do gier wieloosobowych i do gracza o innym id.
 - **Zabezpieczenie:** sterownik używa `player.isHuman`; nie ma sztywnego id człowieka.
 - **Test:** `controller-test.ts` (gracz o id `h`).
+
+### 16. Gracz wskazuje w nieskończoność
+- **Ryzyko:** po poprawnej odpowiedzi gra czeka na wybór rywala bez końca.
+- **Zabezpieczenie:** 10 s na wybór (`PICK_TIMEOUT_MS`); po upływie `pickAtRandom` losuje spośród legalnych celów (w finale może być sam odpowiadający).
+- **Test:** `potato/__tests__/controller-test.ts` › „bez wyboru w 10 s przekazanie idzie do losowego aktywnego rywala”; „wybór przed upływem 10 s anuluje losowanie”.
+
+### 17. Ekran zostaje z działającymi zegarami po wyjściu
+- **Ryzyko:** po zamknięciu ekranu zegary nadal odpalają tury i sprint.
+- **Zabezpieczenie:** `controller.stop()` zatrzymuje wszystkie zegary (hook zwraca je w sprzątaniu efektu); `start()` po ponownym uruchomieniu wznawia od bieżącego kroku (`resume`).
+- **Test:** ręcznie (wyjście i powrót na ekran); sterownik wznawia tury według stanu.
+
+### 18. Odbicie w ciemno na ekranie zostaje włączone po zmianie tury
+- **Ryzyko:** tryb „odbicia” pozostaje aktywny, gdy tura się zmieni, i kliknięcie w pulpit wykonuje przypadkowy ruch.
+- **Zabezpieczenie:** tryb działa tylko wtedy, gdy odbicie jest dostępne (`blindOn = blindMode && blindAvailable`), bez efektu do resetowania.
+- **Test:** ręcznie w przeglądarce (tryb pokazuje się tylko na turze człowieka w rundzie 1).

@@ -1,7 +1,7 @@
 import type { Question } from '../../types';
 import { createRng } from '../../rng';
 import { activePlayers, createPotatoGame, POTATO, reducePotato, type PotatoState } from '../engine';
-import { DEFAULT_POTATO_PACING, PotatoController, type PotatoView } from '../controller/PotatoController';
+import { DEFAULT_POTATO_PACING, PICK_TIMEOUT_MS, PotatoController, type PotatoView } from '../controller/PotatoController';
 
 const OK = 'ok';
 const BAD = 'zle';
@@ -204,5 +204,61 @@ describe('pełna gra sterowana zegarem', () => {
     expect(view.game.phase).toBe('finished');
     expect(view.overlay).toEqual({ kind: 'finished' });
     expect(view.game.ranking).toHaveLength(PLAYERS.length);
+  });
+});
+
+describe('limit 10 s na wybór i opcje ABCD', () => {
+  it('bez wyboru w 10 s przekazanie idzie do losowego aktywnego rywala', () => {
+    const { controller, advance } = setup();
+    controller.start();
+    controller.submitAnswer(OK);
+    expect(controller.getView().deadline).toBe(PICK_TIMEOUT_MS);
+    advance(PICK_TIMEOUT_MS);
+    const view = controller.getView();
+    expect(view.awaitingPick).toBeNull();
+    expect(view.overlay).toMatchObject({ kind: 'reveal', playerId: 'h', correct: true });
+    advance(REVEAL);
+    expect(view.game.holderId).not.toBe('h');
+    expect(activePlayers(view.game).map((p) => p.id)).toContain(view.game.holderId);
+  });
+
+  it('wybór przed upływem 10 s anuluje losowanie', () => {
+    const { controller, advance } = setup();
+    controller.start();
+    controller.submitAnswer(OK);
+    advance(3000);
+    controller.pick('b3');
+    expect(controller.getView().game.holderId).toBe('b3');
+    // Losowanie już nie zadziała: po pokazaniu wyniku tura należy do bota wskazanego przez gracza.
+    advance(REVEAL);
+    expect(controller.getView().thinkingId).toBe('b3');
+    advance(PICK_TIMEOUT_MS);
+    const overlay = controller.getView().overlay;
+    expect(overlay?.kind === 'reveal' ? overlay.playerId : null).not.toBe('h');
+  });
+
+  it('na poziomie Normalny człowiek dostaje cztery opcje ABCD z poprawną odpowiedzią', () => {
+    // Pięć pytań o różnych odpowiedziach daje pomyłki tego samego typu.
+    const deck = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ ...question(id), answers: [`odp ${id}`] }));
+    const game = reducePotato(createPotatoGame({ players: PLAYERS, deck }), { type: 'start', holderId: 'h' });
+    const { controller } = setup(game);
+    controller.start();
+    const choices = controller.getView().choices;
+    expect(choices?.options).toHaveLength(4);
+    expect(choices?.options).toContain('odp a');
+  });
+
+  it('sprint ma znacznik końca, który przesuwa się o kary', () => {
+    const game = started('h', {
+      phase: 'sprint',
+      sprintMsLeft: 10000,
+      players: started().players.map((p) => (p.id === 'b1' || p.id === 'b2' ? { ...p, eliminated: true } : p)),
+    });
+    const { controller, advance } = setup(game);
+    controller.start();
+    expect(controller.getView().sprintEndsAt).toBe(10000);
+    advance(1000);
+    controller.submitAnswer(BAD);
+    expect(controller.getView().sprintEndsAt).toBe(1000 + 10000 - 1000 - POTATO.sprintPenaltyMs);
   });
 });

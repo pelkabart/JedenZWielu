@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
-import { SoloGame } from '@/components/solo/SoloGame';
+import { PotatoGame } from '@/components/potato/PotatoGame';
 import { DIFFICULTIES } from '@/game/rules';
 import type { Difficulty } from '@/game/types';
 
@@ -14,7 +14,7 @@ export default function SoloGameScreen() {
   return (
     <>
       <Stack.Screen options={{ gestureEnabled: false }} />
-      <SoloGame key={round} difficulty={difficulty} onPlayAgain={() => setRound((r) => r + 1)} />
+      <PotatoGame key={round} difficulty={difficulty} onPlayAgain={() => setRound((r) => r + 1)} />
     </>
   );
 }

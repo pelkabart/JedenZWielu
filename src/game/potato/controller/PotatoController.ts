@@ -7,6 +7,7 @@ import { realClock, type Clock } from '../../controller/SoloController';
 import { DEFAULT_RULES, DIFFICULTY_PRESETS } from '../../rules';
 import { pickRandom, type Rng } from '../../rng';
 import type { Difficulty, Rules } from '../../types';
+import { buildChoices, CHOICE_COUNT } from '../../choices';
 import { pickTarget } from '../bots';
 import { activePlayers, PotatoRuleError, reducePotato, type PotatoPhase, type PotatoState } from '../engine';
 
@@ -20,6 +21,9 @@ export interface PotatoPacing {
 }
 
 export const DEFAULT_POTATO_PACING: PotatoPacing = { revealMs: 1500, roundMs: 2500 };
+
+/** Ile czasu ma gracz na wskazanie, komu przekazać ziemniaka. Po upływie wybór jest losowy. */
+export const PICK_TIMEOUT_MS = 10_000;
 
 export type PotatoOverlay =
   | { kind: 'reveal'; playerId: string; text: string | null; correct: boolean; correctAnswer: string }
@@ -35,6 +39,10 @@ export interface PotatoView {
   thinkingId: string | null;
   /** Gracz odpowiedział poprawnie i wskazuje, komu przekazać ziemniaka (`allowSelf` w finale). */
   awaitingPick: { chooserId: string; allowSelf: boolean } | null;
+  /** Opcje A–D na bieżące pytanie gracza (poziomy Łatwy i Normalny). */
+  choices: { questionId: string; options: string[] } | null;
+  /** Kiedy (wg zegara) kończy się sprint; `null` poza sprintem. */
+  sprintEndsAt: number | null;
 }
 
 export interface PotatoControllerOptions {
@@ -65,6 +73,8 @@ export class PotatoController {
   private sprintSyncAt = 0;
   /** Poprawna odpowiedź człowieka czeka, aż wskaże, komu przekazać ziemniaka. */
   private pendingAnswer: { playerId: string; text: string | null } | null = null;
+  /** Czy gra jest uruchomiona (między `start` a `stop`). */
+  private running = false;
 
   constructor({ game, difficulty, rng, clock = realClock, pacing, getProfile = getBotProfile }: PotatoControllerOptions) {
     this.difficulty = difficulty;
@@ -73,7 +83,16 @@ export class PotatoController {
     this.pacing = { ...DEFAULT_POTATO_PACING, ...pacing };
     this.getProfile = getProfile;
     this.rules = { ...DEFAULT_RULES, answerTimeMs: DIFFICULTY_PRESETS[difficulty].answerTimeMs };
-    this.view = { game, overlay: null, deadline: null, timerMs: null, thinkingId: null, awaitingPick: null };
+    this.view = {
+      game,
+      overlay: null,
+      deadline: null,
+      timerMs: null,
+      thinkingId: null,
+      awaitingPick: null,
+      choices: null,
+      sprintEndsAt: null,
+    };
   }
 
   // ---------- API dla Reacta ----------
@@ -87,18 +106,51 @@ export class PotatoController {
 
   getView = (): PotatoView => this.view;
 
-  /** Start gry: losuje, kto ma ziemniaka w rundzie 1. Przy gotowym stanie od razu wznawia turę. */
+  /** Start gry: losuje, kto ma ziemniaka w rundzie 1. Po `stop` wznawia od bieżącego kroku. */
   start() {
+    if (this.running) return;
+    this.running = true;
     const game = this.view.game;
-    if (game.holderId !== null) {
-      if (game.phase === 'sprint') this.startSprintClock();
-      this.takeTurn();
+    if (game.holderId === null) {
+      const first = pickRandom(this.rng, activePlayers(game));
+      log.info('Start rundy 1', { holder: first.id });
+      if (!this.apply({ type: 'start', holderId: first.id })) return;
+      this.showRound(() => this.takeTurn());
       return;
     }
-    const first = pickRandom(this.rng, activePlayers(game));
-    log.info('Start rundy 1', { holder: first.id });
-    if (!this.apply({ type: 'start', holderId: first.id })) return;
-    this.showRound(() => this.takeTurn());
+    if (game.phase === 'sprint' && this.sprintTimer === null) this.startSprintClock();
+    this.resume();
+  }
+
+  /** Zatrzymuje wszystkie zegary (wyjście z ekranu albo odmontowanie). */
+  stop() {
+    this.running = false;
+    this.clearMain();
+    this.clearSprintTimer();
+  }
+
+  private resume() {
+    const { game, overlay, awaitingPick } = this.view;
+    if (game.phase === 'finished') {
+      this.update({ overlay: { kind: 'finished' } });
+      return;
+    }
+    if (overlay?.kind === 'reveal') {
+      this.schedule(this.pacing.revealMs, () => this.afterReveal(game.phase));
+      return;
+    }
+    if (overlay?.kind === 'round') {
+      this.schedule(this.pacing.roundMs, () => {
+        this.update({ overlay: null });
+        this.takeTurn();
+      });
+      return;
+    }
+    if (awaitingPick) {
+      this.countdown(PICK_TIMEOUT_MS, PICK_TIMEOUT_MS, () => this.pickAtRandom());
+      return;
+    }
+    this.takeTurn();
   }
 
   /** Odpowiedź człowieka na bieżące pytanie. */
@@ -149,7 +201,7 @@ export class PotatoController {
     if (game.phase === 'finished' || game.holderId === null || game.question === null) return;
     if (this.isHuman(game.holderId)) {
       const holderId = game.holderId!;
-      this.update({ awaitingPick: null, thinkingId: null });
+      this.update({ awaitingPick: null, thinkingId: null, choices: this.choicesFor(game) });
       this.countdown(this.rules.answerTimeMs, this.rules.answerTimeMs, () => this.answerBy(holderId, null));
       return;
     }
@@ -177,11 +229,33 @@ export class PotatoController {
     const correct = text !== null && isCorrectAnswer(text, question.answers);
     if (correct && this.isHuman(playerId)) {
       this.pendingAnswer = { playerId, text };
-      this.update({ thinkingId: null, deadline: null, timerMs: null, awaitingPick: { chooserId: playerId, allowSelf: game.phase === 'duel' } });
+      this.update({ thinkingId: null, choices: null, awaitingPick: { chooserId: playerId, allowSelf: game.phase === 'duel' } });
+      this.countdown(PICK_TIMEOUT_MS, PICK_TIMEOUT_MS, () => this.pickAtRandom());
       return;
     }
     const next = this.chooseNext(playerId, correct);
     this.commit(playerId, text, next);
+  }
+
+  /** Opcje ABCD na pytanie człowieka, jeśli poziom ich wymaga i jest ich dość. */
+  private choicesFor(game: PotatoState): { questionId: string; options: string[] } | null {
+    if (DIFFICULTY_PRESETS[this.difficulty].answerFormat !== 'choice' || game.question === null) return null;
+    const options = buildChoices(game.question, game.deck);
+    if (options.length < CHOICE_COUNT) {
+      log.warn('Za mało opcji ABCD, pytanie będzie pisemne', { questionId: game.question.id });
+      return null;
+    }
+    return { questionId: game.question.id, options };
+  }
+
+  /** Po upływie czasu na wybór: losowy aktywny gracz (w finale też możliwy ten sam, który odpowiadał). */
+  private pickAtRandom() {
+    const pick = this.view.awaitingPick;
+    if (!pick) return;
+    const candidates = activePlayers(this.view.game).filter((p) => pick.allowSelf || p.id !== pick.chooserId);
+    const target = pickRandom(this.rng, candidates);
+    log.info('Brak wyboru w czasie, wskazanie losowe', { chooserId: pick.chooserId, targetId: target.id });
+    this.pick(target.id);
   }
 
   /** Bot wybiera cel; w sprincie i po poprawnej odpowiedzi zawsze inny gracz. */
@@ -241,6 +315,7 @@ export class PotatoController {
   /** Zegar sprintu liczy się na żywo; kary za błędy są już odjęte w silniku. */
   private startSprintClock() {
     this.sprintSyncAt = this.clock.now();
+    this.update({ sprintEndsAt: this.clock.now() + this.view.game.sprintMsLeft });
     this.scheduleSprintEnd();
   }
 
@@ -293,6 +368,7 @@ export class PotatoController {
     this.update({ game });
     if (game.phase === 'sprint' && previousPhase !== 'sprint') this.startSprintClock();
     if (game.phase !== 'sprint') this.clearSprintTimer();
+    this.update({ sprintEndsAt: game.phase === 'sprint' ? this.clock.now() + game.sprintMsLeft : null });
   }
 
   private countdown(totalMs: number, fireInMs: number, fn: () => void) {
