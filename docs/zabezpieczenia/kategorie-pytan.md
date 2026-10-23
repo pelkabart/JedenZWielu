@@ -64,3 +64,23 @@ W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej 
 **Ryzyko:** gracz bez własnych kategorii musiałby za każdym razem wybierać jedyną „Domyślną”.
 **Zabezpieczenie:** `soloEntryRoute` prowadzi do listy kategorii tylko wtedy, gdy jest więcej niż jeden zestaw; inaczej od razu do wyboru poziomu.
 **Test:** `soloEntry-test.ts`, `categories-integration-test.ts`.
+
+### 12. Dwa stuknięcia w „Utwórz kategorię” wysyłają dwa płatne zapytania
+**Ryzyko:** dwa stuknięcia w tej samej klatce widzą jeszcze stary stan ekranu (przycisk aktywny). Magazyn odrzuciłby drugi zestaw (ta sama nazwa), ale za oba zapytania do OpenAI trzeba by zapłacić.
+**Zabezpieczenie:** ekran ma znacznik `submitting` (`useRef`), ustawiany synchronicznie przy pierwszym stuknięciu; w czasie tworzenia przycisk znika i pokazuje się postęp.
+**Test:** ręcznie (ekran nie ma testów komponentów); ochrona w magazynie: `QuestionSetStore-test.ts › dwa jednoczesne dodania przy dwóch zestawach: przechodzi tylko jedno`.
+
+### 13. Wybierak plików ukrywa obsługiwane pliki
+**Ryzyko:** filtr typów MIME w wybieraku Androida nie zna części typów (np. `text/markdown`), więc takie pliki byłyby wyszarzone, choć gra je obsługuje.
+**Zabezpieczenie:** wybierak pokazuje wszystkie pliki (`*/*`), a format sprawdza `validateSourceFiles` po rozszerzeniu, z komunikatem, które formaty są obsługiwane.
+**Test:** `sourceFiles-test.ts › mimeTypeFor`, `› odrzuca: nieobsługiwany typ`.
+
+### 14. Czwarty przycisk nie mieści się w menu
+**Ryzyko:** gra działa w poziomie; na telefonie o wysokości ok. 360 punktów tytuł i cztery przyciski nie zmieściłyby się, a dolny („Kategorie”) zostałby ucięty.
+**Zabezpieczenie:** poniżej 400 punktów wysokości (po odjęciu bezpiecznych marginesów) ekran główny zmniejsza tytuł i odstępy. Listy kategorii są w `ScrollView`.
+**Test:** ręcznie, na emulatorze w poziomie.
+
+### 15. Gracz wychodzi z ekranu w czasie generowania
+**Ryzyko:** zapytanie trwa do kilku minut; gracz wraca do menu. Wynik mógłby przepaść albo zapisać się w połowie.
+**Zabezpieczenie:** tworzenie kategorii nie zależy od ekranu: kończy się w tle i zapisuje całą kategorię naraz (najpierw zapis do pliku tymczasowego, potem podmiana), a lista kategorii odświeża się sama (`useSyncExternalStore`).
+**Test:** `QuestionSetStore-test.ts › powiadamia subskrybentów…`, `› błąd zapisu: zestaw nie jest dodany…`.

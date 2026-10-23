@@ -23,11 +23,11 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (18.10.2026)
+## 1. Stan projektu (23.10.2026)
 
 | Element | Stan |
 |---|---|
-| Ekran główny (tytuł, 3 przyciski, ustawienia) | zrobione |
+| Ekran główny (tytuł, 4 przyciski, ustawienia) | zrobione |
 | Tryb poziomy aplikacji | zrobione |
 | Wybór poziomu trudności przed grą | zrobione |
 | Baza pytań (format JSON, 50 pytań przykładowych) | zrobione |
@@ -41,19 +41,20 @@ Spis treści:
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
-| Razem testów automatycznych | 241 |
+| Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
+| Razem testów automatycznych | 361 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), Jest (jest-expo); Python tylko do przygotowania modelu głosu.
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), expo-document-picker, expo-file-system i expo-secure-store (kategorie), OpenAI Responses API, Jest (jest-expo); Python tylko do przygotowania modelu głosu.
 
 ## 2. Ekran główny
 
-Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, trzy przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki) i ikona ustawień w prawym górnym rogu.
+Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, cztery przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki, Kategorie) i ikona ustawień w prawym górnym rogu. Na niskich ekranach (telefon w poziomie, poniżej 400 punktów wysokości) tytuł i odstępy są mniejsze, żeby zmieściły się wszystkie przyciski.
 
 Na tym etapie nie chcieliśmy używać zewnętrznych grafik, więc tło jest narysowane w kodzie jako SVG: ciemnoniebieski gradient, promienie jak w studiu telewizyjnym, gwiazdki z grubym obrysem i znaki zapytania. Przyciski mają efekt „wciskania” (przesuwają się w dół po naciśnięciu), żeby pasowały do komiksowego stylu.
 
-Przycisk „Tryb Jednoosobowy” prowadzi do wyboru poziomu trudności: Łatwy, Normalny albo Ekspert.
+Przycisk „Tryb Jednoosobowy” prowadzi do wyboru poziomu trudności: Łatwy, Normalny albo Ekspert. Jeśli gracz ma własne kategorie pytań, najpierw wybiera kategorię (rozdział 5, „Kategorie pytań”).
 
 ## 3. Silnik gry w trybie jednoosobowym
 
@@ -204,6 +205,24 @@ Na pytanie można odpowiedzieć na dwa sposoby: wpisać odpowiedź albo ją powi
 - Cisza albo brak zgody na mikrofon nie kosztują szansy: gracz widzi komunikat i może spróbować jeszcze raz albo wpisać.
 - Przycisk pojawia się tylko wtedy, gdy telefon ma rozpoznawanie mowy (nie ma go w Expo Go ani na emulatorze bez usług Google). O zgodę na mikrofon gra pyta dopiero przy pierwszym dotknięciu przycisku.
 
+### Kategorie pytań (OpenAI)
+
+Przycisk „Kategorie” na dole menu otwiera listę zestawów pytań. Pierwsza jest zawsze „Domyślna” – 50 pytań z `src/data/questions.json`. Ma kłódkę zamiast kosza, bo nie da się jej usunąć. Pod listą jest przycisk „Dodaj kategorię”. Własne kategorie mogą być najwyżej trzy; przy trzech przycisk jest wyłączony, a gra podpowiada, żeby usunąć którąś.
+
+Nowa kategoria powstaje z plików gracza:
+
+1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) i wpisuje swój klucz API OpenAI.
+2. Gra sprawdza wszystko, co da się sprawdzić bez internetu (nazwa, limit kategorii, pliki), zanim cokolwiek wyśle – zapytanie do OpenAI kosztuje.
+3. Pliki idą do OpenAI Responses API jako `input_file` (base64), razem z opisem formatu teleturnieju: odpowiedzi otwarte, krótkie, z kilkoma akceptowanymi zapisami, daty i liczby cyframi, pomyłki dla botów. Model musi odpowiedzieć zgodnie ze schematem JSON (Structured Outputs, `strict: true`), w którym dziedziny i typy odpowiedzi to dokładnie wartości z gry.
+4. Każde pytanie przechodzi przez tę samą walidację co baza domyślna (`parseQuestion`, wydzielone z `parseQuestionBank`). Złe pytania są odrzucane pojedynczo, powtórzenia pomijane. Prosimy o 60 pytań; poniżej 20 poprawnych kategoria nie powstaje.
+5. Zestaw jest zapisywany w pliku JSON w pamięci telefonu (`expo-file-system`), a klucz API w szyfrowanym magazynie systemu (`expo-secure-store`). Klucza nie ma w kodzie ani w APK.
+
+Gdy oprócz domyślnej jest choć jedna własna kategoria, „Tryb Jednoosobowy” pokazuje najpierw listę kategorii. Pytania w grze są losowane tylko z wybranej; z niej biorą też pomyłki boty. Bez własnych kategorii gra od razu przechodzi do wyboru poziomu.
+
+Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis, klucz). W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
+
+Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy (commit z testami, które jeszcze nie przechodziły), potem kod.
+
 ## 6. Testy i analiza dynamiczna
 
 Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
@@ -226,7 +245,13 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
-| **Razem** | **241** | |
+| `categories/__tests__/sourceFiles-test.ts` | 26 | kategorie: obsługiwane formaty, limity liczby i rozmiaru plików, komunikaty |
+| `categories/__tests__/generatedQuestions-test.ts` | 18 | kategorie: czyszczenie pytań z OpenAI, odrzucanie złych pojedynczo, powtórzenia |
+| `categories/__tests__/openaiGenerator-test.ts` | 24 | kategorie: zapytanie do Responses API (pliki, schemat), błędy HTTP, sieć, odmowa, ucięta odpowiedź, limit czasu, klucz poza logami |
+| `categories/__tests__/QuestionSetStore-test.ts` | 34 | kategorie: domyślna nieusuwalna, limit 3, jednoczesne dodania, zapis i uszkodzony zapis, nazwy |
+| `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
+| `categories/__tests__/categories-integration-test.ts` | 14 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików |
+| **Razem** | **361** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -238,6 +263,8 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy gracz, który nie odpowiada, odpada, a „Pomiń do wyników” kończy grę,
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
+
+Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI. Sprawdzamy, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie albo złych plikach gra nie czyta plików i nie wysyła zapytania.
 
 Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
 
@@ -451,6 +478,11 @@ APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla 
 **7.44. `expo install` wybrał wersję biblioteki dla innego SDK**
 `npx expo install expo-speech-recognition` zainstalował wersję 58.0.0, choć projekt jest na Expo SDK 57. Dla paczek spoza Expo `expo install` nie zna zgodności z SDK i bierze najnowszą wersję. Zauważyliśmy to, porównując wersję z tabelą zgodności w README biblioteki. Zainstalowaliśmy ręcznie gałąź `^57` (57.1.1).
 
+### Kategorie pytań
+
+**7.45. `Buffer` w teście przechodził w Jest, ale nie w TypeScript**
+Test integracyjny kategorii kodował treść udawanego pliku przez `Buffer.from(...).toString('base64')`. Jest działa w Node, więc test przechodził, ale `npx tsc --noEmit` zgłosił „Cannot find name 'Buffer'”: projekt ma typy dla React Native, a nie dla Node, i dobrze, bo w aplikacji `Buffer` nie istnieje. Zamieniliśmy go na `btoa`, które jest i w Node, i w React Native.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
@@ -460,4 +492,5 @@ APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla 
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
 - Poprawa balansu poziomów Normalny i Ekspert (po limicie pytań przeciętny gracz rzadko dochodzi do finału na poziomie Ekspert).
 - Rozbudowa bazy pytań.
+- Kategorie: sprawdzenie na telefonie z prawdziwym kluczem (czas generowania, jakość pytań z różnych formatów plików). Docelowo zapytania do OpenAI przez własny serwer (np. funkcja Supabase), żeby gracz nie musiał mieć własnego klucza.
 - Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.
