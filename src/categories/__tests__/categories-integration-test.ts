@@ -28,7 +28,7 @@ const picked = (name: string, size = 2048): PickedFile => ({ name, size, uri: `f
 function setup(storage = new MemoryStorage()) {
   const store = new QuestionSetStore({ storage, defaultQuestions: QUESTION_BANK });
   const openai = fakeFetch(jsonResponse(questionsResponse(generatedItems(QUESTIONS_TO_REQUEST))));
-  const readFile = jest.fn(async (file: PickedFile) => Buffer.from(`treść ${file.name}`).toString('base64'));
+  const readFile = jest.fn(async (file: PickedFile) => btoa(`plik ${file.name}`));
   const deps: CreateQuestionSetDeps = { store, readFile, fetch: openai.fetch, apiKey: 'sk-test' };
   return { store, storage, openai, readFile, deps };
 }
