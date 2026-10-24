@@ -12,7 +12,7 @@ import { hostLine, introLine, PHASE_TITLES } from '@/game/controller/hostLine';
 import { getPlayer, pickTargets } from '@/game/engine';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import { HUMAN_ID } from '@/game/solo';
-import type { Difficulty, PlayerState } from '@/game/types';
+import type { Difficulty, PlayerState, Question } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSoloController } from '@/hooks/useSoloController';
 import { createLogger } from '@/lib/log';
@@ -36,6 +36,8 @@ const log = createLogger('ekran-gry');
 
 type Props = {
   difficulty: Difficulty;
+  /** Pytania wybranej kategorii. */
+  questions: Question[];
   onPlayAgain: () => void;
 };
 
@@ -59,8 +61,8 @@ function isHighlighted(view: SoloView, player: PlayerState): boolean {
   return false;
 }
 
-export function SoloGame({ difficulty, onPlayAgain }: Props) {
-  const { controller, view } = useSoloController(difficulty);
+export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
+  const { controller, view } = useSoloController(difficulty, questions);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();

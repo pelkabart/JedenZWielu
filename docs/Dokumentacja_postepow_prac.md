@@ -27,7 +27,7 @@ Spis treści:
 
 | Element | Stan |
 |---|---|
-| Ekran główny (tytuł, 3 przyciski, ustawienia) | zrobione |
+| Ekran główny (tytuł, 4 przyciski, ustawienia) | zrobione |
 | Tryb poziomy aplikacji | zrobione |
 | Wybór poziomu trudności przed grą | zrobione |
 | Baza pytań (format JSON, 50 pytań przykładowych) | zrobione |
@@ -41,28 +41,21 @@ Spis treści:
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
-| Formaty odpowiedzi: ABCD na poziomach Łatwy i Normalny, pisemnie na Ekspercie | zrobione |
-| Czas decyzji botów z rozkładu Gaussa (wg PDF „Quiz Frenzy”) | zrobione |
-| Silnik rund „Gorący Ziemniak” (runda 1–4, czysty, bez UI) | zrobione, bez podłączenia do ekranu |
-| Czas odpowiedzi wg poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s | zrobione |
-| Ekran gry w nowych zasadach (rundy 1–4) z limitem 10 s na wybór rywala | zrobione, sprawdzone w przeglądarce |
-| Pauza i lektor w grze rund (licznik czeka na ciszę prowadzącego) | zrobione, sprawdzone w przeglądarce |
-| Muzyka w menu głównym i wyborze poziomu (jedna melodia bez restartu, pauza w rozgrywce) | zrobione, sprawdzone w przeglądarce |
-| Wyciszanie muzyki (ikonka w prawym dolnym rogu, wspólna na wszystkich ekranach) | zrobione, sprawdzone w przeglądarce |
-| Muzyka w rozgrywce (cichsza niż lektor, przyciszana podczas mówienia) | zrobione; przyciszanie do sprawdzenia na telefonie |
-| Razem testów automatycznych | 305 |
+| Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
+| Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
+| Razem testów automatycznych | 393 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), Jest (jest-expo); Python tylko do przygotowania modelu głosu.
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), expo-document-picker, expo-file-system i expo-secure-store (kategorie), OpenAI Responses API, Jest (jest-expo); Python tylko do przygotowania modelu głosu.
 
 ## 2. Ekran główny
 
-Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, trzy przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki) i ikona ustawień w prawym górnym rogu.
+Aplikacja uruchamia się w trybie poziomym (`"orientation": "landscape"` w `app.json`). Na ekranie jest tytuł gry, cztery przyciski (Tryb Jednoosobowy, MultiPlayer, Dodatki, Kategorie) i ikona ustawień w prawym górnym rogu. Zębatka otwiera ekran „Ustawienia”, na razie z kluczem API OpenAI (rozdział 5, „Kategorie pytań”). Na niskich ekranach (telefon w poziomie, poniżej 400 punktów wysokości) tytuł i odstępy są mniejsze, żeby zmieściły się wszystkie przyciski.
 
 Na tym etapie nie chcieliśmy używać zewnętrznych grafik, więc tło jest narysowane w kodzie jako SVG: ciemnoniebieski gradient, promienie jak w studiu telewizyjnym, gwiazdki z grubym obrysem i znaki zapytania. Przyciski mają efekt „wciskania” (przesuwają się w dół po naciśnięciu), żeby pasowały do komiksowego stylu.
 
-Przycisk „Tryb Jednoosobowy” prowadzi do wyboru poziomu trudności: Łatwy, Normalny albo Ekspert.
+Przycisk „Tryb Jednoosobowy” prowadzi do wyboru poziomu trudności: Łatwy, Normalny albo Ekspert. Jeśli gracz ma własne kategorie pytań, najpierw wybiera kategorię (rozdział 5, „Kategorie pytań”).
 
 ## 3. Silnik gry w trybie jednoosobowym
 
@@ -153,18 +146,7 @@ Kiedy bot się myli, podaje odpowiedź tego samego rodzaju co poprawna (pole `an
 
 Czasem bot też po prostu nie zdąży odpowiedzieć.
 
-**Czas decyzji bota** losujemy z rozkładu Gaussa, zależnie od formatu odpowiedzi na danym poziomie (z PDF „Quiz Frenzy”):
-
-| Format | Średnia | Odchylenie | Zakres |
-|---|---|---|---|
-| ABCD (Łatwy, Normalny) | 1,5 s | 0,35 s | 1,0–2,5 s |
-| pisemnie (Ekspert) | 3,5 s | 0,8 s | 2,0–5,0 s |
-
-Mnożnik tempa poziomu (`speedFactor`) nadal działa: na Łatwym boty są wolniejsze, na Ekspercie szybsze. Osobowości botów nie zmieniają już czasu odpowiedzi (wcześniej profile miały różne zakresy), zostają w zgłoszeniach w finale i w skuteczności.
-
 ## 5. Ekran rozgrywki
-
-**Formaty odpowiedzi.** Na poziomach Łatwy i Normalny gracz wybiera jedną z czterech opcji A–D. Opcje to poprawna odpowiedź i trzy pomyłki tego samego rodzaju, losowane z tej samej puli co pomyłki botów (`src/game/choices.ts`). Losowanie idzie z osobnego generatora zasianego id pytania, więc to samo pytanie zawsze ma te same opcje. Na poziomie Ekspert gracz wpisuje odpowiedź (albo mówi ją, jeśli działa mikrofon). W trybie ABCD mikrofon jest wyciszony, a przycisk mikrofonu ukryty.
 
 Po wybraniu poziomu trudności zaczyna się gra. Na razie wszystko jest narysowane prostymi kształtami. Grafiki postaci i pulpitów podmienimy, kiedy będą gotowe.
 
@@ -184,7 +166,7 @@ Między zdarzeniami są krótkie pauzy (wynik odpowiedzi ok. 2 s, „X wskazuje 
 
 Silnik z etapu 3 nie wie nic o czasie. Czasem zajmuje się osobna klasa `SoloController` (`src/game/controller/SoloController.ts`):
 
-- odlicza czas na odpowiedź (12 s) i na zgłoszenie się w finale (6 s),
+- odlicza czas na odpowiedź (15 s) i na zgłoszenie się w finale (6 s),
 - wykonuje ruchy botów z opóźnieniem, żeby wyglądało, że „myślą” i piszą,
 - w finale rozstrzyga, kto zgłosił się pierwszy (gracz czy któryś bot),
 - robi pauzy między zdarzeniami i pozwala je pomijać,
@@ -224,18 +206,25 @@ Na pytanie można odpowiedzieć na dwa sposoby: wpisać odpowiedź albo ją powi
 - Cisza albo brak zgody na mikrofon nie kosztują szansy: gracz widzi komunikat i może spróbować jeszcze raz albo wpisać.
 - Przycisk pojawia się tylko wtedy, gdy telefon ma rozpoznawanie mowy (nie ma go w Expo Go ani na emulatorze bez usług Google). O zgodę na mikrofon gra pyta dopiero przy pierwszym dotknięciu przycisku.
 
-## 5a. Rundy „Gorący Ziemniak” (silnik, gałąź `nowe_solo`)
+### Kategorie pytań (OpenAI)
 
-Przebieg z dokumentu „Quiz Frenzy” w silniku `src/game/potato/engine.ts`. Silnik nie losuje i nie loguje: losowe decyzje (kto dostaje ziemniak po błędzie, cel bota) podaje wywołujący w akcji.
+Przycisk „Kategorie” na dole menu otwiera listę zestawów pytań. Pierwsza jest zawsze „Domyślna” – 50 pytań z `src/data/questions.json`. Ma kłódkę zamiast kosza, bo nie da się jej usunąć. Pod listą jest przycisk „Dodaj kategorię”. Własne kategorie mogą być najwyżej trzy; przy trzech przycisk jest wyłączony, a gra podpowiada, żeby usunąć którąś.
 
-| Runda | Co się dzieje | Zasady przyjęte przy wdrożeniu |
-|---|---|---|
-| 1 (5 → 4) | 3 życia; poprawna odpowiedź przekazuje ziemniaka wybranemu rywalowi; błąd lub brak odpowiedzi to −1 życie i reset ziemniaka do wskazanego gracza; odbicie w ciemno raz na gracza, bez utraty życia; pierwsze odpadnięcie kończy rundę | odbicie wykonuje się przed pytaniem, nie po błędzie |
-| 2 (4 → 3) | 3 punkty osłony; poprawna odpowiedź podnosi mnożnik ×1→×2→×3 i przekazuje bombę; błąd to wybuch: odejmuje mnożnik od osłony i resetuje go do ×1; 0 osłony odpada | po wybuchu bombę dostaje gracz wskazany przez wywołującego |
-| 3 (sprint, 60 s) | wszyscy zachowują awans; +1 punkt za dobrą odpowiedź, −1 s za błąd lub brak; ziemniak rotuje | remis punktów: mniej błędów, potem miejsce przy stole |
-| 4 (finał, 3 → mistrz) | nagrody sprintu: 1. miejsce 3 szanse i pierwszy atak, 2. miejsce 2 szanse, 3. miejsce 1 szansa; poprawna odpowiedź: +1 punkt, bez zmiany szans; błąd −1 szansa; „atak” = przekazanie rywalowi, „na siebie” = kolejne pytanie dla siebie; wygrywa ostatni zostający; punkty widoczne na pulpitach | finał jak w „1 z 10”: nikt nie odzyskuje szans ani ich nie traci za cudzą odpowiedź (odstępstwo od PDF, który przewidywał odnowienie szansy i cios) |
+Nowa kategoria powstaje z plików gracza:
 
-Czas odpowiedzi gracza zależy od poziomu: Łatwy 7 s, Normalny 5 s, Ekspert 10 s (tabela z PDF). Sterownik rund (`potato/controller/PotatoController.ts`) prowadzi grę na udawanym zegarze: tury człowieka i botów, czas, wskazywanie rywala po poprawnej odpowiedzi (10 s, potem losowo), odbicie w ciemno i sprint na zegarze. Ekran rund (`components/potato/PotatoGame.tsx`) jest podpięty pod trasę `solo/game`, więc gra solo idzie nowymi zasadami. Pauza i lektor działają w nowym ekranie; okno „Przerwać grę?” wstrzymuje grę, a „Wyjdź” wraca do menu.
+1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) Klucz API OpenAI jest brany z ustawień; gdy go brak, przycisk „Utwórz kategorię” jest wyłączony, a ekran pokazuje przycisk „Ustawienia”.
+2. Gra sprawdza wszystko, co da się sprawdzić bez internetu (nazwa, limit kategorii, pliki), zanim cokolwiek wyśle – zapytanie do OpenAI kosztuje.
+3. Pliki idą do OpenAI Responses API jako `input_file` (base64), razem z opisem formatu teleturnieju: odpowiedzi otwarte, krótkie, z kilkoma akceptowanymi zapisami, daty i liczby cyframi, pomyłki dla botów. Model musi odpowiedzieć zgodnie ze schematem JSON (Structured Outputs, `strict: true`), w którym dziedziny i typy odpowiedzi to dokładnie wartości z gry.
+4. Każde pytanie przechodzi przez tę samą walidację co baza domyślna (`parseQuestion`, wydzielone z `parseQuestionBank`). Złe pytania są odrzucane pojedynczo, powtórzenia pomijane. Prosimy o 60 pytań; poniżej 20 poprawnych kategoria nie powstaje.
+5. Zestaw jest zapisywany w pliku JSON w pamięci telefonu (`expo-file-system`), a klucz API w szyfrowanym magazynie systemu (`expo-secure-store`). Klucza nie ma w kodzie ani w APK.
+
+Klucz API wpisuje się raz, na ekranie „Ustawienia” (zębatka na ekranie głównym). Gra sprawdza go przed zapisem (bez spacji, zaczyna się od `sk-`, rozsądna długość), więc wklejony fragment albo spacja na końcu wychodzi od razu, a nie po kilku minutach generowania. Na Androidzie `expo-secure-store` trzyma klucz w `SharedPreferences` zaszyfrowanych kluczem z Android Keystore; wtyczka w `app.json` wyłącza ten magazyn z kopii zapasowej. Klucz zostaje po zamknięciu gry i po aktualizacji APK (ta sama nazwa wpisu co wcześniej). Ekran pokazuje go tylko zamaskowany (`sk-…abcd`) i pozwala go zmienić albo usunąć. Logika jest w `src/settings/ApiKeyStore.ts` (magazyn wstrzykiwany, w testach w pamięci), a ekrany czytają klucz przez `useSyncExternalStore` (`useApiKey`), więc po powrocie z ustawień ekran „Nowa kategoria” od razu go widzi.
+
+Gdy oprócz domyślnej jest choć jedna własna kategoria, „Tryb Jednoosobowy” pokazuje najpierw listę kategorii. Pytania w grze są losowane tylko z wybranej; z niej biorą też pomyłki boty. Bez własnych kategorii gra od razu przechodzi do wyboru poziomu.
+
+Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis), klucz API w `src/settings/`. W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
+
+Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy (commit z testami, które jeszcze nie przechodziły), potem kod.
 
 ## 6. Testy i analiza dynamiczna
 
@@ -252,21 +241,22 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `answer-format-test.ts` | 10 | opcje ABCD dla każdego pytania w bazie (4 różne, w tym poprawna), format odpowiedzi na poziomach, czas decyzji botów w przedziałach, średnia rozkładu Gaussa |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
 | `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
-| `narration/__tests__/modelAsset-test.ts` | 4 | wybór folderu modelu, który naprawdę jest w APK (nazwa z Metro niezgodna z APK, brak modelu) |
-| `plugins/__tests__/withVoiceModel-test.js` | 1 | skrót wersji modelu taki sam na Windowsie i Linuksie (EAS) |
 | `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
-| `potato/__tests__/potato-test.ts` | 23 | rundy 1–4 gry „Gorący Ziemniak”: przekazania, odbicie w ciemno, bomba i mnożnik, sprint z czasem i nagrodami, finał, boty wybierają cel, pełna gra zaskryptowana |
-| `potato/__tests__/controller-test.ts` | 11 | sterownik rund na udawanym zegarze: tury człowieka i botów, wskazywanie rywala, czas, odbicie, sprint z zegarem, pełna gra sterowana zegarem |
-| `potato/__tests__/controller-test.ts` (dodatkowo 4 testy: limit 10 s, opcje ABCD, koniec sprintu) | 15 | sterownik rund: tury, wskazywanie, limit 10 s z losowym wyborem, czas, odbicie, sprint, opcje ABCD |
-| `narration/__tests__/potato-narrator-test.ts` | 6 | lektor rund: co mówi w każdym widoku, licznik czeka na ciszę, pauza wstrzymuje głos, błąd syntezy nie blokuje gry |
-| **Razem** | **305** | |
+| `categories/__tests__/sourceFiles-test.ts` | 26 | kategorie: obsługiwane formaty, limity liczby i rozmiaru plików, komunikaty |
+| `categories/__tests__/generatedQuestions-test.ts` | 18 | kategorie: czyszczenie pytań z OpenAI, odrzucanie złych pojedynczo, powtórzenia |
+| `categories/__tests__/openaiGenerator-test.ts` | 24 | kategorie: zapytanie do Responses API (pliki, schemat), błędy HTTP, sieć, odmowa, ucięta odpowiedź, limit czasu, klucz poza logami |
+| `categories/__tests__/QuestionSetStore-test.ts` | 34 | kategorie: domyślna nieusuwalna, limit 3, jednoczesne dodania, zapis i uszkodzony zapis, nazwy |
+| `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
+| `categories/__tests__/categories-integration-test.ts` | 16 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza) |
+| `settings/__tests__/ApiKeyStore-test.ts` | 25 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz poza logami |
+| `settings/__tests__/settings-integration-test.ts` | 5 | testy integracyjne: klucz z ustawień w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
+| **Razem** | **393** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -278,6 +268,8 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy gracz, który nie odpowiada, odpada, a „Pomiń do wyników” kończy grę,
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
+
+Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI. Sprawdzamy, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
 
 Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
 
@@ -294,6 +286,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[ekran-gry]` | przerwanie gry przez gracza |
 | `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
 | `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
+| `[ustawienia]` | wczytanie ustawień i zapis albo usunięcie klucza API – tylko czy klucz jest, nigdy jaki; błędy magazynu (`warn`/`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
 Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
@@ -435,23 +428,6 @@ W tej samej grze dwa boty przez wiele pytań wskazywały tylko siebie nawzajem i
 **7.28. Klawiatura zasłaniała pole odpowiedzi**
 Przy kolejnej grze na telefonie okazało się, że po otwarciu klawiatury nie widać, co się wpisuje. W Expo SDK 57 aplikacja na Androidzie działa w trybie edge-to-edge, więc okno nie zmniejsza się po otwarciu klawiatury, tylko klawiatura je przykrywa. W poziomie zajmuje ona 60–70% wysokości ekranu, a panel odpowiedzi razem z paskiem etapu był wyższy niż miejsce, które zostawało nad klawiaturą. Na zrzucie ekranu w przeglądarce problemu nie było widać, bo tam nie ma klawiatury ekranowej. Rozwiązanie: aplikacja nasłuchuje zdarzeń klawiatury i zna jej wysokość (`useKeyboardHeight`). Przy otwartej klawiaturze panel ustawia się tuż nad nią, pasek etapu się chowa, a przy małej ilości miejsca panel przechodzi w tryb kompaktowy. Obliczenia układu są w osobnej czystej funkcji `answerLayout`, która ma 4 testy (bez klawiatury, z klawiaturą, mało miejsca, wycięcie ekranu). Panel jest ten sam przy otwartej i zamkniętej klawiaturze, zmienia się tylko styl, dzięki czemu pole nie traci fokusu ani wpisanego tekstu. Układ sprawdziliśmy na zrzucie z tymczasowej wersji, w której wysokość klawiatury była ustawiona na stałe na 230 dp. Ostateczne potwierdzenie wymaga testu na telefonie.
 
-### Formaty odpowiedzi i czas botów
-
-**7.29. Za mało pomyłek do opcji ABCD w pytaniach o datach**
-W bazie jest tylko 3 pytania o datach, więc dla większości z nich nie ma skąd wziąć trzech pomyłek tego samego rodzaju. Test całej bazy pokazał to przy pierwszym uruchomieniu: zamiast 4 opcji były 3, a integracyjne testy gier, które nie pozwalają na ostrzeżenia, zgłaszały ostrzeżenie „Za mało opcji ABCD”. Rozwiązanie: dla dat i liczb opcje dopełniamy liczbami obok poprawnej, tak jak robią to boty. Tę logikę przenieśliśmy do `choices.ts`, żeby nie było dwóch kopii. Test `każde pytanie w bazie dostaje 4 różne opcje` pilnuje tego dla całej bazy.
-
-**7.30. Testy czasu botów zakładały stare zakresy**
-Po zmianie na rozkład z PDF trzy testy w `controller-test.ts` oczekiwały, że bot odpowie po co najmniej 4 s (stary zakres profilu). To była zamierzona zmiana, więc testy zmieniliśmy: korzystają z tej samej stałej `DECISION_TIME`, co kod, zamiast wpisywanych na sztywno liczb. Pozostałe testy sterownika i gier przeszły bez zmian.
-
-**7.31. Test lektora zależał od długości pytania**
-Po zmianie losowania botów w grze lektora trafiło się dłuższe pytanie i czytanie trwało dłużej niż 20 s, którego test oczekiwał. Sprawdziliśmy, że czytanie kończy się samo (test przechodzi z 120 s), i zwiększyliśmy czas oczekiwania w teście. Zmiana nie dotyczy kodu lektora.
-
-**7.32. Błędne oczekiwania w testach rund**
-Dwa z pierwszych testów rund były napisane źle: zakładały rundę 2 po odpadnięciu, które w grze przechodzi do sprintu (przy 4 graczach odpadnięcie daje 3), oraz kolejność rankingu bez uwzględnienia dat odpadnięcia. Poprawiliśmy oczekiwania do reguł z dokumentu, a jeden test usunęliśmy, bo opisywał sytuację, której w grze nie ma (runda 2 zaczyna się z 4 graczami).
-
-**7.33. Odpadający pokazywali kropki**
-Po pierwszej grze w nowych zasadach gracz, który odpadł w rundzie 2, nadal miał na pulpicie dwie kropki. Pulpit liczył kropki z osłony, a odpadający nie miał jej zerowanej. Rozwiązanie: silnik zeruje życia i osłonę przy odpadnięciu (test `odpadający w rundzie 2 nie ma żadnych kropek`), a pulpit dla odpadających pokazuje zero. Przy okazji opisy rund były pisane językiem projektu („ziemniak”), więc przepisaliśmy je na zwykły opis zasad, a na pasku pod nagłówkiem pojawiła się legenda z aktualnym mnożnikiem.
-
 ### Logi i testy integracyjne
 
 **7.29. Gra „skończona” za wcześnie w teście integracyjnym**
@@ -508,8 +484,10 @@ APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla 
 **7.44. `expo install` wybrał wersję biblioteki dla innego SDK**
 `npx expo install expo-speech-recognition` zainstalował wersję 58.0.0, choć projekt jest na Expo SDK 57. Dla paczek spoza Expo `expo install` nie zna zgodności z SDK i bierze najnowszą wersję. Zauważyliśmy to, porównując wersję z tabelą zgodności w README biblioteki. Zainstalowaliśmy ręcznie gałąź `^57` (57.1.1).
 
-**7.45. W development buildzie z EAS katalog modelu był pusty**
-Development build zbudowany na EAS uruchamiał się, ale lektor milczał. Logi pokazywały, że katalog `files/models/vits-piper-pl-976a80a8` istnieje, ale nie ma w nim żadnego pliku. Przyczyna: nazwa folderu zawiera skrót zawartości modelu (7.40), liczony z względnych ścieżek plików przez `path.relative`. Na Windowsie te ścieżki mają „”, na Linuksie „/”, więc Metro na komputerze podawało aplikacji `vits-piper-pl-976a80a8`, a prebuild na serwerze EAS zapisał w APK `vits-piper-pl-91b2fede`. Kod `react-native-sherpa-onnx` (0.4.4, `SherpaOnnxAssetHelper.resolveAssetPath`) dla nieistniejącego assetu tworzy pusty katalog i nie zgłasza błędu (`AssetManager.list` zwraca pustą listę), a przy kolejnych uruchomieniach zwraca istniejący katalog bez sprawdzania zawartości. Lokalne APK tego nie pokazywało, bo prebuild i Metro liczyły skrót na tym samym systemie. Rozwiązanie: skrót ze ścieżek z „/”, aplikacja wybiera folder spośród faktycznie obecnych w APK (`listAssetModels`), a niekompletną kopię usuwa przed kopiowaniem. Wniosek: wartość liczona przy budowaniu i przekazywana aplikacji osobną drogą (tu: Metro) musi wychodzić tak samo na każdej maszynie.
+### Kategorie pytań
+
+**7.45. `Buffer` w teście przechodził w Jest, ale nie w TypeScript**
+Test integracyjny kategorii kodował treść udawanego pliku przez `Buffer.from(...).toString('base64')`. Jest działa w Node, więc test przechodził, ale `npx tsc --noEmit` zgłosił „Cannot find name 'Buffer'”: projekt ma typy dla React Native, a nie dla Node, i dobrze, bo w aplikacji `Buffer` nie istnieje. Zamieniliśmy go na `btoa`, które jest i w Node, i w React Native.
 
 ## 8. Dalsze plany
 
@@ -520,4 +498,5 @@ Development build zbudowany na EAS uruchamiał się, ale lektor milczał. Logi p
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
 - Poprawa balansu poziomów Normalny i Ekspert (po limicie pytań przeciętny gracz rzadko dochodzi do finału na poziomie Ekspert).
 - Rozbudowa bazy pytań.
+- Kategorie: sprawdzenie na telefonie z prawdziwym kluczem (czas generowania, jakość pytań z różnych formatów plików). Docelowo zapytania do OpenAI przez własny serwer (np. funkcja Supabase), żeby gracz nie musiał mieć własnego klucza.
 - Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.

@@ -24,7 +24,7 @@ Current state: home screen, difficulty selection and a playable solo mode (human
 3. Add **unit tests** and **integration tests** (`src/game/__tests__/integration-test.ts` wires the same modules as the app, on Jest fake timers).
 4. Update `docs/Dokumentacja_postepow_prac.md` (state table, tests table, and section 7 for problems that actually happened).
 5. Before finishing: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
-6. After changes to the app, build a release APK and put it in `androidApk/` (see "Building the APK" below).
+6. Don't build the APK as part of this workflow. Build it only when the user explicitly asks; then follow "Building the APK" below and put both APKs (arm64-v8a and x86_64) in `androidApk/`.
 
 ## Commands
 
@@ -62,16 +62,20 @@ The APK is built locally (no EAS; there is no `eas.json`): Expo prebuild generat
 npx expo prebuild --platform android
 # 2. Build (in android/; on Windows ./gradlew.bat). The target is a regular Android 15 phone; arm64-v8a is
 #    its CPU architecture (practically every current phone), not a special device. minSdk 24 / targetSdk 36,
-#    so Android 15 (API 35) is covered. Use x86_64 only for the PC emulator.
+#    so Android 15 (API 35) is covered. x86_64 is for the emulator in Android Studio on the PC.
+#    Always build both, one after the other: each build overwrites app-release.apk, so copy it before the next one.
 #    Don't build a universal APK (~320 MB, much slower).
-cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
-# 3. Copy the result to androidApk/ in the project root (create the folder if missing), overwriting the old one.
-mkdir -p androidApk && cp android/app/build/outputs/apk/release/app-release.apk androidApk/JedenZWielu-arm64-v8a.apk
+# 3. Copy each result to androidApk/ in the project root (create the folder if missing), overwriting the old one.
+mkdir -p androidApk
+(cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a)
+cp android/app/build/outputs/apk/release/app-release.apk androidApk/JedenZWielu-arm64-v8a.apk   # phone
+(cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64)
+cp android/app/build/outputs/apk/release/app-release.apk androidApk/JedenZWielu-x86_64.apk      # emulator
 ```
 
 Prebuild recreates `android/` from scratch, deleting `android/local.properties`, and `ANDROID_HOME` is not set on this machine, so Gradle fails with "SDK location not found". After every prebuild write `sdk.dir=C:/Users/dpietek/AppData/Local/Android/Sdk` to `android/local.properties` (forward slashes — in a `.properties` file `\U` is an escape and breaks the path).
 
-Prebuild rewrites `package.json` scripts and adds a placeholder package name to `app.json`; revert those changes and don't commit them. An `arm64-v8a` APK crashes on start on an x86_64 emulator (see section 7 of the progress log).
+Prebuild rewrites `package.json` scripts and adds a placeholder package name to `app.json`; revert those changes and don't commit them. An `arm64-v8a` APK crashes on start on an x86_64 emulator (see section 7 of the progress log), so install `JedenZWielu-x86_64.apk` on the emulator and `JedenZWielu-arm64-v8a.apk` on the phone.
 
 ## Configuration notes
 
