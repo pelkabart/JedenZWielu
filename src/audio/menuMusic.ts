@@ -3,7 +3,6 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { createLogger } from '@/lib/log';
 import { volumeStore } from '@/settings/volume';
 
-import { isMusicMuted, subscribeMusicMuted } from './musicMute';
 import { musicGain } from './volume';
 
 const log = createLogger('muzyka');
@@ -14,7 +13,7 @@ const MENU_VOLUME = 0.3;
 const PAUSE_DELAY_MS = 400;
 
 /**
- * Jeden odtwarzacz dla całego menu (główne menu i wybór poziomu), żeby melodia
+ * Jeden odtwarzacz dla wszystkich ekranów poza rozgrywką, żeby melodia
  * płynęła dalej przy przejściu, zamiast zaczynać się od początku.
  */
 let player: AudioPlayer | null = null;
@@ -22,7 +21,7 @@ let activeScreens = 0;
 let pauseTimer: ReturnType<typeof setTimeout> | null = null;
 
 function currentVolume(): number {
-  return musicGain(MENU_VOLUME, volumeStore.getSettings(), isMusicMuted());
+  return musicGain(MENU_VOLUME, volumeStore.getSettings());
 }
 
 function applyVolume() {
@@ -38,8 +37,7 @@ function getPlayer(): AudioPlayer {
   return player;
 }
 
-// Wyciszenie i suwak w ustawieniach zmieniają głośność już działającego odtwarzacza.
-subscribeMusicMuted(applyVolume);
+// Suwak w ustawieniach zmienia głośność już działającego odtwarzacza.
 volumeStore.subscribe(applyVolume);
 
 /** Ekran menu jest na wierzchu: muzyka gra (wznawia się tam, gdzie była). */

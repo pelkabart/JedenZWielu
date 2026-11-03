@@ -14,7 +14,7 @@ export interface CreateQuestionSetDeps {
   store: QuestionSetStore;
   /** Zwraca zawartość pliku w base64. */
   readFile: (file: PickedFile) => Promise<string>;
-  /** Klucz z ustawień; pusty = błąd `no-api-key` przed czytaniem plików. */
+  /** Klucz z konfiguracji (`.env.local`); pusty = błąd `no-api-key` przed czytaniem plików. */
   apiKey: string;
   fetch?: FetchLike;
   onProgress?: (step: CreationStep) => void;

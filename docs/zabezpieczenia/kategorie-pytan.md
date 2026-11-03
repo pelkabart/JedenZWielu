@@ -32,7 +32,7 @@ W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej 
 
 ### 5. Klucz API wycieka
 **Ryzyko:** klucz wpisany w kod albo w `EXPO_PUBLIC_…` trafiłby do APK, z którego każdy może go wyciągnąć. Klucz w logach trafiłby na ekran albo do raportu.
-**Zabezpieczenie:** klucza nie ma w repozytorium ani w APK – gracz wpisuje własny klucz w ustawieniach gry; jest zapamiętywany w `expo-secure-store` (szyfrowany magazyn systemu, szczegóły w [ustawienia-klucz-api.md](ustawienia-klucz-api.md)). Logi zawierają tylko liczby i nazwy plików, nigdy klucza ani treści plików.
+**Zabezpieczenie:** klucza nie ma w repozytorium. **Od 03.11.2026 klucz z `.env.local` jest w zbudowanym APK**, więc takiego APK nie wolno udostępniać (szczegóły w [ustawienia-klucz-api.md](ustawienia-klucz-api.md)). Logi zawierają tylko liczby i nazwy plików, nigdy klucza ani treści plików.
 **Test:** `openaiGenerator-test.ts › klucz nie trafia do logów`.
 
 ### 6. Więcej niż 3 własne kategorie albo usunięcie domyślnej

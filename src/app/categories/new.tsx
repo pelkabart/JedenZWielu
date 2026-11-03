@@ -21,9 +21,8 @@ import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { colors } from '@/constants/theme';
-import { useApiKey } from '@/hooks/useApiKey';
 import { createLogger } from '@/lib/log';
-import { maskApiKey } from '@/settings/ApiKeyStore';
+import { CONFIG_API_KEY } from '@/settings/configApiKey';
 
 const log = createLogger('ekran-kategorii');
 
@@ -39,8 +38,6 @@ export default function NewCategoryScreen() {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [files, setFiles] = useState<PickedFile[]>([]);
-  // Klucz z ekranu „Ustawienia”; po powrocie stamtąd odświeża się sam.
-  const apiKey = useApiKey();
   const [step, setStep] = useState<CreationStep | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Dwa szybkie stuknięcia w jednej klatce widzą jeszcze stary stan — bez tego poszłyby dwa płatne zapytania.
@@ -48,7 +45,7 @@ export default function NewCategoryScreen() {
 
   const busy = step !== null;
   const problem = files.length > 0 ? validateSourceFiles(files) : null;
-  const canSubmit = !busy && name.trim() !== '' && apiKey !== '' && files.length > 0 && problem === null;
+  const canSubmit = !busy && name.trim() !== '' && CONFIG_API_KEY !== '' && files.length > 0 && problem === null;
 
   const addFiles = async () => {
     try {
@@ -69,7 +66,7 @@ export default function NewCategoryScreen() {
     try {
       const set = await createQuestionSet(
         { name, files },
-        { store: questionSetStore, readFile: readFileBase64, apiKey, onProgress: setStep },
+        { store: questionSetStore, readFile: readFileBase64, apiKey: CONFIG_API_KEY, onProgress: setStep },
       );
       log.info('Utworzono kategorię z ekranu', { setId: set.id, questions: set.questions.length });
       router.back();
@@ -110,27 +107,11 @@ export default function NewCategoryScreen() {
               editable={!busy}
             />
 
-            <Text style={styles.label}>Klucz API OpenAI</Text>
-            {apiKey !== '' ? (
+            {CONFIG_API_KEY === '' && (
               <View style={styles.keyStatus}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.categories} />
-                <Text style={styles.keyText}>Z ustawień: {maskApiKey(apiKey)}</Text>
+                <Ionicons name="alert-circle" size={20} color={colors.starYellow} />
+                <Text style={styles.keyText}>Brak klucza API: wpisz EXPO_PUBLIC_OPENAI_API_KEY w .env.local i zbuduj aplikację ponownie.</Text>
               </View>
-            ) : (
-              <>
-                <View style={styles.keyStatus}>
-                  <Ionicons name="alert-circle" size={20} color={colors.starYellow} />
-                  <Text style={styles.keyText}>Brak klucza – dodaj go w ustawieniach.</Text>
-                </View>
-                <MenuButton
-                  label="Ustawienia"
-                  color={colors.solo}
-                  baseColor={colors.soloBase}
-                  width={200}
-                  disabled={busy}
-                  onPress={() => router.push('/settings')}
-                />
-              </>
             )}
           </View>
 
@@ -254,6 +235,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   keyText: {
+    flex: 1,
     color: colors.white,
     fontSize: 14,
     fontWeight: '700',

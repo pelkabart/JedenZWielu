@@ -2,10 +2,9 @@ import type { VolumeSettings, VolumeStore } from '@/settings/VolumeStore';
 
 /**
  * Głośność odtwarzacza muzyki (0–1). `base` to poziom tego utworu przy 100% w ustawieniach,
- * więc suwak zmienia głośność, a proporcje między muzyką i lektorem zostają. Wyciszenie ma pierwszeństwo.
+ * więc suwak zmienia głośność, a proporcje między muzyką i lektorem zostają.
  */
-export function musicGain(base: number, settings: VolumeSettings, muted: boolean): number {
-  if (muted) return 0;
+export function musicGain(base: number, settings: VolumeSettings): number {
   return base * (settings.music / 100);
 }
 

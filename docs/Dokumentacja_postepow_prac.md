@@ -45,12 +45,13 @@ Spis treści:
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
 | Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą (naprawione: gra używa wybranej kategorii) | zrobione, do sprawdzenia na telefonie z kluczem API |
 | Kategorie: import i eksport do plików `.kat` (JSON), zaimportowana kategoria działa jak z OpenAI | zrobione, testy automatyczne; do sprawdzenia na telefonie (wybór folderu) |
-| Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
-| Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
+| Klucz API OpenAI tylko z `.env.local`; ekran i zapis na telefonie usunięte 03.11.2026 | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Hak pre-commit blokuje commit klucza (`.env.local` w `.gitignore`) | zrobione, testy automatyczne + ręczny test haka |
+| Muzyka menu na wszystkich ekranach poza rozgrywką, bez przycisku wyciszania | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 547 (+ 19 w `server/`) |
+| Razem testów automatycznych | 521 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -222,7 +223,7 @@ Przycisk „Kategorie” na dole menu otwiera listę zestawów pytań. Pierwsza 
 
 Nowa kategoria powstaje z plików gracza:
 
-1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) Klucz API OpenAI jest brany z ustawień; gdy go brak, przycisk „Utwórz kategorię” jest wyłączony, a ekran pokazuje przycisk „Ustawienia”.
+1. Gracz podaje nazwę (do 30 znaków, inną niż istniejące), wybiera od 1 do 9 plików (PDF, DOCX, TXT, MD, PPTX, XLSX, CSV, ODT, RTF; do 10 MB na plik i 30 MB razem) (Stan od 03.11.2026: klucz API OpenAI pochodzi tylko z `.env.local`; ekran ustawień do jego wpisywania usunięto, patrz sekcja 7.59.) Wcześniej klucz API OpenAI był brany z ustawień; gdy go brakowało, przycisk „Utwórz kategorię” był wyłączony, a ekran pokazywał przycisk „Ustawienia”.
 2. Gra sprawdza wszystko, co da się sprawdzić bez internetu (nazwa, limit kategorii, pliki), zanim cokolwiek wyśle – zapytanie do OpenAI kosztuje.
 3. Pliki idą do OpenAI Responses API jako `input_file` (base64), razem z opisem formatu teleturnieju: odpowiedzi otwarte, krótkie, z kilkoma akceptowanymi zapisami, daty i liczby cyframi, pomyłki dla botów. Model musi odpowiedzieć zgodnie ze schematem JSON (Structured Outputs, `strict: true`), w którym dziedziny i typy odpowiedzi to dokładnie wartości z gry.
 4. Każde pytanie przechodzi przez tę samą walidację co baza domyślna (`parseQuestion`, wydzielone z `parseQuestionBank`). Złe pytania są odrzucane pojedynczo, powtórzenia pomijane. Prosimy o 60 pytań; poniżej 20 poprawnych kategoria nie powstaje.
@@ -276,13 +277,13 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
 | `categories/__tests__/categoryFile-test.ts` | 34 | import/eksport: rozszerzenie `.kat`, bezpieczna nazwa pliku, zapis i odczyt JSON, zły format i wersja, złe pytania, za mało pytań, wolna nazwa |
 | `categories/__tests__/transferQuestionSet-test.ts` | 13 | import/eksport: zapis jak kategoria z OpenAI, rozszerzenie, rozmiar i limit sprawdzane przed czytaniem, zajęta nazwa, błędy odczytu i zapisu, anulowanie, domyślna nieeksportowalna |
-| `categories/__tests__/categories-integration-test.ts` | 19 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza), eksport → import na innym telefonie → gra, limit przy imporcie |
-| `settings/__tests__/ApiKeyStore-test.ts` | 30 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz z `.env.local`, klucz poza logami |
-| `settings/__tests__/settings-integration-test.ts` | 6 | testy integracyjne: klucz z ustawień albo z `.env.local` w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
+| `categories/__tests__/categories-integration-test.ts` | 21 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza), eksport → import na innym telefonie → gra, limit przy imporcie |
+| `settings/__tests__/configApiKey-test.ts` | 8 | klucz z `.env.local`: format, brak klucza, klucz poza logami |
 | `settings/__tests__/VolumeStore-test.ts` | 36 | głośność: przycinanie do 0–100, odczyt uszkodzonego pliku, wczytanie, zapis, łączenie zapisów, zmiana przed wczytaniem, błędy pliku |
-| `audio/__tests__/volume-test.ts` | 8 | głośność odtwarzaczy: skalowanie poziomu muzyki, wyciszenie, lektor, podpięcie lektora do ustawień |
+| `audio/__tests__/menuMusicRoutes-test.ts` | 1 | muzyka menu gra na każdym ekranie z `src/app` poza rozgrywką |
+| `audio/__tests__/volume-test.ts` | 7 | głośność odtwarzaczy: skalowanie poziomu muzyki, lektor, podpięcie lektora do ustawień |
 | `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
-| `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, wyciszenie, głośność po ponownym uruchomieniu, nieudany zapis |
+| `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, muzyka wg ekranu, głośność po ponownym uruchomieniu, nieudany zapis |
 | `skins/__tests__/catalog-test.ts` | 7 | skórki: układanie katalogu ze ścieżek, nowy folder, brakujące klatki, nieznane pliki |
 | `skins/__tests__/assignSkins-test.ts` | 7 | skórki: zgodność płci, brak powtórek, wybór gracza, użycie wszystkich skórek, brak skórki |
 | `skins/__tests__/IdleFace-test.ts` | 10 | mimika: mruganie, uśmiech, kasowanie zegarów, mimika w reakcji na odpowiedź |
@@ -291,7 +292,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **547** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **521** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
@@ -306,7 +307,7 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych. T
 - czy logi zgadzają się z grą: kolejność rund, brak ostrzeżeń i błędów w całej grze,
 - podwójne zatwierdzenie, odbicie w ciemno oraz pauzę z pozostałym czasem.
 
-Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI (a przy imporcie i eksporcie – dysk w pamięci). Sprawdzamy, że kategoria wyeksportowana na jednym telefonie i zaimportowana na drugim działa w całej grze i przeżywa ponowne uruchomienie, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
+Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI (a przy imporcie i eksporcie – dysk w pamięci). Sprawdzamy, że kategoria wyeksportowana na jednym telefonie i zaimportowana na drugim działa w całej grze i przeżywa ponowne uruchomienie, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Te same testy sprawdzają, że klucz z konfiguracji trafia do zapytania, ale do żadnego logu, a przy złym formacie klucza nic nie jest czytane ani wysyłane.
 
 Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `usePotatoController`: prawdziwą bazę, sterownik, boty i `PotatoNarrator`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) żadne pytanie nie jest czytane dwa razy z rzędu, w czasie mówienia nie biegnie żaden pasek czasu (także po odbiciu w ciemno), a pauza i wyjście z gry wyciszają lektora.
 
@@ -577,6 +578,12 @@ Po poprawnej odpowiedzi padało „Komu przekazujesz pytanie?”, a „Brawo, do
 
 **7.57. Gra toczyła się dalej po odpadnięciu gracza**
 Gracz, który odpadł, musiał oglądać, jak boty grają dalej (zgłoszone z trzeciego etapu). Po pokazaniu wyniku gra kończy się od razu (akcja `endEarly`) i pojawiają się wyniki. Pozostałe boty nie grają już między sobą, więc nie ma zwycięzcy: są układane wg stanu gry, a ekran i lektor mówią „Odpadasz”.
+
+**7.58. Muzyka grała tylko na części ekranów**
+Każdy ekran sam włączał muzykę, a robiły to tylko menu główne, wybór poziomu i ustawienia. Kategorie i skórki grały w ciszy. Muzyka jest teraz włączana w głównym układzie i zależy od trasy: gra wszędzie poza `/solo/game`. Test czyta trasy z folderu `src/app`. Przyciski wyciszania usunęliśmy razem z ich mechanizmem, bo muzyką steruje suwak w Ustawieniach.
+
+**7.59. Klucz API tylko ze zmiennej środowiskowej**
+Usunęliśmy ekran wpisywania klucza, zapis w `expo-secure-store` i tę zależność, więc potrzebny jest nowy build. Oznacza to odejście od wcześniejszej zasady „klucza nie ma w APK”: klucz z `.env.local` jest teraz w paczce jawnym tekstem, a build EAS bez zmiennych środowiskowych nie ma klucza wcale. Klucz zapisany wcześniej na telefonie zostaje w magazynie do odinstalowania aplikacji albo wyczyszczenia jej danych.
 
 ## 8. Dalsze plany
 

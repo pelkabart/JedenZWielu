@@ -1,14 +1,16 @@
-import { useFocusEffect } from 'expo-router';
+import { usePathname } from 'expo-router';
+import { useEffect } from 'react';
 
 import { acquireMenuMusic, releaseMenuMusic } from '@/audio/menuMusic';
+import { playsMenuMusic } from '@/audio/menuMusicRoutes';
 
-/**
- * Muzyka menu w tle. Ekran zgłasza się, gdy jest na wierzchu, i wyrejestrowuje, gdy go opuszcza.
- * Dzięki temu melodia płynie przez menu główne i wybór poziomu, a w rozgrywce cichnie.
- */
+/** Muzyka menu dla całej aplikacji (w głównym układzie): gra na każdym ekranie poza rozgrywką. */
 export function useMenuMusic() {
-  useFocusEffect(() => {
+  const plays = playsMenuMusic(usePathname());
+
+  useEffect(() => {
+    if (!plays) return;
     acquireMenuMusic();
     return () => releaseMenuMusic();
-  });
+  }, [plays]);
 }

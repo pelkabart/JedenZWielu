@@ -11,7 +11,6 @@ import { MenuButton } from '@/components/home/MenuButton';
 import { PlayerAvatar } from '@/components/home/PlayerAvatar';
 import { colors } from '@/constants/theme';
 import { useQuestionSets } from '@/hooks/useQuestionSets';
-import { useMenuMusic } from '@/hooks/useMenuMusic';
 import { useSelectedSkin } from '@/hooks/useSelectedSkin';
 
 /** Poniżej tej wysokości (telefon w poziomie) cztery przyciski i tytuł muszą się ścisnąć. */
@@ -28,7 +27,6 @@ export default function HomeScreen() {
   const { width, height } = useWindowDimensions();
   const skin = useSelectedSkin();
   const compact = height - insets.top - insets.bottom < COMPACT_HEIGHT;
-  useMenuMusic();
   // Wczytuje kategorie już na ekranie głównym, żeby wybór trybu jednoosobowego ich nie czekał.
   useQuestionSets();
 

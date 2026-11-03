@@ -1,6 +1,6 @@
 # Muzyka w menu i wyborze poziomu
 
-Funkcjonalność: muzyka w tle na ekranie głównym i na ekranie wyboru poziomu trudności (plik `assets/audio/menu.mp3`). W rozgrywce muzyki z tego modułu nie ma, będzie tam osobny utwór.
+Funkcjonalność: muzyka w tle na każdym ekranie poza rozgrywką (plik `assets/audio/menu.mp3`), włączana w głównym układzie (`useMenuMusic` w `src/app/_layout.tsx`). Głośność ustawia się suwakiem w Ustawieniach. Od 03.11.2026 nie ma przycisku wyciszania, więc punkty o nim są już nieaktualne.
 
 ## Ryzyka
 
@@ -28,3 +28,13 @@ Funkcjonalność: muzyka w tle na ekranie głównym i na ekranie wyboru poziomu 
 - **Ryzyko:** stan wyciszenia zapisany tylko w ekranie znika przy przejściu do innego ekranu.
 - **Zabezpieczenie:** stan jest w module muzyki (`src/audio/menuMusic.ts`) i jest wspólny dla wszystkich ekranów; przycisk czyta go przez `useSyncExternalStore`.
 - **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie utrzymuje się na wyborze poziomu i w grze. Od 03.11.2026 ekran główny nie ma już tego przycisku; muzyką zarządza się w Ustawieniach.
+
+### 6. Nowy ekran bez muzyki
+- **Ryzyko:** gdy każdy ekran sam włącza muzykę, łatwo o tym zapomnieć. Tak się stało: kategorie i skórki grały w ciszy (dokumentacja postępów, 7.58).
+- **Zabezpieczenie:** muzyka jest włączona w głównym układzie i zależy od trasy (`playsMenuMusic`). Domyślnie gra, a wyjątkiem jest tylko rozgrywka.
+- **Test:** `audio/__tests__/menuMusicRoutes-test.ts` czyta trasy z folderu `src/app`; `volume-integration-test.ts` › „muzyka gra na ekranach menu bez przerwy, a w rozgrywce milknie”.
+
+### 7. Muzyka menu nakłada się na rozgrywkę
+- **Ryzyko:** po wejściu do gry dwa utwory grają razem.
+- **Zabezpieczenie:** trasa `/solo/game` jest wyłączona z muzyki menu; po opuszczeniu ekranu muzyka pauzuje po 400 ms.
+- **Test:** jak w punkcie 6.

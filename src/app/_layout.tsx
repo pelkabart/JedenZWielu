@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { useEffect } from "react";
 
 import { colors } from "@/constants/theme";
+import { useMenuMusic } from "@/hooks/useMenuMusic";
 import { volumeStore } from "@/settings/volume";
 
 export default function RootLayout() {
@@ -9,6 +10,7 @@ export default function RootLayout() {
   useEffect(() => {
     void volumeStore.load();
   }, []);
+  useMenuMusic();
 
   return (
     <Stack

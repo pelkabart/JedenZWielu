@@ -2,7 +2,6 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 
 import { volumeStore } from '@/settings/volume';
 
-import { isMusicMuted, subscribeMusicMuted } from './musicMute';
 import { musicGain } from './volume';
 
 /**
@@ -16,7 +15,7 @@ let player: AudioPlayer | null = null;
 let ducked = false;
 
 function currentVolume(): number {
-  return musicGain(ducked ? DUCKED_VOLUME : GAME_VOLUME, volumeStore.getSettings(), isMusicMuted());
+  return musicGain(ducked ? DUCKED_VOLUME : GAME_VOLUME, volumeStore.getSettings());
 }
 
 function applyVolume() {
@@ -48,6 +47,5 @@ export function setGameMusicDucked(value: boolean) {
   applyVolume();
 }
 
-// Wyciszenie i suwak w ustawieniach zmieniają głośność już działającego odtwarzacza.
-subscribeMusicMuted(applyVolume);
+// Suwak w ustawieniach zmienia głośność już działającego odtwarzacza.
 volumeStore.subscribe(applyVolume);

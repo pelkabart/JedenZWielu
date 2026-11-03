@@ -32,7 +32,7 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [odpowiedzi-glosem.md](odpowiedzi-glosem.md) | odpowiadanie na pytania głosem (mikrofon) |
 | [kategorie-pytan.md](kategorie-pytan.md) | kategorie: własne zestawy pytań generowane przez OpenAI z plików, wybór kategorii w trybie jednoosobowym |
 | [kategorie-import-eksport.md](kategorie-import-eksport.md) | import i eksport kategorii do plików `.kat` (JSON) |
-| [ustawienia-klucz-api.md](ustawienia-klucz-api.md) | ekran ustawień: klucz API OpenAI zapisany na telefonie (Android Keystore) |
+| [ustawienia-klucz-api.md](ustawienia-klucz-api.md) | klucz API OpenAI z pliku `.env.local` (wcześniej ekran ustawień i Android Keystore) |
 | [ustawienia-glosnosc.md](ustawienia-glosnosc.md) | ekran ustawień: głośność muzyki i lektora (suwaki 0–100%, zapis na telefonie) |
 | [skorki.md](skorki.md) | skórki postaci: katalog z folderu, przydział wg płci bez powtórek, wybór gracza, mimika |
 | [serwer-testowy.md](serwer-testowy.md) | serwer testowy na Azure Container Apps (`server/`) i sprawdzanie połączenia z aplikacji |

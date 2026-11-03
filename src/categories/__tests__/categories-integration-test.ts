@@ -9,7 +9,8 @@ import { activePlayers } from '@/game/potato/engine';
 import { createPotatoSoloGame, HUMAN_ID } from '@/game/potato/solo';
 import { QUESTION_BANK } from '@/game/questions';
 import { createRng } from '@/game/rng';
-import { getLogEntries, resetLog } from '@/lib/log';
+import { formatEntry, getLogEntries, resetLog } from '@/lib/log';
+import { resolveApiKey } from '@/settings/configApiKey';
 
 import { isCategoryFileName } from '../categoryFile';
 import { createQuestionSet, type CreateQuestionSetDeps } from '../createQuestionSet';
@@ -143,6 +144,33 @@ describe('od plików do gry', () => {
   });
 });
 
+describe('klucz API z konfiguracji', () => {
+  const KEY = 'sk-proj-TESTOWY0123456789abcdWXYZ';
+
+  it('poprawny klucz trafia do zapytania, ale do żadnego logu', async () => {
+    const { store, openai, deps } = setup();
+    await store.load();
+    await createQuestionSet({ name: 'Historia', files: [picked('a.pdf')] }, { ...deps, apiKey: resolveApiKey(` ${KEY} `) });
+    expect(openai.calls[0].init.headers).toEqual(expect.objectContaining({ Authorization: `Bearer ${KEY}` }));
+    expect(getLogEntries().map(formatEntry).join('\n')).not.toContain(KEY);
+  });
+
+  it('klucz w złym formacie: nic nie jest czytane ani wysyłane, kategorie zostają', async () => {
+    const { store, openai, readFile, deps } = setup();
+    await store.load();
+    const first = await createQuestionSet({ name: 'Historia', files: [picked('a.pdf')] }, deps);
+    openai.calls.length = 0;
+    readFile.mockClear();
+
+    const error = await errorOf(createQuestionSet({ name: 'Sport', files: [picked('b.pdf')] }, { ...deps, apiKey: resolveApiKey('zly-klucz') }));
+
+    expect(error.kind).toBe('no-api-key');
+    expect(readFile).not.toHaveBeenCalled();
+    expect(openai.calls).toHaveLength(0);
+    expect(store.getSet(first.id)).toBeDefined();
+  });
+});
+
 describe('zabezpieczenia przed wysłaniem plików', () => {
   it(`przy ${MAX_CUSTOM_SETS} własnych kategoriach nie czyta plików i nie płaci za zapytanie`, async () => {
     const { store, openai, readFile, deps } = setup();
@@ -178,12 +206,12 @@ describe('zabezpieczenia przed wysłaniem plików', () => {
   it.each([
     ['pusty', ''],
     ['same spacje', '   '],
-  ])('bez klucza API (%s): błąd przed czytaniem plików, z odesłaniem do ustawień', async (_, apiKey) => {
+  ])('bez klucza API (%s): błąd przed czytaniem plików, z informacją o .env.local', async (_, apiKey) => {
     const { store, storage, openai, readFile, deps } = setup();
     await store.load();
     const error = await errorOf(createQuestionSet({ name: 'A', files: [picked('a.pdf')] }, { ...deps, apiKey }));
     expect(error.kind).toBe('no-api-key');
-    expect(error.message).toContain('Ustawienia');
+    expect(error.message).toContain('.env.local');
     expect(readFile).not.toHaveBeenCalled();
     expect(openai.calls).toHaveLength(0);
     expect(storage.writes).toBe(0);

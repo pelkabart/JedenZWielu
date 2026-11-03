@@ -15,7 +15,8 @@ Projekt gry quizowej na Androida.
 - W terminalu uruchomić komendę: npx expo start --dev-client. Po wykonaniu zeskanować w pobranej aplikacji kod QR z terminala. Ewentualnie skopiować i wkleić kod ręcznie.
 
 ## Klucz API OpenAI (dla programistów)
-- Skopiuj `.env.example` jako `.env.local` i wpisz klucz: `EXPO_PUBLIC_OPENAI_API_KEY=sk-...`. Gra użyje go, gdy w Ustawieniach na telefonie nie ma zapisanego klucza.
+- Skopiuj `.env.example` jako `.env.local` i wpisz klucz: `EXPO_PUBLIC_OPENAI_API_KEY=sk-...`. To jedyne źródło klucza: gra nie ma ekranu do jego wpisywania, a bez klucza nie da się tworzyć kategorii z plików (import `.kat` działa).
 - `.env.local` jest w `.gitignore`, a hak `.githooks/pre-commit` (włącza go `npm install`) nie pozwoli zacommitować klucza.
 - Po zmianie klucza uruchom ponownie `npx expo start` (najlepiej z `-c`).
+- Build EAS nie widzi `.env.local` (plik jest w `.gitignore`). Do takiego buildu klucz trzeba podać przez zmienne środowiskowe EAS.
 - Uwaga: klucz z `.env.local` trafia do zbudowanego APK jawnym tekstem – nie udostępniaj takiego APK innym.

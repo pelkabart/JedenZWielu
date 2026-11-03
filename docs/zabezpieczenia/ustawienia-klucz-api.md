@@ -1,5 +1,24 @@
 # Ustawienia: klucz API OpenAI
 
+> **Od 03.11.2026 klucza nie wpisuje się w aplikacji.** Ekran, zapis na telefonie (`ApiKeyStore`, `expo-secure-store`) i ich testy są usunięte. Klucz pochodzi tylko z `EXPO_PUBLIC_OPENAI_API_KEY` (`src/settings/configApiKey.ts`). Punkty o Keystore i ekranie ustawień poniżej to zapis wcześniejszych prac.
+
+## Aktualne ryzyka
+
+### A. Klucz jest w zbudowanej aplikacji
+**Ryzyko:** `EXPO_PUBLIC_…` trafia do paczki jawnym tekstem, więc każdy, kto dostanie APK, może wyciągnąć klucz i korzystać z niego na koszt właściciela.
+**Zabezpieczenie:** tylko częściowe: `.env.local` jest w `.gitignore`, hak pre-commit blokuje commit klucza, a klucz nie trafia do logów. APK z kluczem nie wolno udostępniać. Pełne rozwiązanie to pośrednik po stronie serwera.
+**Test:** `configApiKey-test.ts`, `categories-integration-test.ts` › „poprawny klucz trafia do zapytania, ale do żadnego logu”.
+
+### B. Build bez klucza
+**Ryzyko:** build EAS nie ma `.env.local` (plik jest w `.gitignore`), więc tworzenie kategorii z plików w nim nie działa. Import `.kat` działa dalej.
+**Zabezpieczenie:** przycisk „Utwórz kategorię” jest wyłączony, a ekran mówi, czego brakuje. Klucz do buildów EAS trzeba podać przez zmienne środowiskowe EAS.
+**Test:** `categories-integration-test.ts` › „bez klucza API…”.
+
+### C. Zły format klucza
+**Ryzyko:** literówka w pliku wyszłaby dopiero jako błąd 401, po czytaniu plików.
+**Zabezpieczenie:** `resolveApiKey` sprawdza format przy starcie, zły klucz traktuje jak brak i zapisuje ostrzeżenie bez treści klucza.
+**Test:** `configApiKey-test.ts` › „odrzuca…”; `categories-integration-test.ts` › „klucz w złym formacie…”.
+
 Moduły: `src/settings/ApiKeyStore.ts` (walidacja, maskowanie, magazyn klucza), adapter `src/settings/device/secureKeyStorage.ts` (`expo-secure-store`), wspólna instancja `src/settings/apiKey.ts`, hak `src/hooks/useApiKey.ts`, ekran `src/app/settings.tsx`; ekran `src/app/categories/new.tsx` tylko czyta klucz.
 Testy: `src/settings/__tests__/ApiKeyStore-test.ts`, `src/settings/__tests__/settings-integration-test.ts`, `src/categories/__tests__/categories-integration-test.ts` (brak klucza).
 Logi: `[ustawienia]`.

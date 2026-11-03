@@ -1,8 +1,9 @@
 /**
  * Testy integracyjne głośności: te same moduły co aplikacja — prawdziwy magazyn głośności
- * (plik udawany w pamięci), prawdziwa muzyka menu i gry, wyciszenie i podpięcie lektora.
+ * (plik udawany w pamięci), prawdziwa muzyka menu i gry oraz podpięcie lektora.
  * Atrapa jest tylko w miejscu odtwarzacza `expo-audio` (natywny moduł).
  */
+import { playsMenuMusic } from '@/audio/menuMusicRoutes';
 import { MemoryStorage } from '@/categories/testing/fakes';
 import { getLogEntries, resetLog } from '@/lib/log';
 
@@ -52,7 +53,6 @@ type AudioModules = {
   store: VolumeStore;
   menu: typeof import('@/audio/menuMusic');
   game: typeof import('@/audio/gameMusic');
-  mute: typeof import('@/audio/musicMute');
   volume: typeof import('@/audio/volume');
 };
 
@@ -68,7 +68,6 @@ function launch(storage: MemoryStorage): AudioModules {
       store,
       menu: require('@/audio/menuMusic'),
       game: require('@/audio/gameMusic'),
-      mute: require('@/audio/musicMute'),
       volume: require('@/audio/volume'),
     };
     /* eslint-enable @typescript-eslint/no-require-imports */
@@ -123,18 +122,30 @@ describe('głośność w całej aplikacji', () => {
     expect(menuPlayer.volume).toBeCloseTo(0.15);
   });
 
-  it('wyciszenie przyciskiem i suwak działają razem', async () => {
+  it('muzyka gra na ekranach menu bez przerwy, a w rozgrywce milknie', async () => {
     const app = launch(file);
     await app.store.load();
-    app.menu.acquireMenuMusic();
-    const [menuPlayer] = players;
+    // Tak jak `useMenuMusic` w głównym układzie: reaguje tylko na zmianę „gra / nie gra”.
+    let playing = false;
+    const openScreen = (pathname: string) => {
+      const plays = playsMenuMusic(pathname);
+      if (plays === playing) return;
+      if (plays) app.menu.acquireMenuMusic();
+      else app.menu.releaseMenuMusic();
+      playing = plays;
+    };
 
-    app.mute.toggleMusicMuted();
-    expect(menuPlayer.volume).toBe(0);
-    app.store.preview('music', 70);
-    expect(menuPlayer.volume).toBe(0);
-    app.mute.toggleMusicMuted();
-    expect(menuPlayer.volume).toBeCloseTo(0.21);
+    for (const screen of ['/', '/categories', '/categories/new', '/settings', '/skins', '/solo/categories', '/solo']) {
+      openScreen(screen);
+      jest.advanceTimersByTime(1000);
+      expect(players[0].playing).toBe(true);
+    }
+    openScreen('/solo/game');
+    jest.advanceTimersByTime(1000);
+    expect(players[0].playing).toBe(false);
+    openScreen('/');
+    expect(players[0].playing).toBe(true);
+    expect(players).toHaveLength(1);
   });
 
   it('po ponownym uruchomieniu głośność z pliku', async () => {

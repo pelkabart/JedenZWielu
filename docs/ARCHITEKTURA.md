@@ -20,7 +20,6 @@ flowchart LR
     App -->|rozpoznawanie mowy pl-PL| ASR[Usługa rozpoznawania mowy Androida]
     App -->|pliki gracza, base64| OpenAI[OpenAI Responses API]
     App -->|JSON w dokumentach aplikacji| FS[(Pamięć telefonu)]
-    App -->|klucz API| SS[(SecureStore / Android Keystore)]
 ```
 
 Własny backend jest na etapie szkieletu: `server/` (Node + TypeScript, `/health` i WebSocket `/ws`) wdrażany jako kontener na **Azure Container Apps** (Azure for Students), instrukcja w `docs/backend-azure-instrukcja.md`. Aplikacja na razie tylko sprawdza z nim połączenie (Ustawienia → „Sprawdź połączenie”, adres z `EXPO_PUBLIC_SERVER_URL`). OpenAI dalej jest wywoływane z telefonu kluczem gracza (albo programisty z `.env.local`). Plan dla serwera: pośrednik OpenAI, baza pytań, Eliminacje, konta i autorytatywny multiplayer.
@@ -37,7 +36,7 @@ Własny backend jest na etapie szkieletu: `server/` (Node + TypeScript, `/health
 | Synteza mowy | `react-native-sherpa-onnx` + model Piper (VITS, 22 050 Hz) – moduł natywny |
 | Rozpoznawanie mowy | `expo-speech-recognition` (`pl-PL`) – moduł natywny |
 | Pliki | `expo-document-picker`, `expo-file-system`, `@dr.pogodin/react-native-fs` |
-| Sekrety | `expo-secure-store` |
+| Sekrety | zmienna `EXPO_PUBLIC_OPENAI_API_KEY` z `.env.local` (trafia do paczki jawnym tekstem) |
 | AI | OpenAI Responses API, Structured Outputs (`strict: true`) |
 | Testy | Jest + `jest-expo`, fałszywe zegary Jesta |
 | Budowanie | EAS Build (`eas.json`: development / preview / production), CNG – `android/` generowany |
@@ -60,7 +59,7 @@ flowchart TB
         Ctrl["Sterownik: PotatoController"]
         Narr["Lektor: PotatoNarrator"]
         Voice["VoiceAnswerSession"]
-        Stores["Magazyny: QuestionSetStore, ApiKeyStore, VolumeStore"]
+        Stores["Magazyny: QuestionSetStore, VolumeStore"]
         CatFlow["createQuestionSet, transferQuestionSet, openaiGenerator"]
     end
     subgraph Domain["Domena (czyste funkcje, bez czasu, bez I/O)"]
@@ -73,20 +72,19 @@ flowchart TB
         Sherpa["narration/sherpaVoice.ts"]
         Rec["speech/expoRecognizer.ts"]
         Files["categories/device/*"]
-        Secure["settings/device/secureKeyStorage.ts"]
         Audio["audio/*"]
     end
     UI --> App
     UI --> Domain
     App --> Domain
     Hooks --> Device
-    App -. interfejsy: Clock, Voice, Recognizer, TextStorage, SecretStorage, FetchLike .-> Device
+    App -. interfejsy: Clock, Voice, Recognizer, TextStorage, FetchLike .-> Device
 ```
 
 Reguły:
 1. **Domena** (`src/game/` bez `potato/controller/`) nie zna czasu, React, logów ani urządzenia. `reducePotato` jest czystą funkcją: zwraca nowy stan, nie modyfikuje starego, nie loguje. Losowość przychodzi z zewnątrz (gotowe decyzje w akcji, a tasowanie talii przez `Rng` z ziarnem przy tworzeniu gry).
-2. **Warstwa aplikacji** dokłada czas i reżyserię. Zależności od świata przychodzą przez interfejsy: `Clock`, `Voice`, `Recognizer`, `TextStorage`, `SecretStorage`, `FetchLike`. W testach podstawiane są atrapy z folderów `testing/`.
-3. **Adaptery urządzenia** są cienkie i jako jedyne importują moduły natywne. Tworzone są w hookach albo w plikach-singletonach (`questionSets.ts`, `apiKey.ts`, `volume.ts`).
+2. **Warstwa aplikacji** dokłada czas i reżyserię. Zależności od świata przychodzą przez interfejsy: `Clock`, `Voice`, `Recognizer`, `TextStorage`, `FetchLike`. W testach podstawiane są atrapy z folderów `testing/`.
+3. **Adaptery urządzenia** są cienkie i jako jedyne importują moduły natywne. Tworzone są w hookach albo w plikach-singletonach (`questionSets.ts`, `volume.ts`).
 4. **UI** tylko wyświetla „widok” sterownika i przekazuje mu ruchy gracza. Nie zawiera reguł gry.
 
 ## 4. Struktura katalogów
@@ -104,7 +102,7 @@ src/
     solo/game.tsx         rozgrywka
   components/             home/, solo/, potato/, categories/, settings/
   hooks/                  usePotatoController,
-                          useVoiceAnswer, useQuestionSets, useApiKey, useMenuMusic, useKeyboardHeight
+                          useVoiceAnswer, useQuestionSets, useMenuMusic, useKeyboardHeight
   game/                   domena + sterowniki
     types.ts rules.ts clock.ts answers.ts choices.ts questions.ts rng.ts
     bots/                 profiles.ts (8 postaci), brain.ts (decyzje)
@@ -115,8 +113,8 @@ src/
   speech/                 VoiceAnswerSession, spokenAnswer, expoRecognizer; testing/FakeRecognizer
   categories/             QuestionSetStore, createQuestionSet, openaiGenerator, generatedQuestions,
                           categoryFile, transferQuestionSet, sourceFiles, errors, types; device/
-  settings/               ApiKeyStore, VolumeStore, configApiKey; device/secureKeyStorage
-  audio/                  menuMusic, gameMusic, musicMute, volume (czysta funkcja wzmocnienia)
+  settings/               VolumeStore, configApiKey
+  audio/                  menuMusic, menuMusicRoutes, gameMusic, volume (czysta funkcja wzmocnienia)
   lib/log.ts              logowanie
   data/questions.json     domyślna baza pytań (wersja 2, 50 pytań)
   constants/theme.ts      kolory
@@ -140,10 +138,9 @@ flowchart LR
     Diff2 --> Game
     Home -->|Kategorie| Cats["/categories"] --> New["/categories/new"]
     Home -->|zębatka| Settings["/settings"]
-    New -->|brak klucza| Settings
 ```
 
-Parametry przechodzą przez URL (`difficulty`, `set`). Stan współdzielony między ekranami (kategorie, klucz, głośność) jest w singletonach-magazynach czytanych przez `useSyncExternalStore`, a nie w kontekście React. „MultiPlayer” i „Dodatki” nie mają jeszcze ekranów.
+Parametry przechodzą przez URL (`difficulty`, `set`). Stan współdzielony między ekranami (kategorie, głośność) jest w singletonach-magazynach czytanych przez `useSyncExternalStore`, a nie w kontekście React. „MultiPlayer” i „Dodatki” nie mają jeszcze ekranów.
 
 ## 6. Domena gry
 
@@ -257,9 +254,9 @@ flowchart LR
 
 ## 11. Ustawienia, sekrety, dźwięk
 
-- **Klucz API:** `ApiKeyStore` (walidacja `sk-…`, maskowanie `sk-…abcd`, subskrypcja) na `SecretStorage` → `expo-secure-store` (Android Keystore, wyłączony z kopii zapasowej). Pierwszeństwo ma klucz zapisany na telefonie, potem `EXPO_PUBLIC_OPENAI_API_KEY` z `.env.local` (`configApiKey.ts`). Klucz z `.env.local` trafia do APK jawnym tekstem – APK dla innych budujemy bez niego. Hak `.githooks/pre-commit` (włączany skryptem `prepare`) blokuje commit plików `.env*` i tekstów wyglądających na klucz.
+- **Klucz API:** tylko `EXPO_PUBLIC_OPENAI_API_KEY` z `.env.local`; `configApiKey.ts` sprawdza format, a zły klucz traktuje jak brak. Klucz trafia do APK jawnym tekstem, więc APK z kluczem nie wolno udostępniać. Build EAS nie widzi `.env.local` i potrzebuje zmiennych środowiskowych EAS. Hak `.githooks/pre-commit` (włączany skryptem `prepare`) blokuje commit plików `.env*` i tekstów wyglądających na klucz.
 - **Głośność:** `VolumeStore` (muzyka i głos 0–100, plik `volume.json`), wczytywany w `_layout.tsx` przed pierwszym ekranem.
-- **Muzyka:** `audio/menuMusic.ts` – jeden odtwarzacz dla wszystkich ekranów menu z licznikiem referencji (`acquire`/`release`, `useMenuMusic`) i zwłoką 400 ms, żeby melodia nie przerywała się przy przejściach. `audio/gameMusic.ts` – muzyka rozgrywki z wyciszaniem pod lektora. `musicMute.ts` – globalny przełącznik. `volume.ts` – czysta funkcja `musicGain`.
+- **Muzyka:** `audio/menuMusic.ts` – jeden odtwarzacz dla wszystkich ekranów poza rozgrywką, włączany w `_layout.tsx` (`useMenuMusic`, wyjątki w `menuMusicRoutes.ts`), ze zwłoką pauzy 400 ms. `audio/gameMusic.ts` – muzyka rozgrywki, ciszej pod lektorem. Sterowanie tylko suwakiem w Ustawieniach. `volume.ts` – czysta funkcja `musicGain`.
 
 ## 12. Przekrojowe zasady
 
@@ -267,7 +264,7 @@ flowchart LR
 `createLogger('<moduł>')` z `src/lib/log.ts`. Poziomy `debug`/`info` dla zwykłego przebiegu, `warn`/`error` widać na ekranie w Expo Go. Logujemy tylko małe wartości (id, liczby), nigdy cały stan gry. Bufor wpisów i wymienne „sinki” pozwalają testom sprawdzać logi. Silnik nie loguje.
 
 ### 12.2. Wstrzykiwanie zależności
-Każda klasa z efektami ubocznymi dostaje je w konstruktorze (zegar, głos, rozpoznawanie, magazyn, `fetch`, `now`). Produkcyjne instancje składane są w jednym miejscu: hooki gry oraz singletony `categories/questionSets.ts`, `settings/apiKey.ts`, `settings/volume.ts`.
+Każda klasa z efektami ubocznymi dostaje je w konstruktorze (zegar, głos, rozpoznawanie, magazyn, `fetch`, `now`). Produkcyjne instancje składane są w jednym miejscu: hooki gry oraz singletony `categories/questionSets.ts`, `settings/volume.ts`.
 
 ### 12.3. Odporność
 Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy tworzeniu, mikrofon ukryty. Błędne dane z sieci i plików są odrzucane pojedynczo przez wspólną walidację.
@@ -275,7 +272,7 @@ Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy two
 ### 12.4. Testy
 - Testy w folderach `__tests__` obok kodu (każdy plik tam jest testem), atrapy w `testing/`.
 - Rodzaje: jednostkowe (silnik, boty, odpowiedzi, magazyny), testy sterownika na fałszywym zegarze, testy integracyjne (`*integration-test.ts` – te same moduły co aplikacja, tylko adaptery urządzenia podmienione), test wtyczki `withVoiceModel`.
-- 547 testów aplikacji wg `npm test` (z parametryzacją), plus osobne testy `server/`.
+- 521 testów aplikacji wg `npm test` (z parametryzacją), plus osobne testy `server/`.
 - Przed zakończeniem pracy: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
 
 ### 12.5. Proces dla nowej funkcji
@@ -293,7 +290,7 @@ Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 2. **Mikrofon nie ucisza lektora.** `PotatoGame` nie przekazuje `onListening` do `AnswerPanel`, a `PotatoController` nie ma `setListening`. Na poziomie Ekspert gracz może włączyć mikrofon w czasie czytania pytania i rozpoznawanie słyszy wtedy lektora. Tak samo było przed usunięciem starego silnika.
 3. **„Gorący Ziemniak” nie ma pełnego opisu w `Dokumentacja_postepow_prac.md`** (rozdziały 3–5 opisują usunięte zasady; aktualne ryzyka są w `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
 4. **Brak symulacji balansu.** Symulator działał tylko na starym silniku i został usunięty; nowych zasad nie sprawdzono na setkach gier pod kątem balansu.
-5. **Klucz OpenAI na telefonie.** Gracz potrzebuje własnego klucza; klucz programisty w APK jest jawny. Docelowo pośrednik po stronie serwera (np. funkcja Supabase).
+5. **Klucz OpenAI w APK.** Klucz jest tylko w `.env.local` i trafia do paczki jawnym tekstem, więc gra z kategoriami z plików nie nadaje się do rozdawania. Build EAS bez zmiennych środowiskowych nie ma klucza wcale. Docelowo pośrednik po stronie serwera.
 6. **Backend tylko jako szkielet, brak multiplayera.** Serwer testowy (`server/`) działa, ale nie ma jeszcze żadnej logiki gry. Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
 7. **Rozmiar modelu głosu** (63 MB) w APK. Rozważana kwantyzacja int8; AAB dla Google Play.
 8. **Brak testów komponentów** (np. React Native Testing Library) – UI sprawdzany ręcznie.

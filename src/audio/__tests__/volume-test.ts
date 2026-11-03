@@ -5,20 +5,16 @@ import { bindVoiceVolume, musicGain, voiceGain } from '../volume';
 
 describe('musicGain', () => {
   it('100% = poziom bazowy utworu', () => {
-    expect(musicGain(0.3, { music: 100, voice: 100 }, false)).toBeCloseTo(0.3);
+    expect(musicGain(0.3, { music: 100, voice: 100 })).toBeCloseTo(0.3);
   });
 
   it('skaluje poziom bazowy', () => {
-    expect(musicGain(0.22, { music: 50, voice: 100 }, false)).toBeCloseTo(0.11);
-    expect(musicGain(0.3, { music: 0, voice: 100 }, false)).toBe(0);
-  });
-
-  it('wyciszenie ma pierwszeństwo', () => {
-    expect(musicGain(0.3, { music: 100, voice: 100 }, true)).toBe(0);
+    expect(musicGain(0.22, { music: 50, voice: 100 })).toBeCloseTo(0.11);
+    expect(musicGain(0.3, { music: 0, voice: 100 })).toBe(0);
   });
 
   it('nie zależy od głośności lektora', () => {
-    expect(musicGain(0.3, { music: 80, voice: 0 }, false)).toBeCloseTo(0.24);
+    expect(musicGain(0.3, { music: 80, voice: 0 })).toBeCloseTo(0.24);
   });
 });
 

@@ -17,4 +17,4 @@ Funkcjonalność: muzyka w tle rozgrywki (`assets/audio/gra.mp3`), cichsza niż 
 ### 3. Wyciszenie nie działa w grze
 - **Ryzyko:** przycisk wyciszenia działa tylko w menu.
 - **Zabezpieczenie:** stan wyciszenia jest w `src/audio/musicMute.ts`; oba odtwarzacze (menu i gra) go słuchają.
-- **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie utrzymuje się w grze.
+- **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie utrzymuje się w grze. Od 03.11.2026 nie ma przycisku wyciszania; muzykę reguluje suwak w Ustawieniach.
