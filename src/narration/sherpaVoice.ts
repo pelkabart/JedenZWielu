@@ -3,7 +3,9 @@ import { createAudioPlayer } from 'expo-audio';
 import Constants from 'expo-constants';
 import type { GeneratedAudio, TtsEngine } from 'react-native-sherpa-onnx/tts';
 
+import { bindVoiceVolume } from '@/audio/volume';
 import { createLogger } from '@/lib/log';
+import { volumeStore } from '@/settings/volume';
 
 import { MODEL_FOLDER_PREFIX, pickModelAsset } from './modelAsset';
 import type { Voice } from './NarrationDirector';
@@ -494,6 +496,8 @@ export function createSherpaVoice(): Voice {
   void loadEngine();
 
   const player = createAudioPlayer(null);
+  // Suwak „Lektor” w ustawieniach: działa od razu, także w trakcie wypowiedzi.
+  const unbindVolume = bindVoiceVolume(player, volumeStore);
 
   let token = 0;
   let paused = false;
@@ -654,6 +658,7 @@ export function createSherpaVoice(): Voice {
 
       finishCurrentClip();
 
+      unbindVolume();
       subscription.remove();
       player.remove();
     },

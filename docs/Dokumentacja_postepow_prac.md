@@ -45,7 +45,8 @@ Spis treści:
 | Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
 | Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
 | Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
-| Razem testów automatycznych | 404 |
+| Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
+| Razem testów automatycznych | 532 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -262,7 +263,11 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/categories-integration-test.ts` | 16 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza) |
 | `settings/__tests__/ApiKeyStore-test.ts` | 30 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz z `.env.local`, klucz poza logami |
 | `settings/__tests__/settings-integration-test.ts` | 6 | testy integracyjne: klucz z ustawień albo z `.env.local` w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
-| **Razem** | **404** | |
+| `settings/__tests__/VolumeStore-test.ts` | 36 | głośność: przycinanie do 0–100, odczyt uszkodzonego pliku, wczytanie, zapis, łączenie zapisów, zmiana przed wczytaniem, błędy pliku |
+| `audio/__tests__/volume-test.ts` | 8 | głośność odtwarzaczy: skalowanie poziomu muzyki, wyciszenie, lektor, podpięcie lektora do ustawień |
+| `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
+| `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, wyciszenie, głośność po ponownym uruchomieniu, nieudany zapis |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **532** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -292,7 +297,7 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[ekran-gry]` | przerwanie gry przez gracza |
 | `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
 | `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
-| `[ustawienia]` | wczytanie ustawień i zapis albo usunięcie klucza API – tylko czy klucz jest, nigdy jaki; błędy magazynu (`warn`/`error`) |
+| `[ustawienia]` | wczytanie ustawień i zapis albo usunięcie klucza API – tylko czy klucz jest, nigdy jaki; błędy magazynu (`warn`/`error`); wczytanie i zmiana głośności (liczby 0–100), uszkodzony plik głośności (`warn`), błąd zapisu (`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
 Silnik gry nic nie loguje, bo jest czystą funkcją. Jego ruchy i zdarzenia loguje sterownik. W testach logi nie trafiają do konsoli, tylko do bufora. W wersji produkcyjnej pomijamy poziom `debug`.
@@ -499,6 +504,10 @@ Test integracyjny kategorii kodował treść udawanego pliku przez `Buffer.from(
 
 **7.46. Pytania czytane płasko; same parametry modelu nie pomagały**
 Lektor czytał pytania tak samo jak zwykłe zdania. Przyczyna leży w danych treningowych głosu: 200 nagrań monologu o finansach, w tym tylko 10 pytań i ani jednego wykrzyknika. Najpierw sprawdziliśmy parametry syntezy (`noiseScale` 0.667–0.95, `noiseScaleW` 0.8–1.2, `lengthScale`). Na próbkach z komputera pytanie „Czy…?” we wszystkich wariantach kończyło się spadkiem tonu o 2–4 półtony, bo te parametry dodają tylko losowe wahania. Pierwsza próba obróbki dźwięku (zmiana wysokości „ziarnami” po 40 ms) rozmywała głos i pomiar tonu gubił ostatnią sylabę. Zadziałała dopiero „przyspieszana taśma” na końcówce. Po drodze: pakiet `piper-tts` na macOS szuka danych espeak pod ścieżką z maszyny, na której go zbudowano, a `sherpa-onnx` 2.x w Pythonie nie zamienia już tekstu na fonemy dla tego modelu, więc próbki robiliśmy w wersji 1.12.35, tej samej co w aplikacji. Wniosek: przy syntezie mowy oceniać zmiany pomiarem (tu wysokość tonu), a nie tylko nazwą parametru.
+
+### Ustawienia: głośność
+- **Problem:** pierwsza wersja suwaka używała `PanResponder` tworzonego raz, który czytał bieżącą szerokość toru i funkcje z `useRef` aktualizowanego w trakcie renderu. `npx expo lint` (reguły React Compiler `react-hooks/refs`) zgłosił to jako błąd: odczyt refa w renderze może dać nieaktualne wartości po optymalizacji kompilatora.
+- **Rozwiązanie:** suwak korzysta bezpośrednio z propsów systemu dotyku (`onResponderGrant`, `onResponderMove`, `onResponderRelease`); ref przechowuje tylko początek dotyku i jest zmieniany wyłącznie w obsłudze dotyku. Matematyka suwaka jest w czystej funkcji `sliderValue` z testami.
 
 ## 8. Dalsze plany
 

@@ -1,17 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { VolumeSlider } from '@/components/settings/VolumeSlider';
 import { colors } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { useMenuMusic } from '@/hooks/useMenuMusic';
 import { createLogger } from '@/lib/log';
 import { apiKeyStore } from '@/settings/apiKey';
 import { ApiKeyError, maskApiKey, validateApiKey } from '@/settings/ApiKeyStore';
+import { volumeStore } from '@/settings/volume';
 
 const log = createLogger('ustawienia');
 
@@ -23,6 +26,10 @@ export default function SettingsScreen() {
   const [input, setInput] = useState('');
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const volume = useSyncExternalStore(volumeStore.subscribe, volumeStore.getSettings);
+  const volumeSaveFailed = useSyncExternalStore(volumeStore.subscribe, volumeStore.didSaveFail);
+  // Muzyka menu gra dalej w ustawieniach, żeby od razu było słychać zmianę głośności.
+  useMenuMusic();
 
   const check = input.trim() === '' ? null : validateApiKey(input);
 
@@ -65,6 +72,27 @@ export default function SettingsScreen() {
         ]}
       >
         <Text style={styles.title}>Ustawienia</Text>
+
+        <View style={styles.panel}>
+          <Text style={styles.label}>Głośność</Text>
+          <VolumeSlider
+            label="Muzyka"
+            icon="musical-notes"
+            value={volume.music}
+            onPreview={(value) => volumeStore.preview('music', value)}
+            onCommit={(value) => void volumeStore.set('music', value)}
+          />
+          <VolumeSlider
+            label="Lektor"
+            icon="mic"
+            value={volume.voice}
+            onPreview={(value) => volumeStore.preview('voice', value)}
+            onCommit={(value) => void volumeStore.set('voice', value)}
+          />
+          {volumeSaveFailed && (
+            <Text style={styles.error}>Nie udało się zapisać głośności – po ponownym uruchomieniu gry wróci poprzednia.</Text>
+          )}
+        </View>
 
         <View style={styles.panel}>
           <Text style={styles.label}>Klucz API OpenAI</Text>
