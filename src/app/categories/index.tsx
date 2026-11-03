@@ -1,9 +1,12 @@
 import { router } from 'expo-router';
+import { useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { pickCategoryFile, readCategoryFileText, saveCategoryFile } from '@/categories/device/categoryFiles';
 import { CategoryError } from '@/categories/errors';
 import { questionSetStore } from '@/categories/questionSets';
+import { exportQuestionSet, importQuestionSet } from '@/categories/transferQuestionSet';
 import { MAX_CUSTOM_SETS, type QuestionSet } from '@/categories/types';
 import { CategoryRow } from '@/components/categories/CategoryRow';
 import { BackButton } from '@/components/home/BackButton';
@@ -20,6 +23,41 @@ export default function CategoriesScreen() {
   const sets = useQuestionSets();
   const customCount = sets.filter((s) => !s.builtIn).length;
   const full = customCount >= MAX_CUSTOM_SETS;
+  const [busy, setBusy] = useState(false);
+  // Dwa szybkie stuknięcia w jednej klatce widzą jeszcze stary stan `busy`.
+  const working = useRef(false);
+
+  /** Import i eksport po jednym naraz; błąd pokazuje okno „Błąd”. */
+  const runExclusive = async (action: string, task: () => Promise<void>) => {
+    if (working.current) return;
+    working.current = true;
+    setBusy(true);
+    try {
+      await task();
+    } catch (error) {
+      const kind = error instanceof CategoryError ? error.kind : 'unknown';
+      log.warn(`Nie udało się: ${action}`, { kind });
+      Alert.alert('Błąd', error instanceof CategoryError ? error.message : `Nie udało się: ${action}.`);
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
+
+  const importFile = () =>
+    runExclusive('import kategorii', async () => {
+      const file = await pickCategoryFile();
+      if (!file) return;
+      const set = await importQuestionSet(file, { store: questionSetStore, readText: readCategoryFileText });
+      log.info('Zaimportowano kategorię z ekranu', { setId: set.id, questions: set.questions.length });
+      Alert.alert('Zaimportowano', `Dodano kategorię „${set.name}” (${set.questions.length} pytań).`);
+    });
+
+  const exportSet = (set: QuestionSet) =>
+    runExclusive('eksport kategorii', async () => {
+      const fileName = await exportQuestionSet(set, { saveFile: saveCategoryFile });
+      if (fileName) Alert.alert('Wyeksportowano', `Zapisano plik „${fileName}”.`);
+    });
 
   const confirmDelete = (set: QuestionSet) => {
     Alert.alert('Usunąć kategorię?', `„${set.name}” zostanie usunięta z telefonu razem z pytaniami.`, [
@@ -57,18 +95,35 @@ export default function CategoriesScreen() {
 
         <View style={styles.list}>
           {sets.map((set) => (
-            <CategoryRow key={set.id} set={set} onDelete={() => confirmDelete(set)} />
+            <CategoryRow
+              key={set.id}
+              set={set}
+              disabled={busy}
+              onDelete={() => confirmDelete(set)}
+              onExport={() => exportSet(set)}
+            />
           ))}
         </View>
 
-        <MenuButton
-          label="Dodaj kategorię"
-          color={colors.categories}
-          baseColor={colors.categoriesBase}
-          disabled={full}
-          onPress={() => router.push('/categories/new')}
-        />
-        {full && <Text style={styles.hint}>Masz już {MAX_CUSTOM_SETS} własne kategorie – usuń którąś, żeby dodać nową.</Text>}
+        <View style={styles.buttons}>
+          <MenuButton
+            label="Dodaj kategorię"
+            color={colors.categories}
+            baseColor={colors.categoriesBase}
+            width={260}
+            disabled={full || busy}
+            onPress={() => router.push('/categories/new')}
+          />
+          <MenuButton
+            label="Importuj"
+            color={colors.multi}
+            baseColor={colors.multiBase}
+            width={200}
+            disabled={full || busy}
+            onPress={importFile}
+          />
+        </View>
+        {full && <Text style={styles.hint}>Masz już {MAX_CUSTOM_SETS} własne kategorie – usuń którąś, żeby dodać albo zaimportować nową.</Text>}
       </ScrollView>
     </View>
   );
@@ -103,6 +158,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 560,
     gap: 8,
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 16,
   },
   hint: {
     color: colors.white,

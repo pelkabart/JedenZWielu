@@ -30,5 +30,6 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [lektor.md](lektor.md) | głos prowadzącego na żywo (Piper + sherpa-onnx), krok „czytanie” w sterowniku |
 | [odpowiedzi-glosem.md](odpowiedzi-glosem.md) | odpowiadanie na pytania głosem (mikrofon) |
 | [kategorie-pytan.md](kategorie-pytan.md) | kategorie: własne zestawy pytań generowane przez OpenAI z plików, wybór kategorii w trybie jednoosobowym |
+| [kategorie-import-eksport.md](kategorie-import-eksport.md) | import i eksport kategorii do plików `.kat` (JSON) |
 | [ustawienia-klucz-api.md](ustawienia-klucz-api.md) | ekran ustawień: klucz API OpenAI zapisany na telefonie (Android Keystore) |
 | [ustawienia-glosnosc.md](ustawienia-glosnosc.md) | ekran ustawień: głośność muzyki i lektora (suwaki 0–100%, zapis na telefonie) |

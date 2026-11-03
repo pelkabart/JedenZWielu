@@ -43,10 +43,11 @@ Spis treści:
 | Lektor: intonacja pytająca (ton rośnie na końcu pytania) | zrobione, sprawdzone na próbkach z komputera, do odsłuchania na telefonie |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
 | Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
+| Kategorie: import i eksport do plików `.kat` (JSON), zaimportowana kategoria działa jak z OpenAI | zrobione, testy automatyczne; do sprawdzenia na telefonie (wybór folderu) |
 | Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
 | Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
-| Razem testów automatycznych | 532 |
+| Razem testów automatycznych | 582 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -228,6 +229,8 @@ Programista może zamiast tego wpisać klucz raz w pliku `.env.local` (`EXPO_PUB
 
 Gdy oprócz domyślnej jest choć jedna własna kategoria, „Tryb Jednoosobowy” pokazuje najpierw listę kategorii. Pytania w grze są losowane tylko z wybranej; z niej biorą też pomyłki boty. Bez własnych kategorii gra od razu przechodzi do wyboru poziomu.
 
+**Import i eksport.** Przy każdej własnej kategorii jest przycisk eksportu (strzałka obok kosza), a pod listą obok „Dodaj kategorię” przycisk „Importuj”. Eksport pyta o folder (systemowy wybór folderu Androida) i zapisuje tam plik `<nazwa kategorii>.kat`; znaki niedozwolone w nazwach plików zamieniane są na `_`. W środku jest zwykły JSON: `format` (`jeden-z-wielu/kategoria`), `version` (1), `name`, `exportedAt`, `sourceFiles` i `questions` w formacie bazy pytań (bez wewnętrznych id). Import przyjmuje tylko pliki z rozszerzeniem `.kat` (sprawdzane przed czytaniem, bo Android nie zna typu MIME `.kat` i nie da się ich odfiltrować w wybieraku), do 5 MB. Pytania z pliku przechodzą tę samą walidację co pytania z OpenAI; poniżej 20 poprawnych import jest odrzucany. Zaimportowana kategoria trafia do tego samego magazynu co kategoria z OpenAI: dostaje nowe id, liczy się do limitu 3, można ją wybrać przed grą, wyeksportować i usunąć. Jeśli nazwa jest zajęta (np. ten sam plik zaimportowany drugi raz), gra nadaje „Nazwa (2)”. Domyślnej kategorii nie da się eksportować. Kod: `categoryFile.ts` (format), `transferQuestionSet.ts` (przebieg, z wstrzykiwanym odczytem i zapisem), `device/categoryFiles.ts` (wybierak, zapis przez `Directory.pickDirectoryAsync` z typem `application/octet-stream`, żeby Android nie dopisał `.json`).
+
 Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis), klucz API w `src/settings/`. W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
 
 Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy (commit z testami, które jeszcze nie przechodziły), potem kod.
@@ -260,14 +263,16 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/openaiGenerator-test.ts` | 24 | kategorie: zapytanie do Responses API (pliki, schemat), błędy HTTP, sieć, odmowa, ucięta odpowiedź, limit czasu, klucz poza logami |
 | `categories/__tests__/QuestionSetStore-test.ts` | 34 | kategorie: domyślna nieusuwalna, limit 3, jednoczesne dodania, zapis i uszkodzony zapis, nazwy |
 | `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
-| `categories/__tests__/categories-integration-test.ts` | 16 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza) |
+| `categories/__tests__/categoryFile-test.ts` | 34 | import/eksport: rozszerzenie `.kat`, bezpieczna nazwa pliku, zapis i odczyt JSON, zły format i wersja, złe pytania, za mało pytań, wolna nazwa |
+| `categories/__tests__/transferQuestionSet-test.ts` | 13 | import/eksport: zapis jak kategoria z OpenAI, rozszerzenie, rozmiar i limit sprawdzane przed czytaniem, zajęta nazwa, błędy odczytu i zapisu, anulowanie, domyślna nieeksportowalna |
+| `categories/__tests__/categories-integration-test.ts` | 19 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza), eksport → import na innym telefonie → gra, limit przy imporcie |
 | `settings/__tests__/ApiKeyStore-test.ts` | 30 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz z `.env.local`, klucz poza logami |
 | `settings/__tests__/settings-integration-test.ts` | 6 | testy integracyjne: klucz z ustawień albo z `.env.local` w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
 | `settings/__tests__/VolumeStore-test.ts` | 36 | głośność: przycinanie do 0–100, odczyt uszkodzonego pliku, wczytanie, zapis, łączenie zapisów, zmiana przed wczytaniem, błędy pliku |
 | `audio/__tests__/volume-test.ts` | 8 | głośność odtwarzaczy: skalowanie poziomu muzyki, wyciszenie, lektor, podpięcie lektora do ustawień |
 | `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
 | `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, wyciszenie, głośność po ponownym uruchomieniu, nieudany zapis |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **532** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **582** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -280,7 +285,7 @@ Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 1
 - czy to samo ziarno daje identyczny przebieg całej gry,
 - czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
 
-Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI. Sprawdzamy, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
+Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI (a przy imporcie i eksporcie – dysk w pamięci). Sprawdzamy, że kategoria wyeksportowana na jednym telefonie i zaimportowana na drugim działa w całej grze i przeżywa ponowne uruchomienie, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
 
 Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
 
@@ -508,6 +513,10 @@ Lektor czytał pytania tak samo jak zwykłe zdania. Przyczyna leży w danych tre
 ### Ustawienia: głośność
 - **Problem:** pierwsza wersja suwaka używała `PanResponder` tworzonego raz, który czytał bieżącą szerokość toru i funkcje z `useRef` aktualizowanego w trakcie renderu. `npx expo lint` (reguły React Compiler `react-hooks/refs`) zgłosił to jako błąd: odczyt refa w renderze może dać nieaktualne wartości po optymalizacji kompilatora.
 - **Rozwiązanie:** suwak korzysta bezpośrednio z propsów systemu dotyku (`onResponderGrant`, `onResponderMove`, `onResponderRelease`); ref przechowuje tylko początek dotyku i jest zmieniany wyłącznie w obsłudze dotyku. Matematyka suwaka jest w czystej funkcji `sliderValue` z testami.
+
+### Kategorie: import i eksport
+- **Problem:** przy sprawdzaniu zmian `npx tsc --noEmit` zgłaszał 5 błędów typów tras (np. `"/categories/new"` nie pasuje do typu `router.push`), także na czystym `main`, a `npx expo lint` – „Unable to resolve path to module 'expo-document-picker'”. Przyczyna: `node_modules` nie zgadzał się z `package-lock.json` (brakowało m.in. `expo-document-picker`, `expo-secure-store`, `expo-speech-recognition`), więc wygenerowany plik `.expo/types/router.d.ts` był stary, a ESLint trzymał w pamięci podręcznej stare wyniki.
+- **Rozwiązanie:** `npm install`, krótkie uruchomienie `npx expo start` (generuje typy tras na nowo) i `npx expo lint --no-cache`. Wniosek: po `git pull` z nowymi zależnościami zawsze `npm install`, a dziwne błędy typów tras to najpierw sygnał nieaktualnych `.expo/types`.
 
 ## 8. Dalsze plany
 

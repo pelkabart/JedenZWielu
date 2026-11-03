@@ -7,6 +7,9 @@ import { colors } from '@/constants/theme';
 type Props = {
   set: QuestionSet;
   onDelete?: () => void;
+  onExport?: () => void;
+  /** Wyłącza przyciski na czas importu lub eksportu. */
+  disabled?: boolean;
 };
 
 /** 1 pytanie, 2–4 pytania (ale 12–14 pytań), 5 pytań. */
@@ -23,7 +26,7 @@ function details(set: QuestionSet) {
   return `${questions} · z ${n} ${n === 1 ? 'pliku' : 'plików'}`;
 }
 
-export function CategoryRow({ set, onDelete }: Props) {
+export function CategoryRow({ set, onDelete, onExport, disabled = false }: Props) {
   return (
     <View style={styles.row}>
       <Ionicons
@@ -42,15 +45,30 @@ export function CategoryRow({ set, onDelete }: Props) {
       {set.builtIn ? (
         <Ionicons name="lock-closed" size={20} color={colors.sky} accessibilityLabel="Nie można usunąć" />
       ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Usuń kategorię ${set.name}`}
-          hitSlop={8}
-          onPress={onDelete}
-          style={({ pressed }) => [styles.delete, pressed && styles.deletePressed]}
-        >
-          <Ionicons name="trash" size={20} color={colors.outline} />
-        </Pressable>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Eksportuj kategorię ${set.name}`}
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            hitSlop={8}
+            onPress={onExport}
+            style={({ pressed }) => [styles.action, styles.export, pressed && styles.actionPressed, disabled && styles.actionDisabled]}
+          >
+            <Ionicons name="share-outline" size={20} color={colors.outline} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Usuń kategorię ${set.name}`}
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            hitSlop={8}
+            onPress={onDelete}
+            style={({ pressed }) => [styles.action, styles.delete, pressed && styles.actionPressed, disabled && styles.actionDisabled]}
+          >
+            <Ionicons name="trash" size={20} color={colors.outline} />
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -81,19 +99,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  delete: {
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  action: {
     width: 40,
     height: 40,
     borderRadius: 20,
     borderWidth: 3,
     borderColor: colors.outline,
-    backgroundColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: `0 3px 0 ${colors.outline}`,
   },
-  deletePressed: {
+  export: {
+    backgroundColor: colors.categories,
+  },
+  delete: {
+    backgroundColor: colors.danger,
+  },
+  actionPressed: {
     transform: [{ translateY: 2 }],
     boxShadow: `0 1px 0 ${colors.outline}`,
+  },
+  actionDisabled: {
+    opacity: 0.5,
   },
 });

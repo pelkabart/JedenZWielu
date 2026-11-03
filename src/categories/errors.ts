@@ -9,6 +9,11 @@ export type CategoryErrorKind =
   // pliki
   | 'files'
   | 'file-read'
+  // import i eksport plików .kat
+  | 'import-extension'
+  | 'import-size'
+  | 'import-format'
+  | 'export-write'
   // OpenAI
   | 'no-api-key'
   | 'auth'

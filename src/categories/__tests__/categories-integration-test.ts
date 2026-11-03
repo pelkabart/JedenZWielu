@@ -11,12 +11,14 @@ import { createRng } from '@/game/rng';
 import { createSoloGame, HUMAN_ID } from '@/game/solo';
 import { getLogEntries, resetLog } from '@/lib/log';
 
+import { isCategoryFileName } from '../categoryFile';
 import { createQuestionSet, type CreateQuestionSetDeps } from '../createQuestionSet';
 import { CategoryError } from '../errors';
 import { QUESTIONS_TO_REQUEST } from '../openaiGenerator';
 import { QuestionSetStore } from '../QuestionSetStore';
 import { soloEntryRoute } from '../soloEntry';
 import type { PickedFile } from '../sourceFiles';
+import { exportQuestionSet, importQuestionSet } from '../transferQuestionSet';
 import { fakeFetch, generatedItems, jsonResponse, MemoryStorage, questionsResponse } from '../testing/fakes';
 import { DEFAULT_SET_ID, DEFAULT_SET_NAME, MAX_CUSTOM_SETS } from '../types';
 
@@ -221,5 +223,91 @@ describe('zabezpieczenia przed wysłaniem plików', () => {
     const onProgress = jest.fn();
     await createQuestionSet({ name: 'A', files: [picked('a.pdf')] }, { ...deps, onProgress });
     expect(onProgress.mock.calls.map(([step]) => step)).toEqual(['reading', 'generating', 'saving']);
+  });
+});
+
+describe('import i eksport (.kat)', () => {
+  /** Udawany dysk: eksport zapisuje tu plik, import go stąd czyta. */
+  function fakeDisk() {
+    const files = new Map<string, string>();
+    const saveFile = jest.fn(async (fileName: string, text: string) => {
+      files.set(fileName, text);
+      return true;
+    });
+    const readText = jest.fn(async (file: PickedFile) => {
+      const text = files.get(file.name);
+      if (text === undefined) throw new Error('ENOENT');
+      return text;
+    });
+    const pick = (name: string): PickedFile => ({ name, size: files.get(name)?.length ?? 0, uri: `file:///pobrane/${name}` });
+    return { files, saveFile, readText, pick };
+  }
+
+  it('kategoria wyeksportowana i zaimportowana na innym telefonie działa w grze', async () => {
+    const disk = fakeDisk();
+    const phoneA = setup();
+    await phoneA.store.load();
+    const original = await createQuestionSet({ name: 'Biologia', files: [picked('komorka.pdf')] }, phoneA.deps);
+
+    const fileName = await exportQuestionSet(original, { saveFile: disk.saveFile });
+    expect(fileName).toBe('Biologia.kat');
+    expect(isCategoryFileName(fileName!)).toBe(true);
+    // W środku zwykły JSON.
+    expect(JSON.parse(disk.files.get('Biologia.kat')!).name).toBe('Biologia');
+
+    const phoneB = setup();
+    await phoneB.store.load();
+    const imported = await importQuestionSet(disk.pick('Biologia.kat'), { store: phoneB.store, readText: disk.readText });
+
+    // Zachowuje się jak kategoria z OpenAI: lista, wybór przed grą, zapis po restarcie, gra tylko na jej pytaniach.
+    expect(phoneB.openai.calls).toHaveLength(0);
+    expect(imported.sourceFiles).toEqual(['komorka.pdf']);
+    expect(imported.questions.map((q) => q.question)).toEqual(original.questions.map((q) => q.question));
+    expect(phoneB.store.getSets().map((s) => s.name)).toEqual([DEFAULT_SET_NAME, 'Biologia']);
+    expect(soloEntryRoute(phoneB.store.getSets())).toEqual({ pathname: '/solo/categories' });
+
+    const restarted = new QuestionSetStore({ storage: phoneB.storage, defaultQuestions: QUESTION_BANK });
+    await restarted.load();
+    expect(restarted.questionsForSet(imported.id)).toEqual(imported.questions);
+
+    const questions = restarted.questionsForSet(imported.id);
+    const game = playWholeGame(questions, 11);
+    const setIds = new Set(questions.map((q) => q.id));
+    const asked = game.events.flatMap((e) => (e.type === 'question' ? [e.questionId] : []));
+    expect(asked.length).toBeGreaterThan(20);
+    expect(asked.every((id) => setIds.has(id))).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('zaimportowaną kategorię można wyeksportować i usunąć, a import liczy się do limitu', async () => {
+    const disk = fakeDisk();
+    const { store, deps } = setup();
+    await store.load();
+    const original = await createQuestionSet({ name: 'Chemia', files: [picked('chemia.pdf')] }, deps);
+    await exportQuestionSet(original, { saveFile: disk.saveFile });
+
+    const copies = [];
+    for (let i = 1; i < MAX_CUSTOM_SETS; i++) {
+      copies.push(await importQuestionSet(disk.pick('Chemia.kat'), { store, readText: disk.readText }));
+    }
+    expect(store.getSets().map((s) => s.name)).toEqual([DEFAULT_SET_NAME, 'Chemia', 'Chemia (2)', 'Chemia (3)']);
+
+    disk.readText.mockClear();
+    const error = await errorOf(importQuestionSet(disk.pick('Chemia.kat'), { store, readText: disk.readText }));
+    expect(error.kind).toBe('limit');
+    expect(disk.readText).not.toHaveBeenCalled();
+
+    expect(await exportQuestionSet(copies[0], { saveFile: disk.saveFile })).toBe('Chemia (2).kat');
+    await store.remove(copies[0].id);
+    expect(store.customCount()).toBe(MAX_CUSTOM_SETS - 1);
+  });
+
+  it('plik z innym rozszerzeniem nie jest czytany', async () => {
+    const disk = fakeDisk();
+    const { store } = setup();
+    disk.files.set('Biologia.kat.json', '{}');
+    const error = await errorOf(importQuestionSet(disk.pick('Biologia.kat.json'), { store, readText: disk.readText }));
+    expect(error.kind).toBe('import-extension');
+    expect(disk.readText).not.toHaveBeenCalled();
   });
 });
