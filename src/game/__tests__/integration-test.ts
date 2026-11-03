@@ -1,17 +1,17 @@
 /**
- * Testy integracyjne: te same moduły, które składa `useSoloController` w aplikacji —
- * prawdziwa baza pytań, losowe miejsce gracza, prawdziwe profile botów, sterownik, silnik,
- * symulator i logi — na udawanym zegarze Jesta.
+ * Testy integracyjne: te same moduły, które składa `usePotatoController` w aplikacji —
+ * prawdziwa baza pytań, losowe miejsce gracza, prawdziwe profile botów, sterownik, silnik
+ * i logi — na udawanym zegarze Jesta.
  */
-import { clearLog, getLogEntries, resetLog } from '@/lib/log';
+import { getLogEntries, resetLog } from '@/lib/log';
 
-import { humanTurn, SoloController, type SoloView } from '../controller/SoloController';
-import { getPlayer, pickTargets } from '../engine';
+import { PotatoController, type PotatoView } from '../potato/controller/PotatoController';
+import { activePlayers } from '../potato/engine';
+import { createPotatoSoloGame, HUMAN_ID } from '../potato/solo';
 import { QUESTION_BANK } from '../questions';
-import { DIFFICULTIES } from '../rules';
+import { DIFFICULTIES, DIFFICULTY_PRESETS } from '../rules';
 import { createRng } from '../rng';
-import { createSoloGame, HUMAN_ID } from '../solo';
-import type { Difficulty, GameEvent } from '../types';
+import type { Difficulty } from '../types';
 
 const STEP_MS = 100;
 /** Gra, która nie skończy się w 2 godziny udawanego czasu, na pewno utknęła. */
@@ -19,47 +19,40 @@ const MAX_GAME_MS = 2 * 60 * 60 * 1000;
 
 type Strategy = 'right' | 'silent';
 
-function newController(seed: number, difficulty: Difficulty = 'normal') {
+function newGame(seed: number) {
   const rng = createRng(seed);
-  const game = createSoloGame({ difficulty, humanName: 'Ty', questions: QUESTION_BANK, rng });
-  return new SoloController({ game, rng, bank: QUESTION_BANK });
+  return { rng, game: createPotatoSoloGame({ humanName: 'Ty', questions: QUESTION_BANK, rng }) };
 }
 
-function correctAnswer(view: SoloView) {
-  if (view.game.pending.kind !== 'answer') throw new Error('Brak pytania');
-  return view.game.pending.question.answers[0];
+function newController(seed: number, difficulty: Difficulty = 'normal') {
+  const { rng, game } = newGame(seed);
+  return new PotatoController({ game, difficulty, rng });
 }
 
-/** Jak w `SoloGame`: wyniki widać dopiero po zniknięciu wyniku ostatniej odpowiedzi. */
-const isResultsScreen = (view: SoloView) => view.game.phase === 'finished' && view.overlay === null;
+const humanTurn = ({ game, overlay, awaitingPick }: PotatoView) =>
+  overlay === null && awaitingPick === null && game.holderId === HUMAN_ID && game.question !== null;
 
-/**
- * Prowadzi grę jak gracz na telefonie: zamyka plansze etapów, odpowiada według strategii,
- * w finale zgłasza się od razu i bierze pytania na siebie.
- */
-function playUntilFinished(c: SoloController, strategy: Strategy) {
-  for (let elapsed = 0; !isResultsScreen(c.getView()); elapsed += STEP_MS) {
+const human = (view: PotatoView) => view.game.players.find((p) => p.id === HUMAN_ID)!;
+
+/** Prowadzi grę jak gracz na telefonie: odpowiada według strategii i wskazuje pierwszego rywala. */
+function playUntilFinished(c: PotatoController, strategy: Strategy) {
+  c.start();
+  for (let elapsed = 0; c.getView().overlay?.kind !== 'finished'; elapsed += STEP_MS) {
     const view = c.getView();
-    if (elapsed > MAX_GAME_MS) {
-      throw new Error(`Gra utknęła: etap ${view.game.phase}, czeka na ${view.game.pending.kind}, nakładka ${view.overlay?.kind}`);
+    if (elapsed > MAX_GAME_MS) throw new Error(`Gra utknęła: runda ${view.game.phase}, nakładka ${view.overlay?.kind}`);
+    if (view.awaitingPick) {
+      const { chooserId } = view.awaitingPick;
+      c.pick(activePlayers(view.game).find((p) => p.id !== chooserId)!.id);
+    } else if (strategy === 'right' && humanTurn(view)) {
+      c.submitAnswer(view.game.question!.answers[0]);
+    } else {
+      jest.advanceTimersByTime(STEP_MS);
     }
-    if (view.overlay?.kind === 'banner') {
-      jest.advanceTimersByTime(1000);
-      c.skip();
-      continue;
-    }
-    const turn = humanTurn(view);
-    if (strategy === 'right' && turn === 'answer') c.submitAnswer(correctAnswer(view));
-    else if (strategy === 'right' && turn === 'buzz') c.buzz();
-    else if (turn === 'pick') c.pick(pickTargets(view.game, HUMAN_ID)[0].id);
-    else if (strategy === 'silent' && getPlayer(view.game, HUMAN_ID).eliminated) c.fastForward();
-    else jest.advanceTimersByTime(STEP_MS);
   }
   return c.getView();
 }
 
-const phasesFromEvents = (events: GameEvent[]) => events.flatMap((e) => (e.type === 'phase' ? [e.phase] : []));
-const messages = (tag: string) => getLogEntries({ tag }).map((e) => e.message);
+const logData = (tag: string, message: string) => getLogEntries({ tag }).filter((e) => e.message === message).map((e) => e.data);
 
 beforeAll(() => {
   // Wpis o załadowaniu bazy powstał przy imporcie, zanim testy zaczęły czyścić bufor.
@@ -79,113 +72,100 @@ afterEach(() => {
 });
 
 describe('pełna gra na prawdziwej bazie i botach', () => {
-  it.each(DIFFICULTIES)('pełna gra kończy się poprawnie na poziomie %s', (difficulty) => {
-    const c = newController(11, difficulty);
-    c.start();
-    const { game } = playUntilFinished(c, 'right');
-
+  it.each(DIFFICULTIES)('gracz bez błędów wygrywa na poziomie %s, bez wiszących liczników', (difficulty) => {
+    const { game } = playUntilFinished(newController(11, difficulty), 'right');
+    expect(game.phase).toBe('finished');
     expect(game.ranking).toHaveLength(5);
-    expect(new Set(game.ranking)).toEqual(new Set(game.players.map((p) => p.id)));
-    // Gracz odpowiadający zawsze dobrze nie traci szans, więc dochodzi do finału.
-    expect(getPlayer(game, HUMAN_ID).finalist).toBe(true);
-    expect(game.players.filter((p) => p.finalist)).toHaveLength(3);
+    expect(game.ranking?.[0]).toBe(HUMAN_ID);
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('gracz, który nie odpowiada, odpada, a po przewinięciu gra kończy się bez wiszących liczników', () => {
-    const c = newController(5);
-    c.start();
-    const { game } = playUntilFinished(c, 'silent');
-
-    const human = getPlayer(game, HUMAN_ID);
-    expect(human.eliminated).toBe(true);
-    expect(human.correct).toBe(0);
-    expect(game.ranking?.at(-1)).toBe(HUMAN_ID);
+  it('gracz, który nie odpowiada, odpada, a boty kończą grę same', () => {
+    const view = playUntilFinished(newController(5), 'silent');
+    expect(human(view).eliminated).toBe(true);
+    expect(view.game.ranking?.[0]).not.toBe(HUMAN_ID);
     expect(jest.getTimerCount()).toBe(0);
   });
 
   it('to samo ziarno daje identyczny przebieg całej gry', () => {
-    const play = () => {
-      const c = newController(42, 'expert');
-      c.start();
-      return playUntilFinished(c, 'right').game.events;
+    const run = () => {
+      resetLog();
+      const { game } = playUntilFinished(newController(42), 'right');
+      return { ranking: game.ranking, answers: logData('ziemniak', 'Odpowiedź') };
     };
-    const first = play();
-    jest.clearAllTimers();
-    expect(play()).toEqual(first);
+    const first = run();
+    expect(first.answers.length).toBeGreaterThan(20);
+    expect(run()).toEqual(first);
+  });
+
+  it('każda gra tasuje talię: inna kolejność pytań, te same pytania', () => {
+    const decks = [1, 2, 3].map((seed) => newGame(seed).game.deck.map((q) => q.id));
+    const bank = QUESTION_BANK.map((q) => q.id).sort();
+    for (const deck of decks) expect([...deck].sort()).toEqual(bank);
+    expect(new Set(decks.map((deck) => deck.join())).size).toBe(decks.length);
+    expect(decks[0]).not.toEqual(QUESTION_BANK.map((q) => q.id));
   });
 });
 
 describe('logi z rozgrywki', () => {
-  it('logi etapów zgadzają się z przebiegiem gry, a w całej grze nie ma ostrzeżeń ani błędów', () => {
-    const c = newController(11);
-    c.start();
-    const { game } = playUntilFinished(c, 'right');
-
-    const loggedPhases = getLogEntries({ tag: 'sterownik' })
-      .filter((e) => e.message === 'Etap')
-      .map((e) => e.data?.phase);
-    // Etap I jest w stanie początkowym gry (sterownik loguje go przy starcie), kolejne — przy zmianie.
-    expect(['stage1', ...loggedPhases]).toEqual(phasesFromEvents(game.events));
-    expect(messages('sterownik')).toContain('Start rozgrywki');
-    expect(messages('sterownik').at(-1)).toBe('Koniec gry');
+  it('logi rund zgadzają się z przebiegiem gry, a w całej grze nie ma ostrzeżeń ani błędów', () => {
+    playUntilFinished(newController(11), 'right');
+    expect(logData('ziemniak', 'Runda')).toEqual([{ phase: 'round1' }, { phase: 'round2' }, { phase: 'sprint' }, { phase: 'duel' }]);
+    expect(logData('ziemniak', 'Koniec gry')).toHaveLength(1);
     expect(getLogEntries({ minLevel: 'warn' })).toEqual([]);
   });
 
-  it('każdy upływ czasu człowieka ma wpis w logach', () => {
-    const c = newController(5);
-    c.start();
-    const { game } = playUntilFinished(c, 'silent');
-
-    const timeouts = game.events.filter((e) => e.type === 'answer' && e.playerId === HUMAN_ID && e.text === null);
-    expect(timeouts.length).toBe(game.rules.lives);
-    expect(messages('sterownik').filter((m) => m === 'Koniec czasu na odpowiedź')).toHaveLength(timeouts.length);
-    expect(messages('sterownik')).toContain('Przewinięcie do wyników');
-  });
-
-  it('podwójne zatwierdzenie odpowiedzi liczy się raz i jest zapisane jako zignorowane', () => {
-    const c = newController(5);
-    c.start();
-    for (let elapsed = 0; humanTurn(c.getView()) !== 'answer'; elapsed += STEP_MS) {
-      if (elapsed > MAX_GAME_MS) throw new Error('Gracz nie dostał pytania');
-      if (c.getView().overlay?.kind === 'banner') {
-        jest.advanceTimersByTime(1000);
-        c.skip();
-      } else {
-        jest.advanceTimersByTime(STEP_MS);
-      }
+  it('logi nie zawierają całego stanu gry', () => {
+    playUntilFinished(newController(11), 'right');
+    for (const entry of getLogEntries({ tag: 'ziemniak' })) {
+      expect(JSON.stringify(entry.data ?? {}).length).toBeLessThan(200);
     }
-    const answer = correctAnswer(c.getView());
-    clearLog();
+  });
+});
 
-    c.submitAnswer(answer);
-    c.submitAnswer(answer);
+describe('ruchy gracza w czasie gry', () => {
+  /** Przewija grę do pierwszej tury człowieka z biegnącym licznikiem. */
+  function untilHumanTurn(c: PotatoController) {
+    c.start();
+    for (let elapsed = 0; !humanTurn(c.getView()); elapsed += STEP_MS) {
+      if (elapsed > MAX_GAME_MS) throw new Error('Gracz nie dostał pytania');
+      jest.advanceTimersByTime(STEP_MS);
+    }
+  }
 
-    const humanAnswers = c.getView().game.events.filter((e) => e.type === 'answer' && e.playerId === HUMAN_ID);
-    expect(humanAnswers).toHaveLength(1);
-    expect(getLogEntries({ tag: 'sterownik' })).toContainEqual(
-      expect.objectContaining({
-        message: 'Zignorowano ruch gracza',
-        data: expect.objectContaining({ move: 'answer', overlay: 'reveal' }),
-      }),
-    );
+  it('podwójne zatwierdzenie odpowiedzi liczy się raz', () => {
+    const c = newController(5);
+    untilHumanTurn(c);
+    const before = human(c.getView()).errors;
+    c.submitAnswer('na pewno zla odpowiedz');
+    c.submitAnswer('na pewno zla odpowiedz');
+    expect(human(c.getView()).errors).toBe(before + 1);
   });
 
-  it('pauza i wznowienie są zapisane z pozostałym czasem', () => {
+  it('odbicie w ciemno działa raz na grę i oddaje pełny czas rywalowi', () => {
     const c = newController(5);
-    c.start();
+    untilHumanTurn(c);
+    jest.advanceTimersByTime(2000);
+    const target = activePlayers(c.getView().game).find((p) => p.id !== HUMAN_ID)!.id;
+    c.blindPass(target);
+    const view = c.getView();
+    expect(view.game.holderId).toBe(target);
+    expect(human(view).blindPassUsed).toBe(true);
+    expect(view.timerMs).toBe(DIFFICULTY_PRESETS.normal.answerTimeMs);
+    expect(view.deadline).toBe(Date.now() + DIFFICULTY_PRESETS.normal.answerTimeMs);
+  });
+
+  it('pauza zatrzymuje licznik, a wznowienie daje resztę czasu', () => {
+    const c = newController(5);
+    untilHumanTurn(c);
+    const left = c.getView().deadline! - Date.now() - 1000;
     jest.advanceTimersByTime(1000);
-    c.skip(); // plansza etapu I
-    jest.advanceTimersByTime(1500); // w trakcie zapowiedzi „Odpowiada: …” (4 s)
-
     c.pause();
-    jest.advanceTimersByTime(60000);
-    c.start();
-
-    const entries = getLogEntries({ tag: 'sterownik' });
-    const pause = entries.find((e) => e.message === 'Pauza');
-    const resume = entries.find((e) => e.message === 'Wznowienie');
-    expect(pause?.data).toEqual({ remainingMs: 2500 });
-    expect(resume?.data).toEqual({ remainingMs: 2500 });
+    jest.advanceTimersByTime(60_000);
+    expect(c.getView().overlay).toBeNull();
+    c.unpause();
+    expect(c.getView().deadline).toBe(Date.now() + left);
+    jest.advanceTimersByTime(left);
+    expect(c.getView().overlay).toMatchObject({ kind: 'reveal', playerId: HUMAN_ID, text: null });
   });
 });

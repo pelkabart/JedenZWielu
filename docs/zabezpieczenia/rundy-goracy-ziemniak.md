@@ -117,3 +117,18 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** wyjątek lub odrzucona obietnica lektora zostawia grę w miejscu czekania na ciszę.
 - **Zabezpieczenie:** narrator łapie błąd, loguje go i zwalnia `setSpeaking(false)`.
 - **Test:** `potato-narrator-test.ts` › „błąd syntezy nie blokuje gry”.
+
+### 22. Stary pasek czasu widoczny w czasie mówienia lektora
+- **Ryzyko:** po odbiciu w ciemno albo poprawnej odpowiedzi pasek pokazuje resztę poprzedniego czasu, dopóki lektor mówi. To się naprawdę zdarzyło (dokumentacja postępów, 7.53).
+- **Zabezpieczenie:** `clearMain` zeruje `deadline` i `timerMs`, więc każdy nowy krok zaczyna bez starego paska.
+- **Test:** `potato/__tests__/controller-test.ts` › „odbicie w ciemno w czasie mówienia lektora…”, „poprawna odpowiedź w czasie mówienia lektora…”; `narration-integration-test.ts` › „gdy lektor mówi, nie biegnie żaden pasek czasu…”.
+
+### 23. Odpadający gracz wylosowany jako następny
+- **Ryzyko:** silnik odrzuca ruch, a gracz dostaje drugie podejście do pytania mimo utraty ostatniej szansy. To się naprawdę zdarzyło (dokumentacja postępów, 7.54).
+- **Zabezpieczenie:** `chooseNext` pomija gracza, którego błąd eliminuje (`errorEliminates`).
+- **Test:** `controller-test.ts` › „błąd, po którym gracz odpada”.
+
+### 24. Ta sama kolejność pytań w każdej grze
+- **Ryzyko:** bez tasowania każda gra zaczyna od tych samych pytań.
+- **Zabezpieczenie:** `createPotatoSoloGame` tasuje talię generatorem gry, więc kolejność da się odtworzyć z ziarna.
+- **Test:** `game/__tests__/integration-test.ts` › „każda gra tasuje talię…”, „to samo ziarno daje identyczny przebieg całej gry”.

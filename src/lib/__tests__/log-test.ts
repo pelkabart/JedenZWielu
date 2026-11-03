@@ -1,6 +1,5 @@
-import { simulateGame } from '@/game/simulate';
-import { newGame } from '@/game/testing/fixtures';
-import { createRng } from '@/game/rng';
+import { createPotatoGame, POTATO, reducePotato } from '@/game/potato/engine';
+import { TEST_BANK } from '@/game/testing/fixtures';
 
 import { clearLog, configureLog, consoleSink, createLogger, formatData, formatEntry, getLogEntries, resetLog, type LogEntry } from '../log';
 
@@ -123,8 +122,11 @@ describe('formatowanie', () => {
 });
 
 describe('logi a silnik', () => {
-  it('symulacja pełnej gry nie zapisuje żadnego wpisu (silnik jest czysty)', () => {
-    simulateGame(newGame(3), { rng: createRng(3) });
+  it('przebieg rundy w silniku nie zapisuje żadnego wpisu (silnik jest czysty)', () => {
+    const players = ['a', 'b', 'c'].map((id) => ({ id, name: id, isHuman: true }));
+    let state = reducePotato(createPotatoGame({ players, deck: TEST_BANK }), { type: 'start', holderId: 'a' });
+    for (let i = 0; i < POTATO.lives; i++) state = reducePotato(state, { type: 'answer', playerId: 'a', text: null, next: i < POTATO.lives - 1 ? 'a' : 'b' });
+    expect(state.phase).toBe('round2');
     expect(getLogEntries()).toEqual([]);
   });
 });

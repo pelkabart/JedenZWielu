@@ -1,5 +1,7 @@
 # Ekran rozgrywki
 
+> **Częściowo nieaktualne od 03.11.2026:** punkty o klasycznym silniku „1 z 10” (etapy, zgłaszanie się, osobowości botów, `SoloController`, `NarrationDirector`) opisują usunięty kod. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Pliki: `src/app/solo/game.tsx`, `src/components/solo/*`, `src/hooks/useSoloController.ts`, `src/hooks/useKeyboardHeight.ts`
 Testy: `src/components/solo/__tests__/answerLayout-test.ts`, `src/game/__tests__/view-test.ts`, `src/game/__tests__/integration-test.ts`, ręczne w Expo Go
 Logi: `[gra-solo] Nowa gra` (ziarno, poziom, gracze), `[klawiatura]` (otwarcie z wysokością i schowanie), `[ekran-gry] Gracz przerwał grę`.

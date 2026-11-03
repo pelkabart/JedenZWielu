@@ -1,11 +1,12 @@
 import { isCorrectAnswer } from '../answers';
-import { correctChance, decideAnswer, decideBuzz, decideTarget, wrongAnswer, type BotContext } from '../bots/brain';
+import { correctChance, decideAnswer, wrongAnswer, type BotContext } from '../bots/brain';
 import { BOT_PROFILES, getBotProfile, pickOpponents, type BotProfile } from '../bots/profiles';
 import { QUESTION_BANK } from '../questions';
-import { DEFAULT_RULES } from '../rules';
 import { createRng } from '../rng';
-import type { Difficulty, GameState, Question } from '../types';
-import { newGame, TEST_BANK } from '../testing/fixtures';
+import type { Difficulty, Question, Rules } from '../types';
+import { TEST_BANK } from '../testing/fixtures';
+
+const RULES: Rules = { answerTimeMs: 12000 };
 
 const question: Question = {
   id: 'q',
@@ -20,38 +21,13 @@ function ctx(profile: BotProfile, difficulty: Difficulty = 'normal', seed = 1): 
   return { profile, difficulty, rng: createRng(seed), bank: TEST_BANK };
 }
 
-function withPersonality(personality: BotProfile['personality']): BotProfile {
-  return { ...getBotProfile('profesor'), personality };
-}
-
-/** Stan, w którym `chooserId` wskazuje, a gracze mają zadane szanse. */
-function pickState(chooserId: string, livesById: Record<string, number>, allowSelf = false): GameState {
-  const s = newGame();
-  return {
-    ...s,
-    phase: allowSelf ? 'final' : 'stage2',
-    pending: { kind: 'pick', chooserId, allowSelf },
-    players: s.players.map((p) => {
-      const lives = livesById[p.id] ?? 3;
-      return { ...p, lives, eliminated: lives === 0 };
-    }),
-  };
-}
-
 describe('profile botów', () => {
   it('mają unikalne id i sensowne parametry', () => {
     expect(new Set(BOT_PROFILES.map((p) => p.id)).size).toBe(BOT_PROFILES.length);
     for (const p of BOT_PROFILES) {
       expect(p.knowledge).toBeGreaterThan(0);
       expect(p.knowledge).toBeLessThan(1);
-      expect(p.answerTimeMs[0]).toBeLessThanOrEqual(p.answerTimeMs[1]);
-      expect(p.buzzTimeMs[0]).toBeLessThanOrEqual(p.buzzTimeMs[1]);
     }
-  });
-
-  it('każda osobowość występuje w puli', () => {
-    const personalities = new Set(BOT_PROFILES.map((p) => p.personality));
-    expect([...personalities].sort()).toEqual(['avenger', 'chaotic', 'predator', 'tactician']);
   });
 
   it('losuje różnych przeciwników', () => {
@@ -131,8 +107,8 @@ describe('correctChance', () => {
 describe('decideAnswer', () => {
   it('jest powtarzalna dla tego samego ziarna', () => {
     const profile = getBotProfile('ola');
-    expect(decideAnswer(ctx(profile, 'normal', 9), question, DEFAULT_RULES)).toEqual(
-      decideAnswer(ctx(profile, 'normal', 9), question, DEFAULT_RULES),
+    expect(decideAnswer(ctx(profile, 'normal', 9), question, RULES)).toEqual(
+      decideAnswer(ctx(profile, 'normal', 9), question, RULES),
     );
   });
 
@@ -142,7 +118,7 @@ describe('decideAnswer', () => {
       const c = ctx(profile, difficulty, 123);
       let correct = 0;
       for (let i = 0; i < 2000; i++) {
-        if (isCorrectAnswer(decideAnswer(c, question, DEFAULT_RULES).text, question.answers)) correct++;
+        if (isCorrectAnswer(decideAnswer(c, question, RULES).text, question.answers)) correct++;
       }
       return correct / 2000;
     };
@@ -155,16 +131,16 @@ describe('decideAnswer', () => {
   it('pomyłki nigdy nie są przypadkiem poprawne, a odpowiedzi mieszczą się w czasie', () => {
     const c = ctx(getBotProfile('wiesiek'), 'easy', 77);
     for (let i = 0; i < 500; i++) {
-      const forcedWrong = decideAnswer(c, TEST_BANK[0], DEFAULT_RULES, false);
+      const forcedWrong = decideAnswer(c, TEST_BANK[0], RULES, false);
       expect(isCorrectAnswer(forcedWrong.text, TEST_BANK[0].answers)).toBe(false);
       if (forcedWrong.text === null) {
-        expect(forcedWrong.delayMs).toBe(DEFAULT_RULES.answerTimeMs);
+        expect(forcedWrong.delayMs).toBe(RULES.answerTimeMs);
       } else {
-        expect(forcedWrong.delayMs).toBeLessThan(DEFAULT_RULES.answerTimeMs);
+        expect(forcedWrong.delayMs).toBeLessThan(RULES.answerTimeMs);
       }
-      const forcedRight = decideAnswer(c, TEST_BANK[0], DEFAULT_RULES, true);
+      const forcedRight = decideAnswer(c, TEST_BANK[0], RULES, true);
       expect(isCorrectAnswer(forcedRight.text, TEST_BANK[0].answers)).toBe(true);
-      expect(forcedRight.delayMs).toBeLessThan(DEFAULT_RULES.answerTimeMs);
+      expect(forcedRight.delayMs).toBeLessThan(RULES.answerTimeMs);
     }
   });
 
@@ -174,7 +150,7 @@ describe('decideAnswer', () => {
       (q) => q.answers[0],
     );
     for (let i = 0; i < 200; i++) {
-      const { text } = decideAnswer(c, TEST_BANK[0], DEFAULT_RULES, false);
+      const { text } = decideAnswer(c, TEST_BANK[0], RULES, false);
       if (text !== null) expect(sameCategory).toContain(text);
     }
   });
@@ -238,95 +214,5 @@ describe('wrongAnswer – pomyłki tego samego rodzaju', () => {
   it('gdy nie ma pasującej pomyłki, bot nie odpowiada zamiast podać coś bez sensu', () => {
     const q: Question = { id: 'x', category: 'Sport', question: 'Gdzie?', answers: ['Tam'], answerType: 'miejsce', difficulty: 2 };
     expect(wrongAnswer({ ...bankCtx(1), bank: [] }, q)).toBeNull();
-  });
-});
-
-describe('decideBuzz', () => {
-  it('zgłasza się tylko w oknie czasowym', () => {
-    const c = ctx(getBotProfile('bartek'), 'easy', 3);
-    for (let i = 0; i < 300; i++) {
-      const buzz = decideBuzz(c, question, DEFAULT_RULES);
-      if (buzz.delayMs !== null) expect(buzz.delayMs).toBeLessThan(DEFAULT_RULES.buzzWindowMs);
-    }
-  });
-
-  it('częściej zgłasza się, gdy zna odpowiedź', () => {
-    const c = ctx(getBotProfile('zosia'), 'normal', 8);
-    let buzzedKnowing = 0;
-    let knowing = 0;
-    let buzzedNotKnowing = 0;
-    let notKnowing = 0;
-    for (let i = 0; i < 3000; i++) {
-      const buzz = decideBuzz(c, question, DEFAULT_RULES);
-      const knows = isCorrectAnswer(buzz.answer.text, question.answers);
-      if (knows) {
-        knowing++;
-        if (buzz.delayMs !== null) buzzedKnowing++;
-      } else {
-        notKnowing++;
-        if (buzz.delayMs !== null) buzzedNotKnowing++;
-      }
-    }
-    expect(buzzedKnowing / knowing).toBeGreaterThan(0.6);
-    expect(buzzedNotKnowing / notKnowing).toBeLessThan(0.1);
-  });
-});
-
-describe('decideTarget', () => {
-  it('drapieżnik dobija gracza z najmniejszą liczbą szans', () => {
-    const state = pickState('p0', { p1: 3, p2: 1, p3: 2, p4: 3 });
-    for (let seed = 0; seed < 20; seed++) {
-      expect(decideTarget(ctx(withPersonality('predator'), 'expert', seed), state, 'p0')).toBe('p2');
-    }
-  });
-
-  it('taktyk wskazuje najgroźniejszego rywala', () => {
-    const base = pickState('p0', { p1: 2, p2: 3, p3: 1, p4: 2 });
-    const state = { ...base, players: base.players.map((p) => (p.id === 'p4' ? { ...p, correct: 5 } : p)) };
-    for (let seed = 0; seed < 20; seed++) {
-      expect(decideTarget(ctx(withPersonality('tactician'), 'expert', seed), state, 'p0')).toBe('p4');
-    }
-  });
-
-  it('mściciel wskazuje tego, kto ostatnio wskazał jego', () => {
-    const base = pickState('p0', { p1: 3, p2: 3, p3: 1, p4: 3 });
-    const state: GameState = {
-      ...base,
-      events: [...base.events, { type: 'pick', chooserId: 'p1', targetId: 'p0' }, { type: 'pick', chooserId: 'p4', targetId: 'p0' }],
-    };
-    for (let seed = 0; seed < 20; seed++) {
-      expect(decideTarget(ctx(withPersonality('avenger'), 'expert', seed), state, 'p0')).toBe('p4');
-    }
-  });
-
-  it('mściciel bez krzywd zachowuje się jak drapieżnik', () => {
-    const state = pickState('p0', { p1: 3, p2: 3, p3: 1, p4: 3 });
-    expect(decideTarget(ctx(withPersonality('avenger'), 'expert'), state, 'p0')).toBe('p3');
-  });
-
-  it('w etapie II nigdy nie wskazuje siebie ani odpadłych', () => {
-    const state = pickState('p0', { p1: 0, p2: 2, p3: 3, p4: 1 });
-    for (const profile of BOT_PROFILES) {
-      for (let seed = 0; seed < 30; seed++) {
-        expect(['p2', 'p3', 'p4']).toContain(decideTarget(ctx(profile, 'easy', seed), state, 'p0'));
-      }
-    }
-  });
-
-  it('w finale czasem bierze pytanie na siebie, a pewny siebie bot robi to częściej', () => {
-    const state = pickState('p0', { p1: 0, p2: 3, p3: 0, p4: 3 }, true);
-    const selfRate = (confidence: number) => {
-      const c = ctx({ ...getBotProfile('ola'), confidence }, 'normal', 11);
-      let self = 0;
-      for (let i = 0; i < 1000; i++) if (decideTarget(c, state, 'p0') === 'p0') self++;
-      return self / 1000;
-    };
-    expect(selfRate(0.2)).toBeGreaterThan(0.1);
-    expect(selfRate(0.9)).toBeGreaterThan(selfRate(0.2) + 0.4);
-  });
-
-  it('odmawia, gdy to nie jego kolej', () => {
-    const state = pickState('p1', {});
-    expect(() => decideTarget(ctx(BOT_PROFILES[0]), state, 'p0')).toThrow();
   });
 });

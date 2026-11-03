@@ -4,11 +4,11 @@
  * z atrapą `fetch` udającą OpenAI, walidacja plików, wybór ekranu startowego oraz
  * cała gra (silnik, boty, sterownik) na pytaniach z wygenerowanej kategorii, na udawanym zegarze.
  */
-import { humanTurn, SoloController, type SoloView } from '@/game/controller/SoloController';
-import { pickTargets } from '@/game/engine';
+import { PotatoController } from '@/game/potato/controller/PotatoController';
+import { activePlayers } from '@/game/potato/engine';
+import { createPotatoSoloGame, HUMAN_ID } from '@/game/potato/solo';
 import { QUESTION_BANK } from '@/game/questions';
 import { createRng } from '@/game/rng';
-import { createSoloGame, HUMAN_ID } from '@/game/solo';
 import { getLogEntries, resetLog } from '@/lib/log';
 
 import { isCategoryFileName } from '../categoryFile';
@@ -45,31 +45,26 @@ async function errorOf(promise: Promise<unknown>): Promise<CategoryError> {
   throw new Error('Oczekiwano błędu');
 }
 
-/** Gra jak w `useSoloController`, a gracz zawsze odpowiada dobrze. */
+/** Gra jak w `usePotatoController`, a gracz zawsze odpowiada dobrze. Zwraca też id wszystkich zadanych pytań. */
 function playWholeGame(questions: typeof QUESTION_BANK, seed: number) {
   const rng = createRng(seed);
-  const game = createSoloGame({ difficulty: 'normal', humanName: 'Ty', questions, rng });
-  const c = new SoloController({ game, rng, bank: questions });
+  const game = createPotatoSoloGame({ humanName: 'Ty', questions, rng });
+  const c = new PotatoController({ game, difficulty: 'normal', rng });
+  const asked: string[] = [];
   c.start();
-  const finished = (view: SoloView) => view.game.phase === 'finished' && view.overlay === null;
-  for (let elapsed = 0; !finished(c.getView()); elapsed += STEP_MS) {
+  for (let elapsed = 0; c.getView().overlay?.kind !== 'finished'; elapsed += STEP_MS) {
     if (elapsed > MAX_GAME_MS) throw new Error('Gra utknęła');
-    const view = c.getView();
-    const turn = humanTurn(view);
-    if (view.overlay?.kind === 'banner') {
-      jest.advanceTimersByTime(1000);
-      c.skip();
-    } else if (turn === 'answer' && view.game.pending.kind === 'answer') {
-      c.submitAnswer(view.game.pending.question.answers[0]);
-    } else if (turn === 'buzz') {
-      c.buzz();
-    } else if (turn === 'pick') {
-      c.pick(pickTargets(view.game, HUMAN_ID)[0].id);
+    const { game: state, overlay, awaitingPick } = c.getView();
+    if (state.question && state.question.id !== asked.at(-1)) asked.push(state.question.id);
+    if (awaitingPick) {
+      c.pick(activePlayers(state).find((p) => p.id !== awaitingPick.chooserId)!.id);
+    } else if (overlay === null && state.question && state.holderId === HUMAN_ID) {
+      c.submitAnswer(state.question.answers[0]);
     } else {
       jest.advanceTimersByTime(STEP_MS);
     }
   }
-  return c.getView().game;
+  return { ...c.getView().game, asked };
 }
 
 beforeEach(() => {
@@ -106,10 +101,9 @@ describe('od plików do gry', () => {
     const questions = store.questionsForSet(set.id);
     const game = playWholeGame(questions, 7);
 
-    const asked = game.events.flatMap((e) => (e.type === 'question' ? [e.questionId] : []));
     const setIds = new Set(questions.map((q) => q.id));
-    expect(asked.length).toBeGreaterThan(20);
-    expect(asked.every((id) => setIds.has(id))).toBe(true);
+    expect(game.asked.length).toBeGreaterThan(20);
+    expect(game.asked.every((id) => setIds.has(id))).toBe(true);
     expect(game.ranking).toHaveLength(5);
     expect(jest.getTimerCount()).toBe(0);
   });
@@ -273,9 +267,8 @@ describe('import i eksport (.kat)', () => {
     const questions = restarted.questionsForSet(imported.id);
     const game = playWholeGame(questions, 11);
     const setIds = new Set(questions.map((q) => q.id));
-    const asked = game.events.flatMap((e) => (e.type === 'question' ? [e.questionId] : []));
-    expect(asked.length).toBeGreaterThan(20);
-    expect(asked.every((id) => setIds.has(id))).toBe(true);
+    expect(game.asked.length).toBeGreaterThan(20);
+    expect(game.asked.every((id) => setIds.has(id))).toBe(true);
     expect(jest.getTimerCount()).toBe(0);
   });
 

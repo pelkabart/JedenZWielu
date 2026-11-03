@@ -3,13 +3,13 @@ import { createLogger } from '@/lib/log';
 import { isCorrectAnswer } from '../../answers';
 import { decideAnswer, type BotAnswer, type BotContext } from '../../bots/brain';
 import { getBotProfile, type BotProfile } from '../../bots/profiles';
-import { realClock, type Clock } from '../../controller/SoloController';
-import { DEFAULT_RULES, DIFFICULTY_PRESETS } from '../../rules';
+import { realClock, type Clock } from '../../clock';
+import { DIFFICULTY_PRESETS } from '../../rules';
 import { pickRandom, type Rng } from '../../rng';
 import type { Difficulty, Rules } from '../../types';
 import { buildChoices, CHOICE_COUNT } from '../../choices';
 import { pickTarget } from '../bots';
-import { activePlayers, PotatoRuleError, reducePotato, type PotatoPhase, type PotatoState } from '../engine';
+import { activePlayers, errorEliminates, PotatoRuleError, reducePotato, type PotatoPhase, type PotatoState } from '../engine';
 
 const log = createLogger('ziemniak');
 
@@ -100,7 +100,7 @@ export class PotatoController {
     this.clock = clock;
     this.pacing = { ...DEFAULT_POTATO_PACING, ...pacing };
     this.getProfile = getProfile;
-    this.rules = { ...DEFAULT_RULES, answerTimeMs: DIFFICULTY_PRESETS[difficulty].answerTimeMs };
+    this.rules = { answerTimeMs: DIFFICULTY_PRESETS[difficulty].answerTimeMs };
     this.view = {
       game,
       overlay: null,
@@ -310,11 +310,13 @@ export class PotatoController {
     this.pick(target.id);
   }
 
-  /** Bot wybiera cel; w sprincie i po poprawnej odpowiedzi zawsze inny gracz. */
+  /** Wybór celu; w sprincie i po poprawnej odpowiedzi zawsze inny gracz. */
   private chooseNext(holderId: string, correct: boolean): string {
     const game = this.view.game;
     if (game.phase === 'sprint' || correct) return pickTarget(game, holderId, this.rng);
-    return pickTarget(game, null, this.rng);
+    // Po błędzie ziemniak może wrócić do tego samego gracza, chyba że właśnie odpada.
+    const holder = game.players.find((p) => p.id === holderId)!;
+    return pickTarget(game, errorEliminates(game, holder) ? holderId : null, this.rng);
   }
 
   private commit(playerId: string, text: string | null, next: string) {
@@ -484,6 +486,8 @@ export class PotatoController {
     this.timer = null;
     this.mainStep = null;
     this.waiting = null;
+    // Nowy krok może czekać na ciszę lektora: w tym czasie nie wolno pokazywać starego paska.
+    if (this.view.deadline !== null || this.view.timerMs !== null) this.update({ deadline: null, timerMs: null });
   }
 
   private update(patch: Partial<PotatoView>) {

@@ -1,6 +1,7 @@
 import { PotatoController, type PotatoView } from '@/game/potato/controller/PotatoController';
 import { createPotatoGame, reducePotato, type PotatoState } from '@/game/potato/engine';
 import type { Question } from '@/game/types';
+import { getLogEntries, resetLog } from '@/lib/log';
 import { PotatoNarrator, narrationFor } from '@/narration/PotatoNarrator';
 import { FakeVoice } from '@/narration/testing/FakeVoice';
 import { createRng } from '@/game/rng';
@@ -73,6 +74,8 @@ function view(patch: Partial<PotatoView>): PotatoView {
   };
 }
 
+beforeEach(() => resetLog());
+
 describe('co mówi prowadzący', () => {
   it('na turze gracza czyta, kto odpowiada, i pytanie', () => {
     expect(narrationFor(view({}))).toEqual(['Odpowiadasz Ty!', 'pytanie a']);
@@ -110,6 +113,29 @@ describe('lektor z kontrolerem', () => {
     narrator.dispose();
   });
 
+  it('odbicie w ciemno: gdy lektor czyta pytanie rywala, nie widać paska gracza', async () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    voice.finish();
+    await flush();
+    expect(controller.getView().deadline).not.toBeNull();
+    timers.advance(1000);
+
+    controller.blindPass('b1');
+    expect(voice.texts).toEqual(['Odpowiada: Bot 1.', 'pytanie b']);
+    expect(controller.getView().deadline).toBeNull();
+
+    timers.advance(2000);
+    voice.finish();
+    await flush();
+    expect(controller.getView().deadline).toBe(3000 + 5000);
+    expect(controller.getView().timerMs).toBe(5000);
+    narrator.dispose();
+  });
+
   it('pauza wstrzymuje głos, a wznowienie gry go wznawia', () => {
     const timers = fakeClock();
     const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
@@ -121,6 +147,47 @@ describe('lektor z kontrolerem', () => {
     controller.unpause();
     expect(voice.state).toBe('speaking');
     narrator.dispose();
+  });
+
+  it('nowa kwestia przerywa poprzednią, a spóźniony koniec starej nie zgłasza końca nowej', async () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    controller.blindPass('b1');
+    expect(voice.actions()).toEqual(['say', 'stop', 'say']);
+    await flush();
+    // Stara wypowiedź skończyła się przez `stop`, ale nowa dalej trwa.
+    expect(controller.getView().speaking).toBe(true);
+    expect(controller.getView().deadline).toBeNull();
+    narrator.dispose();
+  });
+
+  it('błąd przy pauzie nie przerywa gry i trafia do logów', () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    voice.failOn = 'pause';
+    expect(() => controller.pause()).not.toThrow();
+    expect(getLogEntries({ tag: 'lektor', minLevel: 'error' })).toHaveLength(1);
+    voice.failOn = null;
+    narrator.dispose();
+  });
+
+  it('dispose zatrzymuje głos, zgłasza ciszę i przestaje słuchać', () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    narrator.dispose();
+    expect(voice.actions().slice(-2)).toEqual(['stop', 'dispose']);
+    expect(controller.getView().speaking).toBe(false);
+    // Zwolniony lektor rzuciłby wyjątkiem przy kolejnej wypowiedzi.
+    expect(() => controller.blindPass('b1')).not.toThrow();
   });
 
   it('błąd syntezy nie blokuje gry', async () => {

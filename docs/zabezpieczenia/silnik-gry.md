@@ -1,5 +1,7 @@
 # Silnik gry
 
+> **Moduł usunięty 03.11.2026** razem z klasycznym silnikiem „1 z 10”. Plik zostaje jako zapis prac; kod jest w historii gita. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduł: `src/game/engine.ts`, zasady: `src/game/rules.ts`
 Testy: `src/game/__tests__/engine-test.ts`, `simulate-test.ts`, `integration-test.ts`
 Logi: silnik celowo nic nie loguje (czysta funkcja). Jego ruchy i zdarzenia loguje sterownik (`[sterownik] Ruch`, `Etap`, `Gracz odpadł`, `Koniec gry`).

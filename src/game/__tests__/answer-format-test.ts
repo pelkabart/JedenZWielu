@@ -4,8 +4,10 @@ import { BOT_PROFILES } from '../bots/profiles';
 import { decideAnswer, DECISION_TIME, type BotContext } from '../bots/brain';
 import { createRng, gaussian } from '../rng';
 import { QUESTION_BANK } from '../questions';
-import { DEFAULT_RULES, DIFFICULTY_PRESETS } from '../rules';
-import type { Difficulty } from '../types';
+import { DIFFICULTY_PRESETS } from '../rules';
+import type { Difficulty, Rules } from '../types';
+
+const RULES: Rules = { answerTimeMs: 12000 };
 
 describe('opcje ABCD', () => {
   it('każde pytanie w bazie dostaje 4 różne opcje, w tym poprawną odpowiedź', () => {
@@ -48,10 +50,10 @@ describe('format odpowiedzi na poziomach', () => {
     expect(DIFFICULTY_PRESETS.expert.answerFormat).toBe('text');
   });
 
-  it('pozostałe parametry poziomów (skuteczność botów, tempo, zaangażowanie) się nie zmieniły', () => {
-    expect(DIFFICULTY_PRESETS.easy).toMatchObject({ knowledgeOffset: -0.2, speedFactor: 1.3, strategicness: 0.5 });
-    expect(DIFFICULTY_PRESETS.normal).toMatchObject({ knowledgeOffset: 0, speedFactor: 1, strategicness: 0.8 });
-    expect(DIFFICULTY_PRESETS.expert).toMatchObject({ knowledgeOffset: 0.15, speedFactor: 0.75, strategicness: 1 });
+  it('pozostałe parametry poziomów (skuteczność botów, tempo) się nie zmieniły', () => {
+    expect(DIFFICULTY_PRESETS.easy).toMatchObject({ knowledgeOffset: -0.2, speedFactor: 1.3 });
+    expect(DIFFICULTY_PRESETS.normal).toMatchObject({ knowledgeOffset: 0, speedFactor: 1 });
+    expect(DIFFICULTY_PRESETS.expert).toMatchObject({ knowledgeOffset: 0.15, speedFactor: 0.75 });
   });
 });
 
@@ -65,14 +67,14 @@ describe('czas decyzji botów', () => {
       const rng = createRng(7);
       for (let i = 0; i < 300; i++) {
         const ctx: BotContext = { profile: BOT_PROFILES[i % BOT_PROFILES.length], difficulty, rng, bank: QUESTION_BANK };
-        const { text, delayMs } = decideAnswer(ctx, QUESTION_BANK[i % QUESTION_BANK.length], DEFAULT_RULES);
+        const { text, delayMs } = decideAnswer(ctx, QUESTION_BANK[i % QUESTION_BANK.length], RULES);
         // Brak odpowiedzi (bot nie zdążył) kończy się pełnym czasem; reszta mieści się w rozkładzie.
         if (text === null) {
-          expect(delayMs).toBe(DEFAULT_RULES.answerTimeMs);
+          expect(delayMs).toBe(RULES.answerTimeMs);
           continue;
         }
         expect(delayMs).toBeGreaterThanOrEqual(Math.round(min * preset.speedFactor) - 1);
-        expect(delayMs).toBeLessThanOrEqual(Math.min(DEFAULT_RULES.answerTimeMs - 300, Math.round(max * preset.speedFactor)));
+        expect(delayMs).toBeLessThanOrEqual(Math.min(RULES.answerTimeMs - 300, Math.round(max * preset.speedFactor)));
       }
     });
   }

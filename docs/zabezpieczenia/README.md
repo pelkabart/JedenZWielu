@@ -20,10 +20,11 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [ekran-glowny.md](ekran-glowny.md) | ekran główny, wybór poziomu, tło |
 | [baza-pytan.md](baza-pytan.md) | format i walidacja bazy pytań |
 | [sprawdzanie-odpowiedzi.md](sprawdzanie-odpowiedzi.md) | normalizacja i tolerancja literówek |
-| [silnik-gry.md](silnik-gry.md) | zasady etapów I, II i finału |
+| [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md) | zasady i sterownik rund „Gorący Ziemniak” (jedyny tryb gry) |
+| [silnik-gry.md](silnik-gry.md) | zasady etapów I, II i finału (kod usunięty) |
 | [boty.md](boty.md) | decyzje i osobowości botów |
-| [symulator.md](symulator.md) | rozgrywanie całych gier botami |
-| [sterownik-gry.md](sterownik-gry.md) | czas, pauzy i ruchy botów w czasie rzeczywistym |
+| [symulator.md](symulator.md) | rozgrywanie całych gier botami (kod usunięty) |
+| [sterownik-gry.md](sterownik-gry.md) | czas, pauzy i ruchy botów w starym trybie (kod usunięty) |
 | [ekran-rozgrywki.md](ekran-rozgrywki.md) | ekran gry, klawiatura, wyjście z gry |
 | [logowanie.md](logowanie.md) | logi aplikacji |
 | [testy-integracyjne.md](testy-integracyjne.md) | testy całej rozgrywki na prawdziwych modułach |

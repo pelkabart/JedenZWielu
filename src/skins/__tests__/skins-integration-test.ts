@@ -6,10 +6,9 @@
 import { getBotProfile } from '@/game/bots/profiles';
 import { PotatoController } from '@/game/potato/controller/PotatoController';
 import { activePlayers } from '@/game/potato/engine';
-import { createPotatoSoloGame } from '@/game/potato/solo';
+import { createPotatoSoloGame, HUMAN_ID } from '@/game/potato/solo';
 import { QUESTION_BANK } from '@/game/questions';
 import { createRng } from '@/game/rng';
-import { createSoloGame, HUMAN_ID } from '@/game/solo';
 
 import { assignSkins, genderLimits } from '../assignSkins';
 import { buildCatalog, type Expression } from '../catalog';
@@ -75,21 +74,6 @@ describe('skórki w całej grze', () => {
     const { game } = newGame(1, catalog);
     const skins = assignSkins(game.players, catalog, store.getSelected()?.id ?? null, createRng(2));
     expect(skins[HUMAN_ID]?.id).toBe('player/nowy');
-  });
-
-  it('stary tryb gry też nie wylosuje składu ponad limit', () => {
-    const catalog = buildCatalog(diskSkinFiles());
-    for (let seed = 0; seed < 300; seed++) {
-      const game = createSoloGame({
-        difficulty: 'normal',
-        humanName: 'Ty',
-        questions: QUESTION_BANK,
-        rng: createRng(seed),
-        botLimits: genderLimits(catalog),
-      });
-      const skins = assignSkins(game.players, catalog, null, createRng(seed + 1));
-      expect(game.players.every((p) => skins[p.id])).toBe(true);
-    }
   });
 
   it('cała gra: mimika odpowiada wynikom odpowiedzi, a przydział się nie zmienia', () => {

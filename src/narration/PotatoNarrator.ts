@@ -2,7 +2,7 @@ import { createLogger } from '@/lib/log';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 
-import type { Voice } from './NarrationDirector';
+import type { Voice } from './voice';
 
 const log = createLogger('lektor');
 

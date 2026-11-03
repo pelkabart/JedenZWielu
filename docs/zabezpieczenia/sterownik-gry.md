@@ -1,5 +1,7 @@
 # Sterownik gry
 
+> **Moduł usunięty 03.11.2026** razem z klasycznym silnikiem „1 z 10”. Plik zostaje jako zapis prac; kod jest w historii gita. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduł: `src/game/controller/SoloController.ts`
 Testy: `src/game/__tests__/controller-test.ts`, `view-test.ts`, `integration-test.ts`
 Logi: `[sterownik]` – start, pauza i wznowienie (z pozostałym czasem), każdy ruch i zdarzenie silnika, koniec czasu, decyzje botów, zignorowane ruchy gracza.

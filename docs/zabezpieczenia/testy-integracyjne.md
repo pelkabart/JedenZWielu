@@ -1,5 +1,7 @@
 # Testy integracyjne
 
+> **Częściowo nieaktualne od 03.11.2026:** punkty o klasycznym silniku „1 z 10” (etapy, zgłaszanie się, osobowości botów, `SoloController`, `NarrationDirector`) opisują usunięty kod. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Plik: `src/game/__tests__/integration-test.ts`
 Uruchomienie: `npm run test:integration` (wszystkie testy: `npm test`)
 

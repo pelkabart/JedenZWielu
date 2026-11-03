@@ -135,6 +135,12 @@ export function resourceOf(state: PotatoState, player: PotatoPlayer): number {
   return player.lives;
 }
 
+/** Czy błąd tego gracza oznacza odpadnięcie (ostatnia szansa albo osłona nie wyższa niż mnożnik). Sprint nikogo nie eliminuje. */
+export function errorEliminates(state: PotatoState, player: PotatoPlayer): boolean {
+  if (state.phase === 'sprint') return false;
+  return state.phase === 'round2' ? player.shield <= state.multiplier : player.lives <= 1;
+}
+
 // ---------- obsługa akcji ----------
 
 function answer(s: PotatoState, playerId: string, text: string | null, next: string) {

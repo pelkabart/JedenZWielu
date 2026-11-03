@@ -1,12 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-import { QUESTION_BANK } from '@/game/questions';
 import { createRng } from '@/game/rng';
 import { PotatoNarrator } from '@/narration/PotatoNarrator';
 import { createSherpaVoice } from '@/narration/sherpaVoice';
 import { PotatoController } from '@/game/potato/controller/PotatoController';
 import { createPotatoSoloGame } from '@/game/potato/solo';
-import type { Difficulty } from '@/game/types';
+import type { Difficulty, Question } from '@/game/types';
 import { createLogger } from '@/lib/log';
 import { assignSkins, genderLimits } from '@/skins/assignSkins';
 import { skinSelectionStore } from '@/skins/selection';
@@ -16,14 +15,17 @@ const log = createLogger('gra-solo');
 /** Ziarno skórek to ziarno gry z tą maską, więc przydział też da się odtworzyć. */
 const SKIN_SEED_MASK = 0x5f3759df;
 
-/** Gra solo w nowych zasadach (rundy 1–4). Zegary zatrzymują się przy odmontowaniu ekranu. */
-export function usePotatoController(difficulty: Difficulty) {
+/**
+ * Gra solo w nowych zasadach (rundy 1–4) na pytaniach wybranej kategorii.
+ * Zegary zatrzymują się przy odmontowaniu ekranu.
+ */
+export function usePotatoController(difficulty: Difficulty, questions: Question[]) {
   const [{ controller, skins }] = useState(() => {
     const seed = Date.now();
     const rng = createRng(seed);
-    const game = createPotatoSoloGame({ humanName: 'Ty', questions: QUESTION_BANK, rng, botLimits: genderLimits(skinCatalog) });
+    const game = createPotatoSoloGame({ humanName: 'Ty', questions, rng, botLimits: genderLimits(skinCatalog) });
     // Ziarno pozwala odtworzyć dokładnie tę samą grę, jeśli na telefonie wyjdzie błąd.
-    log.info('Nowa gra w rundach', { seed, difficulty, players: game.players.map((p) => p.id) });
+    log.info('Nowa gra w rundach', { seed, difficulty, questions: questions.length, players: game.players.map((p) => p.id) });
     // Osobny generator: skórki nie mogą zmieniać przebiegu gry z danego ziarna.
     const skins = assignSkins(game.players, skinCatalog, skinSelectionStore.getSelected()?.id ?? null, createRng(seed ^ SKIN_SEED_MASK));
     return { controller: new PotatoController({ game, difficulty, rng }), skins };

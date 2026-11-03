@@ -1,5 +1,7 @@
 # Lektor – głos prowadzącego na żywo (Piper + sherpa-onnx)
 
+> **Częściowo nieaktualne od 03.11.2026:** punkty o klasycznym silniku „1 z 10” (etapy, zgłaszanie się, osobowości botów, `SoloController`, `NarrationDirector`) opisują usunięty kod. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduły: `src/narration/` (`NarrationDirector.ts`, `sherpaVoice.ts`, `pronunciation.ts`), `src/hooks/useNarration.ts`, `hostSpeech` w `src/game/controller/hostLine.ts`, krok „czytanie pytania” i czekanie na prowadzącego w `src/game/controller/SoloController.ts`, przygotowanie modelu `scripts/narration/prepare_voice_model.py`, wtyczka `plugins/withVoiceModel.js`
 Testy: `src/narration/__tests__/NarrationDirector-test.ts`, `src/narration/__tests__/pronunciation-test.ts`, `src/game/__tests__/controller-test.ts` (bloki „czytanie pytania” i „głos prowadzącego”), `src/narration/__tests__/narration-integration-test.ts`
 

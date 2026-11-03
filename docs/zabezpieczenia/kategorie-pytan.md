@@ -84,3 +84,8 @@ W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej 
 **Ryzyko:** zapytanie trwa do kilku minut; gracz wraca do menu. Wynik mógłby przepaść albo zapisać się w połowie.
 **Zabezpieczenie:** tworzenie kategorii nie zależy od ekranu: kończy się w tle i zapisuje całą kategorię naraz (najpierw zapis do pliku tymczasowego, potem podmiana), a lista kategorii odświeża się sama (`useSyncExternalStore`).
 **Test:** `QuestionSetStore-test.ts › powiadamia subskrybentów…`, `› błąd zapisu: zestaw nie jest dodany…`.
+
+### 16. Ekran gry pomija wybraną kategorię
+**Ryzyko:** parametr `set` dochodzi do ekranu gry, ale gra bierze pytania domyślne. To się naprawdę zdarzyło (dokumentacja postępów, 7.52).
+**Zabezpieczenie:** `PotatoGame` i `usePotatoController` wymagają pytań jako parametru, więc pominięcie ich nie przejdzie `tsc`. Nieznany zestaw daje pytania domyślne i ostrzeżenie (`questionsForSet`).
+**Test:** `categories-integration-test.ts` › „cała gra na wygenerowanej kategorii zadaje tylko jej pytania”. Samego ekranu nie obejmują testy automatyczne (brak biblioteki do renderowania), do sprawdzenia ręcznie na telefonie.

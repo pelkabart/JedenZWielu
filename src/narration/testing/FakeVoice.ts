@@ -1,4 +1,4 @@
-import type { Voice } from '../NarrationDirector';
+import type { Voice } from '../voice';
 
 export type FakeVoiceCall = { action: 'say'; texts: string[]; at: number } | { action: 'pause' | 'resume' | 'stop' | 'dispose'; at: number };
 

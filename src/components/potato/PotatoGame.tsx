@@ -18,7 +18,7 @@ import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { activePlayers, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
 import { legendFor, PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
-import type { Difficulty, PlayerState } from '@/game/types';
+import type { Difficulty, PlayerState, Question } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { setGameMusicDucked, startGameMusic, stopGameMusic } from '@/audio/gameMusic';
 import { usePotatoController } from '@/hooks/usePotatoController';
@@ -32,6 +32,8 @@ const SEAT_SCALE = [1, 0.92, 0.84, 0.92, 1];
 
 type Props = {
   difficulty: Difficulty;
+  /** Pytania wybranej kategorii. */
+  questions: Question[];
   onPlayAgain: () => void;
 };
 
@@ -47,11 +49,6 @@ function toPodium(p: PotatoPlayer, phase: PotatoPhase): PlayerState {
     lives: p.eliminated ? 0 : phase === 'round2' ? p.shield : p.lives,
     score: p.points,
     eliminated: p.eliminated,
-    eliminatedOrder: p.eliminatedAt,
-    finalist: phase === 'duel',
-    correct: 0,
-    wrong: p.errors,
-    questionsWithoutTurn: 0,
   };
 }
 
@@ -76,8 +73,8 @@ function hostLine(view: PotatoView): string {
   return 'Gramy dalej.';
 }
 
-export function PotatoGame({ difficulty, onPlayAgain }: Props) {
-  const { controller, view, skins } = usePotatoController(difficulty);
+export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
+  const { controller, view, skins } = usePotatoController(difficulty, questions);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();

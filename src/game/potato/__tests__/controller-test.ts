@@ -1,3 +1,5 @@
+import { getLogEntries, resetLog } from '@/lib/log';
+
 import type { Question } from '../../types';
 import { createRng } from '../../rng';
 import { activePlayers, createPotatoGame, POTATO, reducePotato, type PotatoState } from '../engine';
@@ -123,6 +125,44 @@ describe('tury człowieka', () => {
     expect(controller.getView().game.holderId).toBe('b1');
     expect(player(controller.getView().game, 'h').lives).toBe(POTATO.lives);
     expect(player(controller.getView().game, 'h').blindPassUsed).toBe(true);
+  });
+});
+
+describe('błąd, po którym gracz odpada', () => {
+  const withHolder = (patch: Partial<PotatoState['players'][number]>, game: Partial<PotatoState> = {}) => {
+    const base = started('h', game);
+    return { ...base, players: base.players.map((p) => (p.id === 'h' ? { ...p, ...patch } : p)) };
+  };
+
+  it.each([
+    ['runda 1: ostatnie życie', withHolder({ lives: 1 })],
+    ['runda 2: osłona mniejsza niż mnożnik', withHolder({ shield: 2 }, { phase: 'round2', multiplier: 3 })],
+    ['finał: ostatnia szansa', withHolder({ lives: 1 }, { phase: 'duel' })],
+  ])('%s: odpada od razu i ziemniak nie wraca do niego', (_name, game) => {
+    for (let seed = 0; seed < 50; seed++) {
+      resetLog();
+      const timers = fakeClock();
+      const controller = new PotatoController({ game, difficulty: 'normal', rng: createRng(seed), clock: timers.clock });
+      controller.start();
+      controller.submitAnswer(BAD);
+      const view = controller.getView();
+      expect(view.overlay).toMatchObject({ kind: 'reveal', playerId: 'h', correct: false });
+      expect(player(view.game, 'h').eliminated).toBe(true);
+      expect(view.game.holderId).not.toBe('h');
+      expect(getLogEntries({ minLevel: 'warn' }).filter((e) => e.message === 'Odrzucony ruch')).toEqual([]);
+    }
+  });
+
+  it('błąd bez odpadnięcia nadal może oddać ziemniaka temu samemu graczowi', () => {
+    const holders = new Set<string | null>();
+    for (let seed = 0; seed < 50; seed++) {
+      const timers = fakeClock();
+      const controller = new PotatoController({ game: started('h'), difficulty: 'normal', rng: createRng(seed), clock: timers.clock });
+      controller.start();
+      controller.submitAnswer(BAD);
+      holders.add(controller.getView().game.holderId);
+    }
+    expect(holders).toContain('h');
   });
 });
 
@@ -297,6 +337,44 @@ describe('pauza i lektor', () => {
     expect(controller.getView().game.sprintMsLeft).toBe(9000);
     // Zegar sprintu rusza od nowa: bez zmian w trakcie pauzy.
     expect(controller.getView().game.phase).toBe('sprint');
+  });
+
+  it('odbicie w ciemno w czasie mówienia lektora: pasek gracza znika, a po ciszy rywal ma pełny czas', () => {
+    const { controller, advance } = setup();
+    controller.start();
+    advance(2000);
+    // Tak robi lektor: zaczyna mówić, gdy tylko zmienia się posiadacz ziemniaka.
+    const off = controller.subscribe(() => {
+      if (controller.getView().game.holderId !== 'b1') return;
+      off();
+      controller.setSpeaking(true);
+    });
+    controller.blindPass('b1');
+    expect(controller.getView().game.holderId).toBe('b1');
+    expect(controller.getView().deadline).toBeNull();
+    expect(controller.getView().timerMs).toBeNull();
+    advance(1000);
+    controller.setSpeaking(false);
+    expect(controller.getView().deadline).toBe(3000 + NORMAL_TIME);
+    expect(controller.getView().timerMs).toBe(NORMAL_TIME);
+  });
+
+  it('poprawna odpowiedź w czasie mówienia lektora: pasek odpowiedzi znika, a po ciszy jest pełny czas na wybór', () => {
+    const { controller, advance } = setup();
+    controller.start();
+    advance(2000);
+    const off = controller.subscribe(() => {
+      if (!controller.getView().awaitingPick) return;
+      off();
+      controller.setSpeaking(true);
+    });
+    controller.submitAnswer(OK);
+    expect(controller.getView().awaitingPick).not.toBeNull();
+    expect(controller.getView().deadline).toBeNull();
+    expect(controller.getView().timerMs).toBeNull();
+    controller.setSpeaking(false);
+    expect(controller.getView().deadline).toBe(2000 + PICK_TIMEOUT_MS);
+    expect(controller.getView().timerMs).toBe(PICK_TIMEOUT_MS);
   });
 
   it('licznik nie rusza, dopóki lektor mówi; startuje po ciszy', () => {

@@ -1,9 +1,10 @@
 import { pickOpponents, type GenderLimits } from '../bots/profiles';
-import { randomInt, type Rng } from '../rng';
+import { randomInt, shuffle, type Rng } from '../rng';
 import { SOLO_PLAYER_COUNT } from '../rules';
-import { HUMAN_ID } from '../solo';
 import type { PlayerSetup, Question } from '../types';
 import { createPotatoGame, type PotatoState } from './engine';
+
+export const HUMAN_ID = 'human';
 
 export interface PotatoSoloSetup {
   humanName: string;
@@ -23,5 +24,5 @@ export function createPotatoSoloGame({ humanName, questions, rng, botLimits }: P
   }));
   const players: PlayerSetup[] = [...bots];
   players.splice(randomInt(rng, 0, bots.length), 0, { id: HUMAN_ID, name: humanName, isHuman: true });
-  return createPotatoGame({ players, deck: questions });
+  return createPotatoGame({ players, deck: shuffle(rng, questions) });
 }

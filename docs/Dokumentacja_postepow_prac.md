@@ -23,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (23.10.2026)
+## 1. Stan projektu (03.11.2026)
 
 | Element | Stan |
 |---|---|
@@ -31,25 +31,26 @@ Spis treści:
 | Tryb poziomy aplikacji | zrobione |
 | Wybór poziomu trudności przed grą | zrobione |
 | Baza pytań (format JSON, 50 pytań przykładowych) | zrobione |
-| Silnik gry (etap I, etap II, finał) | zrobione |
-| Boty z osobowościami | zrobione |
+| Silnik gry „Gorący Ziemniak” (rundy 1–2, sprint, finał) – jedyny tryb gry | zrobione |
+| Klasyczny silnik „1 z 10”, jego sterownik, lektor i symulator | usunięte 03.11.2026 |
+| Boty (wiedza, dziedziny, wybór celu) | zrobione |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
 | Teksty prowadzącego | wersja tymczasowa, do rozbudowy w etapie 5 |
-| Testy jednostkowe, symulacje, testy z udawanym zegarem | zrobione |
+| Testy jednostkowe i testy z udawanym zegarem | zrobione |
 | Logi aplikacji (`src/lib/log.ts`) | zrobione |
 | Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
 | Lektor: intonacja pytająca (ton rośnie na końcu pytania) | zrobione, sprawdzone na próbkach z komputera, do odsłuchania na telefonie |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
-| Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
+| Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą (naprawione: gra używa wybranej kategorii) | zrobione, do sprawdzenia na telefonie z kluczem API |
 | Kategorie: import i eksport do plików `.kat` (JSON), zaimportowana kategoria działa jak z OpenAI | zrobione, testy automatyczne; do sprawdzenia na telefonie (wybór folderu) |
 | Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
 | Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 659 (+ 19 w `server/`) |
+| Razem testów automatycznych | 533 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -64,6 +65,8 @@ Na tym etapie nie chcieliśmy używać zewnętrznych grafik, więc tło jest nar
 Przycisk „Tryb Jednoosobowy” prowadzi do wyboru poziomu trudności: Łatwy, Normalny albo Ekspert. Jeśli gracz ma własne kategorie pytań, najpierw wybiera kategorię (rozdział 5, „Kategorie pytań”).
 
 ## 3. Silnik gry w trybie jednoosobowym
+
+> Rozdziały 3–5 w częściach o etapach, zgłaszaniu się, osobowościach botów i `SoloController` opisują klasyczny silnik „1 z 10”, usunięty 03.11.2026 (powód w sekcji 7.55). Zostają jako zapis prac.
 
 W grze bierze udział 5 graczy: użytkownik i 4 boty. Każdy ma 3 szanse. Pytania są otwarte, czyli odpowiedź trzeba wpisać.
 
@@ -253,18 +256,16 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 |---|---|---|
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
-| `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
-| `bots-test.ts` | 30 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
-| `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
-| `controller-test.ts` | 47 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
-| `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
+| `potato/__tests__/potato-test.ts` | 25 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking |
+| `bots-test.ts` | 20 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
+| `potato/__tests__/controller-test.ts` | 24 | sterownik na udawanym zegarze: tury, wskazania, sprint, pauza, czekanie na lektora, pasek czasu, odpadający gracz |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
+| `integration-test.ts` | 11 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry |
 | `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
-| `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
-| `narration/__tests__/narration-integration-test.ts` | 10 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz i z intonacją pytającą, kwestie nieucinane, pauza, wyjście |
+| `narration/__tests__/potato-narrator-test.ts` | 10 | lektor: kiedy mówi, przerywanie kwestii, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
+| `narration/__tests__/narration-integration-test.ts` | 10 | testy integracyjne lektora: całe gry na prawdziwej bazie, intonacja pytająca, brak paska w czasie mówienia, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
@@ -287,26 +288,27 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/IdleFace-test.ts` | 10 | mimika: mruganie, uśmiech, kasowanie zegarów, mimika w reakcji na odpowiedź |
 | `skins/__tests__/SkinSelectionStore-test.ts` | 12 | wybór skórki: zapis, uszkodzony zapis, usunięta skórka, błędy magazynu, kolejność zapisów |
 | `skins/__tests__/real-assets-test.ts` | 4 | prawdziwy folder skórek: komplet klatek, kanał alfa, liczba skórek, nazwy zasobów Androida |
-| `skins/__tests__/skins-integration-test.ts` | 6 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
+| `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **659** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **533** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
-Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
+Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
 
 ### Testy integracyjne
 
-Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych: 12 pytań testowych i bot, który zawsze odpowiada po 4 s. Testy integracyjne (`src/game/__tests__/integration-test.ts`) składają aplikację tak samo jak ekran gry (`useSoloController`): prawdziwą bazę pytań, `createSoloGame` z losowym miejscem gracza, prawdziwe profile botów, sterownik, silnik, symulator i logi. Test prowadzi grę jak gracz na telefonie: zamyka plansze etapów, odpowiada, zgłasza się i wskazuje. Wszystko dzieje się na udawanym zegarze. Sprawdzamy:
+Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych. Testy integracyjne (`src/game/__tests__/integration-test.ts`) składają aplikację tak samo jak ekran gry (`usePotatoController`): prawdziwą bazę pytań, `createPotatoSoloGame` z losowym miejscem gracza, prawdziwe profile botów, sterownik, silnik i logi. Test prowadzi grę jak gracz na telefonie, na udawanym zegarze. Sprawdzamy:
 
 - czy pełna gra kończy się poprawnie na każdym poziomie i nie zostają uruchomione liczniki,
-- czy gracz, który nie odpowiada, odpada, a „Pomiń do wyników” kończy grę,
-- czy to samo ziarno daje identyczny przebieg całej gry,
-- czy logi zgadzają się z grą: kolejność etapów, każdy upływ czasu, zignorowane podwójne zatwierdzenie, pauza z pozostałym czasem i brak ostrzeżeń oraz błędów w całej grze.
+- czy gracz, który nie odpowiada, odpada, a boty kończą grę same,
+- czy to samo ziarno daje identyczny przebieg całej gry, a różne ziarna inną kolejność pytań,
+- czy logi zgadzają się z grą: kolejność rund, brak ostrzeżeń i błędów w całej grze,
+- podwójne zatwierdzenie, odbicie w ciemno oraz pauzę z pozostałym czasem.
 
 Kategorie mają osobne testy integracyjne (`src/categories/__tests__/categories-integration-test.ts`). Składają to samo co ekrany: prawdziwy magazyn kategorii (zapis w pamięci zamiast pliku), prawdziwy generator i walidację plików, `soloEntryRoute` oraz całą grę (silnik, boty, sterownik) na udawanym zegarze. Jedyna atrapa to `fetch` udający OpenAI (a przy imporcie i eksporcie – dysk w pamięci). Sprawdzamy, że kategoria wyeksportowana na jednym telefonie i zaimportowana na drugim działa w całej grze i przeżywa ponowne uruchomienie, że cała gra na wygenerowanej kategorii zadaje tylko jej pytania, kategoria przeżywa ponowne uruchomienie, po usunięciu ostatniej własnej kategorii znika lista wyboru, a przy limicie, złej nazwie, złych plikach albo braku klucza API gra nie czyta plików i nie wysyła zapytania. Ustawienia mają własne testy integracyjne (`src/settings/__tests__/settings-integration-test.ts`): prawdziwy magazyn klucza (szyfrowany magazyn telefonu udawany w pamięci) razem z magazynem kategorii i generatorem. Sprawdzamy, że klucz zapisany w ustawieniach trafia do zapytania, przeżywa ponowne uruchomienie gry, a po jego usunięciu kategorie zostają, ale nowej nie da się utworzyć.
 
-Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `useSoloController` i `useNarration`: prawdziwą bazę, sterownik z krokiem czytania, boty i `NarrationDirector`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) każde zadane pytanie jest czytane dokładnie raz, gracz nigdy nie może odpowiadać, gdy pytanie jest jeszcze czytane, kwestie przy wynikach, wskazaniach i zapowiedziach nie są ucinane, a pauza, wyjście z gry i przewinięcie do wyników wyciszają lektora. W całej grze nie ma ostrzeżeń ani błędów.
+Lektor ma osobne testy integracyjne (`src/narration/__tests__/narration-integration-test.ts`). Składają to samo co `usePotatoController`: prawdziwą bazę, sterownik, boty i `PotatoNarrator`. Jedyna atrapa to synteza mowy, która „mówi” 60 ms na znak na udawanym zegarze i kończy wypowiedź obietnicą, jak prawdziwa. Sprawdzamy, że w całej grze (na każdym poziomie) żadne pytanie nie jest czytane dwa razy z rzędu, w czasie mówienia nie biegnie żaden pasek czasu (także po odbiciu w ciemno), a pauza i wyjście z gry wyciszają lektora.
 
 ### Logi
 
@@ -339,6 +341,8 @@ Aplikację zbudowaliśmy w wersji webowej (`npx expo export --platform web`) i u
 `npx jest --coverage` dla `src/game` i `src/lib`: instrukcje 94,8%, gałęzie 87,5%, funkcje 99,3%, linie 97,0%. Moduł logów ma 100% instrukcji. Najsłabiej pokryte są teksty prowadzącego (`hostLine.ts`, ok. 69% instrukcji), które i tak zostaną przepisane w etapie 5. Niepokryte zostały też gałęzie obsługi błędów, do których prawidłowa gra nie dochodzi (błąd bazy pytań, limit kroków symulatora, odrzucony ruch w sterowniku).
 
 ### Symulacje gier
+
+> Symulator działał na klasycznym silniku i został usunięty 03.11.2026 razem z nim. Opis i wyniki poniżej to zapis analizy tamtego silnika. Dla zasad „Gorący Ziemniak” nie ma jeszcze symulacji balansu.
 
 Oprócz zwykłych testów jednostkowych napisaliśmy symulator (`src/game/simulate.ts`), który rozgrywa całą grę od początku do końca. Wszyscy gracze są sterowani przez boty, a w miejsce człowieka wstawiamy „przeciętnego gracza” o stałych parametrach. To jest właściwie dynamiczna analiza silnika: zamiast tylko czytać kod, uruchamiamy go setki razy z różnymi danymi i sprawdzamy, czy wynik jest poprawny.
 
@@ -554,6 +558,20 @@ Postać, która odpadła, miała `opacity` 0,35, ale na jasnym tle wyglądała n
 **7.51. Wersja webowa nie uruchamia się od czasu dodania kategorii (nienaprawione)**
 `fileStorage` tworzy `new File(Paths.document, ...)` już przy imporcie, a `expo-file-system` nie działa na webie, więc serwer zwraca błąd 500 („this.validatePath is not a function”). `questionSets` używa go na ekranie głównym także bez skórek. Ekrany skórek oglądaliśmy z tymczasową wersją `fileStorage.web.ts`, której nie ma w repozytorium.
 
+### Poprawki gry w rundach (03.11.2026)
+
+**7.52. Wybrana kategoria nie działała w grze**
+Po wyborze kategorii padały pytania z domyślnej bazy. Commit `0ad0eb8` zamienił `SoloGame` (dostawał pytania) na `PotatoGame`, a `usePotatoController` miał na stałe `QUESTION_BANK`, więc parametr `set` nikt już nie czytał. Testy tego nie wykryły, bo `categories-integration-test.ts` grał dalej na starym `SoloController`. Ekran `solo/game.tsx` czyta teraz `set`, a pytania są wymaganym parametrem `PotatoGame` i hooka. Test integracyjny gra już na `PotatoController`.
+
+**7.53. Po odbiciu pytania rywal miał najpierw resztę czasu gracza**
+Odbicie w ciemno kasowało zegar, ale nie `deadline` w widoku. Lektor zaczynał czytać pytanie, nowy licznik czekał na ciszę, a w tym czasie pasek animował stary czas gracza. Po ciszy pojawiał się pełny czas rywala. To samo działo się po poprawnej odpowiedzi, przy „Komu przekazujesz pytanie?”. Sam czas bota był poprawny, błąd dotyczył tylko paska. `clearMain` zeruje teraz `deadline` i `timerMs`. Testy najpierw odtworzyły błąd (`deadline` = 5000 zamiast `null`).
+
+**7.54. Odpadający gracz dostawał drugie podejście do pytania**
+Po błędzie ostatnią szansą `chooseNext` mógł wylosować tego samego gracza. Silnik odrzucał ruch („już odpadł”), a sterownik zadawał pytanie jeszcze raz, więc gracz mógł uniknąć odpadnięcia. Wyszło to dopiero po przeniesieniu testów integracyjnych, które sprawdzają brak ostrzeżeń w całej grze, na nowy silnik. `chooseNext` pomija teraz gracza, którego błąd eliminuje (`errorEliminates`).
+
+**7.55. Usunięcie klasycznego silnika**
+Klasyczny tryb „1 z 10” (`engine.ts`, `SoloController`, `NarrationDirector`, `simulate.ts`, `SoloGame`) nie był dostępny z żadnego ekranu, a testy przechodziły na nim dalej, chociaż gra działała na czymś innym. Przez to nie wykryły 7.52 i 7.54. Usunęliśmy go, a testy integracyjne (gra, lektor, odpowiedzi głosem, kategorie, skórki) przenieśliśmy na `PotatoController`. Liczba testów spadła z 659 do 533, bo zniknęły testy usuniętego kodu. Przy przenoszeniu wyszły dwie luki nowego sterownika: brak limitu czasu na zawieszonego lektora i brak wyciszania lektora, gdy słucha mikrofon. Opis jest w `docs/ARCHITEKTURA.md`, rozdział 13. Talia jest też teraz tasowana (wcześniej każda gra szła po pytaniach w tej samej kolejności).
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
@@ -562,7 +580,8 @@ Postać, która odpadła, miała `opacity` 0,35, ale na jasnym tle wyglądała n
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
-- Poprawa balansu poziomów Normalny i Ekspert (po limicie pytań przeciętny gracz rzadko dochodzi do finału na poziomie Ekspert).
+- Sprawdzenie balansu zasad „Gorący Ziemniak” (nowy symulator albo testy z graczami).
+- Lektor: limit czasu na zawieszony głos i wyciszanie, gdy słucha mikrofon.
 - Rozbudowa bazy pytań.
 - Kategorie: sprawdzenie na telefonie z prawdziwym kluczem (czas generowania, jakość pytań z różnych formatów plików). Docelowo zapytania do OpenAI przez własny serwer (np. funkcja Supabase), żeby gracz nie musiał mieć własnego klucza.
 - Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.

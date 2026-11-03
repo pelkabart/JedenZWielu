@@ -1,6 +1,6 @@
 # Jeden z Wielu – architektura aplikacji
 
-Dokument dla architekta projektu. Opisuje, z czego składa się aplikacja, jak płyną dane, jakie zasady obowiązują w kodzie i gdzie są znane luki. Stan na 03.11.2026 (commit `10ab74c`).
+Dokument dla architekta projektu. Opisuje, z czego składa się aplikacja, jak płyną dane, jakie zasady obowiązują w kodzie i gdzie są znane luki. Stan na 03.11.2026, po usunięciu klasycznego silnika „1 z 10”.
 
 Powiązane dokumenty:
 - `docs/Dokumentacja_postepow_prac.md` – co i kiedy zrobiono, zasady gry, problemy,
@@ -57,14 +57,14 @@ flowchart TB
         Hooks["src/hooks/ – klej React ↔ logika"]
     end
     subgraph App["Warstwa aplikacji (czysty TS, stan + czas)"]
-        Ctrl["Sterowniki: SoloController, PotatoController"]
-        Narr["Lektor: NarrationDirector, PotatoNarrator"]
+        Ctrl["Sterownik: PotatoController"]
+        Narr["Lektor: PotatoNarrator"]
         Voice["VoiceAnswerSession"]
         Stores["Magazyny: QuestionSetStore, ApiKeyStore, VolumeStore"]
         CatFlow["createQuestionSet, transferQuestionSet, openaiGenerator"]
     end
     subgraph Domain["Domena (czyste funkcje, bez czasu, bez I/O)"]
-        Engine["engine.ts / potato/engine.ts – reduce(stan, akcja)"]
+        Engine["potato/engine.ts – reducePotato(stan, akcja)"]
         Rules["rules.ts, types.ts"]
         Bots["bots/ – profile i decyzje"]
         Ans["answers.ts, choices.ts, questions.ts, rng.ts"]
@@ -84,7 +84,7 @@ flowchart TB
 ```
 
 Reguły:
-1. **Domena** (`src/game/` bez `controller/`) nie zna czasu, React, logów ani urządzenia. `reduce` jest czystą funkcją: zwraca nowy stan, nie modyfikuje starego, nie loguje. Losowość przychodzi z zewnątrz (`Rng` z ziarnem albo – w silniku „Gorący Ziemniak” – gotowe decyzje w akcji).
+1. **Domena** (`src/game/` bez `potato/controller/`) nie zna czasu, React, logów ani urządzenia. `reducePotato` jest czystą funkcją: zwraca nowy stan, nie modyfikuje starego, nie loguje. Losowość przychodzi z zewnątrz (gotowe decyzje w akcji, a tasowanie talii przez `Rng` z ziarnem przy tworzeniu gry).
 2. **Warstwa aplikacji** dokłada czas i reżyserię. Zależności od świata przychodzą przez interfejsy: `Clock`, `Voice`, `Recognizer`, `TextStorage`, `SecretStorage`, `FetchLike`. W testach podstawiane są atrapy z folderów `testing/`.
 3. **Adaptery urządzenia** są cienkie i jako jedyne importują moduły natywne. Tworzone są w hookach albo w plikach-singletonach (`questionSets.ts`, `apiKey.ts`, `volume.ts`).
 4. **UI** tylko wyświetla „widok” sterownika i przekazuje mu ruchy gracza. Nie zawiera reguł gry.
@@ -103,15 +103,14 @@ src/
     solo/index.tsx        wybór poziomu trudności
     solo/game.tsx         rozgrywka
   components/             home/, solo/, potato/, categories/, settings/
-  hooks/                  useSoloController, usePotatoController, useNarration,
+  hooks/                  usePotatoController,
                           useVoiceAnswer, useQuestionSets, useApiKey, useMenuMusic, useKeyboardHeight
   game/                   domena + sterowniki
-    types.ts rules.ts engine.ts solo.ts answers.ts choices.ts questions.ts rng.ts simulate.ts
+    types.ts rules.ts clock.ts answers.ts choices.ts questions.ts rng.ts
     bots/                 profiles.ts (8 postaci), brain.ts (decyzje)
-    controller/           SoloController.ts (czas, boty, pauzy), hostLine.ts (teksty prowadzącego)
     potato/               engine.ts, solo.ts, bots.ts, texts.ts, controller/PotatoController.ts
     testing/              wspólne fikstury testów
-  narration/              NarrationDirector, PotatoNarrator, sherpaVoice, pronunciation,
+  narration/              voice (interfejs), PotatoNarrator, sherpaVoice, pronunciation,
                           questionIntonation, modelAsset; testing/FakeVoice
   speech/                 VoiceAnswerSession, spokenAnswer, expoRecognizer; testing/FakeRecognizer
   categories/             QuestionSetStore, createQuestionSet, openaiGenerator, generatedQuestions,
@@ -148,28 +147,26 @@ Parametry przechodzą przez URL (`difficulty`, `set`). Stan współdzielony mię
 
 ## 6. Domena gry
 
-### 6.1. Dwa silniki
+### 6.1. Silnik
 
-W kodzie są dwa niezależne zestawy zasad. Oba mają ten sam kształt: czysty `stan + akcja → nowy stan`.
+Zasady „Gorącego Ziemniaka” (PDF „Quiz Frenzy”) to czysty `stan + akcja → nowy stan`.
 
-| | Klasyczny („1 z 10”) | „Gorący Ziemniak” (PDF „Quiz Frenzy”) |
-|---|---|---|
-| Silnik | `game/engine.ts` – `createGame`, `reduce` | `game/potato/engine.ts` – `createPotatoGame`, `reducePotato` |
-| Fazy | `stage1` → `stage2` → `final` → `finished` | `round1` (ziemniak, 3 życia) → `round2` (bomba z mnożnikiem, osłona) → `sprint` (60 s) → `duel` (finał) → `finished` |
-| Akcje | `answer`, `buzz`, `noBuzz`, `pick` | `start`, `answer` (z polem `next`), `blindPass`, `tick` |
-| Losowość | `Rng` przekazany przy tworzeniu (tasowanie, miejsce startowe) | żadnej – decyzje losowe podaje sterownik w akcji |
-| Stan oczekiwania | `pending` (`answer` / `buzz` / `pick` / `none`) | `holderId` + `question` |
-| Zdarzenia | lista `events` (pod animacje i lektora) | brak listy; sterownik porównuje stany |
-| Sterownik | `SoloController` | `PotatoController` |
-| Lektor | `NarrationDirector` + `hostLine.ts` | `PotatoNarrator` + `potato/texts.ts` |
-| Ekran | `components/solo/SoloGame.tsx` | `components/potato/PotatoGame.tsx` |
-| Podpięty do trasy | **nie** (patrz rozdz. 13) | **tak** – `solo/game.tsx` |
+| | |
+|---|---|
+| Silnik | `game/potato/engine.ts` – `createPotatoGame`, `reducePotato` |
+| Fazy | `round1` (ziemniak, 3 życia) → `round2` (bomba z mnożnikiem, osłona) → `sprint` (60 s) → `duel` (finał) → `finished` |
+| Akcje | `start`, `answer` (z polem `next`), `blindPass`, `tick` |
+| Losowość | w silniku żadnej – decyzje losowe podaje sterownik w akcji; talię tasuje `createPotatoSoloGame` |
+| Stan oczekiwania | `holderId` + `question` |
+| Sterownik | `PotatoController` |
+| Lektor | `PotatoNarrator` + `potato/texts.ts` |
+| Ekran | `components/potato/PotatoGame.tsx` (trasa `solo/game.tsx`) |
 
-Wspólne elementy obu silników: `types.ts` (`Question`, `Difficulty`), `answers.ts`, `choices.ts`, `bots/`, `rules.ts` (`DIFFICULTY_PRESETS`), `HUMAN_ID` z `solo.ts`. Komponenty `Podium`, `QuestionCard`, `AnswerPanel`, `Host`, `TimerBar` z `components/solo/` są używane przez oba ekrany; `PotatoGame` mapuje swojego gracza na `PlayerState` (`toPodium`).
+Komponenty `Podium`, `QuestionCard`, `AnswerPanel`, `Host`, `TimerBar` są w `components/solo/`; `PotatoGame` mapuje swojego gracza na `PlayerState` (`toPodium`). Klasyczny silnik „1 z 10” został usunięty 03.11.2026; jego kod jest w historii gita.
 
 ### 6.2. Parametry
 
-Wszystkie liczby klasycznych zasad są w `game/rules.ts` (`DEFAULT_RULES`: szanse, pula finału, punkty, czasy, `maxQuestionsWithoutHuman`). Poziomy trudności (`DIFFICULTY_PRESETS`) zmieniają wiedzę i szybkość botów, ich „strategiczność”, format odpowiedzi gracza (`choice` dla Łatwy/Normalny, `text` dla Ekspert) i czas na odpowiedź. Zasady „Gorącego Ziemniaka” są w stałej `POTATO` w `potato/engine.ts`.
+Zasady są w stałej `POTATO` w `potato/engine.ts`. Poziomy trudności (`DIFFICULTY_PRESETS` w `game/rules.ts`) zmieniają wiedzę i szybkość botów, format odpowiedzi gracza (`choice` dla Łatwy/Normalny, `text` dla Ekspert) i czas na odpowiedź.
 
 ### 6.3. Pytania i odpowiedzi
 
@@ -181,42 +178,37 @@ Wszystkie liczby klasycznych zasad są w `game/rules.ts` (`DEFAULT_RULES`: szans
 
 ### 6.4. Boty
 
-`bots/profiles.ts` – 8 postaci z wiedzą bazową, mocnymi/słabymi dziedzinami, czasami reakcji, skłonnością do zgłaszania się i osobowością (drapieżnik, taktyk, mściciel, chaotyk). `bots/brain.ts` – czyste decyzje: szansa trafienia (`correctChance`), pomyłka tego samego typu (`wrongAnswer`), zgłoszenie, opóźnienie, wybór celu (`decideTarget`). `potato/bots.ts` – prostszy wybór celu dla „Gorącego Ziemniaka”. Boty nie są w silniku; wywołuje je sterownik.
+`bots/profiles.ts` – 8 postaci z płcią (pula skórek), wiedzą bazową i mocnymi/słabymi dziedzinami. `bots/brain.ts` – czyste decyzje: szansa trafienia (`correctChance`), pomyłka tego samego typu (`wrongAnswer`), odpowiedź i jej opóźnienie (`decideAnswer`). `potato/bots.ts` – wybór celu (`pickTarget`: lider 60%, najsłabszy 40%). Boty nie są w silniku; wywołuje je sterownik.
 
-### 6.5. Symulator
+## 7. Sterownik (czas rzeczywisty)
 
-`game/simulate.ts` rozgrywa całą klasyczną grę bez czasu (boty + „przeciętny gracz” jako człowiek). Używany w testach balansu (tysiące gier z ziarnami) oraz przez `SoloController` do „Pomiń do wyników”.
-
-## 7. Sterowniki (czas rzeczywisty)
-
-Sterownik to obiekt z zewnętrznym magazynem stanu („widokiem”), zgodny z `useSyncExternalStore`:
+`PotatoController` to obiekt z zewnętrznym magazynem stanu („widokiem”), zgodny z `useSyncExternalStore`:
 
 ```
 subscribe(listener) / getView()   → React renderuje widok
-start() / pause()                 → cykl życia (Potato: także unpause(), stop())
+start() / stop()                  → cykl życia ekranu
+pause() / unpause()               → okno „Przerwać grę?”
 submitAnswer(text) / pick(id)     → ruchy gracza
-  Solo: buzz(), skip(), fastForward() („Pomiń do wyników”), setListening(bool)
-  Potato: blindPass(id) („odbicie w ciemno”)
+blindPass(id)                     → „odbicie w ciemno”
 setSpeaking(bool)                 → lektor zgłasza początek/koniec mowy
 ```
 
-Widok (`SoloView`, `PotatoView`) zawiera stan silnika i stan reżyserii: `overlay` (plansza etapu, wynik, zapowiedź „Odpowiada…”, czytanie pytania), `deadline`/`timerMs`, `thinkingId` (który bot „myśli”), `choices` (A–D), `paused`, `speaking`/`listening`. Pochodne pytania UI liczą czyste funkcje (`visibleQuestion`, `narratedQuestion`, `humanTurn`).
+`PotatoView` zawiera stan silnika i stan reżyserii: `overlay` (wynik, plansza rundy, koniec gry), `deadline`/`timerMs`, `thinkingId` (który bot „myśli”), `awaitingPick`, `choices` (A–D), `sprintEndsAt`, `paused`, `speaking`.
 
 Zasady sterownika:
-- **Wstrzykiwany zegar** (`Clock`: `now`, `setTimeout`, `clearTimeout`; produkcyjnie `realClock`). Testy używają fałszywych zegarów Jesta.
-- **Wszystkie zmiany stanu gry idą przez `reduce`.** Sterownik tylko decyduje, *kiedy* i *jaką* akcję wysłać (ruch bota po opóźnieniu, `answer(null)` po upływie czasu).
-- **Pauza zachowuje pozostały czas** zaplanowanych kroków (`Scheduled.dueAt`, `MainStep.armedAt`).
-- **Czekanie na lektora:** pauzy i czytanie pytania trwają co najmniej swój minimalny czas (`Pacing`), potem czekają na `setSpeaking(false)`, najdłużej `MAX_SPEECH_WAIT_MS` (20 s), żeby zawieszony głos nie zablokował gry.
-- **Dotknięcie pomija pauzę** (`skip`), plansza etapu ma blokadę 0,7 s przed przypadkowym zamknięciem.
+- **Wstrzykiwany zegar** (`Clock` z `game/clock.ts`; produkcyjnie `realClock`). Testy używają fałszywych zegarów.
+- **Wszystkie zmiany stanu gry idą przez `reducePotato`.** Sterownik tylko decyduje, *kiedy* i *jaką* akcję wysłać.
+- **Pauza zachowuje pozostały czas** kroku i sprintu (`freezeMain`, `MainStep.armedAt`).
+- **Czekanie na lektora:** kroki startują dopiero po ciszy (`whenReady`). Każdy nowy krok najpierw kasuje poprzedni pasek (`clearMain`), więc w czasie mówienia pasek nie biegnie.
 
-Hooki `useSoloController` / `usePotatoController` tworzą grę z ziarnem `Date.now()` (logowanym, żeby odtworzyć błąd), sterownik i lektora; przy odmontowaniu zatrzymują zegary i zwalniają odtwarzacz.
+Hook `usePotatoController` tworzy grę z ziarnem `Date.now()` (logowanym, żeby odtworzyć błąd), sterownik i lektora; przy odmontowaniu zatrzymuje zegary i zwalnia odtwarzacz.
 
 ## 8. Lektor (synteza mowy na żywo)
 
 ```mermaid
 sequenceDiagram
     participant C as Sterownik
-    participant N as NarrationDirector / PotatoNarrator
+    participant N as PotatoNarrator
     participant V as sherpaVoice (Voice)
     participant S as sherpa-onnx (natywny)
     participant A as expo-audio
@@ -233,10 +225,10 @@ sequenceDiagram
     N->>C: setSpeaking(false)
 ```
 
-- Teksty prowadzącego: `hostLine.ts` (`hostSpeech` – lista zdań) i `potato/texts.ts`.
-- `Voice` to interfejs (`say`, `pause`, `resume`, `stop`, `dispose`). Implementacja `sherpaVoice.ts`, atrapa `testing/FakeVoice.ts`.
+- Teksty prowadzącego: `narrationFor` w `PotatoNarrator.ts` i `potato/texts.ts`.
+- `Voice` (`narration/voice.ts`) to interfejs (`say`, `pause`, `resume`, `stop`, `dispose`). Implementacja `sherpaVoice.ts`, atrapa `testing/FakeVoice.ts`.
 - `pronunciation.ts` – cyfry rzymskie po imieniu → liczebniki. `questionIntonation.ts` – sztuczne podniesienie tonu na końcu pytania (przyspieszenie ostatnich 450 ms).
-- Lektor milczy, gdy mikrofon słucha (`listening`). Muzyka gry cichnie, gdy lektor mówi (`setGameMusicDucked`).
+- Muzyka gry cichnie, gdy lektor mówi (`setGameMusicDucked`).
 - Głośność lektora pochodzi z `VolumeStore`.
 - **Model głosu w buildzie:** `voiceModel/voice.onnx` → `scripts/narration/prepare_voice_model.py` → `voiceModel/vits-piper-pl/` (model + `tokens.txt` + `espeak-ng-data`) → `plugins/withVoiceModel.js` przy `npx expo prebuild` kopiuje go do zasobów Androida pod nazwą folderu ze skrótem SHA-1 zawartości (sherpa-onnx nie odświeża raz skopiowanego modelu). `modelAsset.ts` wybiera folder modelu, który naprawdę jest w APK (nazwa z konfiguracji Expo może nie pasować w development buildzie). Prebuild bez przygotowanego modelu kończy się błędem z instrukcją.
 
@@ -272,18 +264,18 @@ flowchart LR
 ## 12. Przekrojowe zasady
 
 ### 12.1. Logowanie
-`createLogger('<moduł>')` z `src/lib/log.ts`. Poziomy `debug`/`info` dla zwykłego przebiegu, `warn`/`error` widać na ekranie w Expo Go. Logujemy tylko małe wartości (id, liczby), nigdy cały `GameState`. Bufor wpisów i wymienne „sinki” pozwalają testom sprawdzać logi. Silniki nie logują.
+`createLogger('<moduł>')` z `src/lib/log.ts`. Poziomy `debug`/`info` dla zwykłego przebiegu, `warn`/`error` widać na ekranie w Expo Go. Logujemy tylko małe wartości (id, liczby), nigdy cały stan gry. Bufor wpisów i wymienne „sinki” pozwalają testom sprawdzać logi. Silnik nie loguje.
 
 ### 12.2. Wstrzykiwanie zależności
 Każda klasa z efektami ubocznymi dostaje je w konstruktorze (zegar, głos, rozpoznawanie, magazyn, `fetch`, `now`). Produkcyjne instancje składane są w jednym miejscu: hooki gry oraz singletony `categories/questionSets.ts`, `settings/apiKey.ts`, `settings/volume.ts`.
 
 ### 12.3. Odporność
-Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy tworzeniu, mikrofon ukryty. Zawieszony głos – limit 20 s. Błędne dane z sieci i plików są odrzucane pojedynczo przez wspólną walidację.
+Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy tworzeniu, mikrofon ukryty. Błędne dane z sieci i plików są odrzucane pojedynczo przez wspólną walidację.
 
 ### 12.4. Testy
 - Testy w folderach `__tests__` obok kodu (każdy plik tam jest testem), atrapy w `testing/`.
-- Rodzaje: jednostkowe (silniki, boty, odpowiedzi, magazyny), symulacje (balans na wielu ziarnach), testy sterowników na fałszywym zegarze, testy integracyjne (`*integration-test.ts` – te same moduły co aplikacja, tylko adaptery urządzenia podmienione), test wtyczki `withVoiceModel`.
-- Ok. 430 przypadków `it`/`test` w kodzie (582 wykonania wg dokumentacji postępów, z parametryzacją).
+- Rodzaje: jednostkowe (silnik, boty, odpowiedzi, magazyny), testy sterownika na fałszywym zegarze, testy integracyjne (`*integration-test.ts` – te same moduły co aplikacja, tylko adaptery urządzenia podmienione), test wtyczki `withVoiceModel`.
+- 533 testy aplikacji wg `npm test` (z parametryzacją), plus osobne testy `server/`.
 - Przed zakończeniem pracy: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
 
 ### 12.5. Proces dla nowej funkcji
@@ -297,10 +289,10 @@ Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy two
 
 Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 
-1. **Dwa tryby gry, jeden podpięty.** `src/app/solo/game.tsx` renderuje tylko `PotatoGame`. Klasyczny tryb (`SoloGame`, `useSoloController`, `NarrationDirector`) jest w pełni przetestowany, ale nieosiągalny z UI. Trzeba zdecydować: usunąć, zostawić jako drugi tryb (np. w „Dodatki”) czy połączyć wspólne części.
-2. **Wybrana kategoria jest ignorowana w grze.** Trasa dostaje parametr `set`, ale `usePotatoController` zawsze używa `QUESTION_BANK` (baza domyślna). Kategorie z OpenAI i z importu działają tylko w nieużywanym `SoloGame`.
-3. **„Gorący Ziemniak” nie jest opisany w `Dokumentacja_postepow_prac.md`** (jest tylko `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
-4. **Duplikacja silników.** Dwa modele gracza (`PlayerState` i `PotatoPlayer`), dwa sterowniki i dwa lektory z podobną logiką czasu i pauz. `PotatoController` importuje `realClock` z `SoloController` – warto wydzielić wspólny moduł (zegar, harmonogram kroków, czekanie na lektora).
+1. **Zawieszony lektor blokuje grę.** Kroki czekają na `setSpeaking(false)` bez limitu czasu. Odrzucona obietnica jest obsłużona, ale obietnica, która nigdy się nie skończy, zatrzyma rozgrywkę. Limit 20 s był tylko w usuniętym sterowniku.
+2. **Mikrofon nie ucisza lektora.** `PotatoGame` nie przekazuje `onListening` do `AnswerPanel`, a `PotatoController` nie ma `setListening`. Na poziomie Ekspert gracz może włączyć mikrofon w czasie czytania pytania i rozpoznawanie słyszy wtedy lektora. Tak samo było przed usunięciem starego silnika.
+3. **„Gorący Ziemniak” nie ma pełnego opisu w `Dokumentacja_postepow_prac.md`** (rozdziały 3–5 opisują usunięte zasady; aktualne ryzyka są w `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
+4. **Brak symulacji balansu.** Symulator działał tylko na starym silniku i został usunięty; nowych zasad nie sprawdzono na setkach gier pod kątem balansu.
 5. **Klucz OpenAI na telefonie.** Gracz potrzebuje własnego klucza; klucz programisty w APK jest jawny. Docelowo pośrednik po stronie serwera (np. funkcja Supabase).
 6. **Backend tylko jako szkielet, brak multiplayera.** Serwer testowy (`server/`) działa, ale nie ma jeszcze żadnej logiki gry. Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
 7. **Rozmiar modelu głosu** (63 MB) w APK. Rozważana kwantyzacja int8; AAB dla Google Play.
@@ -311,6 +303,5 @@ Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 ## 14. Kierunki rozwoju (z perspektywy architektury)
 
 - **Multiplayer:** przenieść czysty silnik do wspólnego pakietu, serwer wykonuje `reduce`, klient wysyła akcje i odbiera widok. Sterownik klienta zostaje warstwą reżyserii (czas, lektor), ale bez decyzji o stanie.
-- **Wspólne „jądro rozgrywki”:** jeden harmonogram kroków z pauzą i czekaniem na lektora, używany przez oba sterowniki.
 - **Pośrednik AI:** `openaiGenerator` ma już wstrzykiwany `FetchLike` i adres – wystarczy podmienić cel na własny endpoint.
 - **Baza pytań:** przy ~2000 pytań rozważyć ładowanie z serwera lub z pliku per dziedzina zamiast jednego JSON w bundlu; walidacja `parseQuestion` zostaje bramą.

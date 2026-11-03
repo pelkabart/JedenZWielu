@@ -1,5 +1,7 @@
 # Symulator gier
 
+> **Moduł usunięty 03.11.2026** razem z klasycznym silnikiem „1 z 10”. Plik zostaje jako zapis prac; kod jest w historii gita. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduł: `src/game/simulate.ts`
 Testy: `src/game/__tests__/simulate-test.ts`, `src/game/__tests__/controller-test.ts` (przewijanie)
 Logi: `[symulator] Symulacja przekroczyła limit kroków` (`error`). Pojedynczych gier nie logujemy, bo testy rozgrywają ich 900.

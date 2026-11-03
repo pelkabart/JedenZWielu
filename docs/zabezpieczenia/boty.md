@@ -1,5 +1,7 @@
 # Boty
 
+> **Częściowo nieaktualne od 03.11.2026:** punkty o klasycznym silniku „1 z 10” (etapy, zgłaszanie się, osobowości botów, `SoloController`, `NarrationDirector`) opisują usunięty kod. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduły: `src/game/bots/brain.ts`, `src/game/bots/profiles.ts`
 Testy: `src/game/__tests__/bots-test.ts`, `simulate-test.ts`, `integration-test.ts`
 Logi: `[sterownik] Bot odpowie` (czas, czy w ogóle odpowie), `[sterownik] Okno zgłoszeń` (najszybszy bot w finale).

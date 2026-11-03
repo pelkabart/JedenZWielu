@@ -8,7 +8,7 @@ import { createLogger } from '@/lib/log';
 import { volumeStore } from '@/settings/volume';
 
 import { MODEL_FOLDER_PREFIX, pickModelAsset } from './modelAsset';
-import type { Voice } from './NarrationDirector';
+import type { Voice } from './voice';
 import { toSpeakable } from './pronunciation';
 import {
   isQuestion,

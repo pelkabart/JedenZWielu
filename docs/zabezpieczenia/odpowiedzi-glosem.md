@@ -1,5 +1,7 @@
 # Odpowiadanie głosem
 
+> **Częściowo nieaktualne od 03.11.2026:** punkty o klasycznym silniku „1 z 10” (etapy, zgłaszanie się, osobowości botów, `SoloController`, `NarrationDirector`) opisują usunięty kod. Aktualne zasady: [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md).
+
 Moduły: `src/speech/` (`VoiceAnswerSession.ts`, `spokenAnswer.ts`, `expoRecognizer.ts`), `src/hooks/useVoiceAnswer.ts`, `src/components/solo/AnswerPanel.tsx`, `setListening` w `src/game/controller/SoloController.ts`
 Testy: `src/speech/__tests__/spokenAnswer-test.ts`, `src/speech/__tests__/VoiceAnswerSession-test.ts`, `src/speech/__tests__/voice-answer-integration-test.ts`, `src/narration/__tests__/NarrationDirector-test.ts` (mikrofon ucisza lektora), `src/game/__tests__/controller-test.ts` (blok „mikrofon”)
 
