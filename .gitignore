@@ -58,3 +58,9 @@ scripts/narration/.venv/
 scripts/narration/__pycache__/
 # Model przygotowany dla sherpa-onnx (prepare_voice_model.py) — 61 MB, generowany z voice.onnx
 voiceModel/vits-piper-pl/
+
+# Eksperymenty z klonowaniem głosu (dane treningowe, checkpointy, venv) — kilka GB, tylko lokalnie
+voice/
+# Python
+__pycache__/
+*.pyc
