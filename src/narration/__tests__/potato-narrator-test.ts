@@ -1,4 +1,4 @@
-import { PotatoController, type PotatoView } from '@/game/potato/controller/PotatoController';
+import { DEFAULT_POTATO_PACING, PotatoController, type PotatoView } from '@/game/potato/controller/PotatoController';
 import { createPotatoGame, reducePotato, type PotatoState } from '@/game/potato/engine';
 import type { Question } from '@/game/types';
 import { getLogEntries, resetLog } from '@/lib/log';
@@ -83,13 +83,32 @@ describe('co mówi prowadzący', () => {
   });
 
   it('po wyniku mówi o poprawności i poprawnej odpowiedzi', () => {
-    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([
+    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'b1', text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([
       'Brawo, dobrze!',
     ]);
+    // Pochwałę dla człowieka lektor mówi już przy wskazywaniu.
+    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([]);
     expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', text: 'x', correct: false, correctAnswer: 'odp a' } }))).toEqual([
       'Niestety.',
       'Poprawna odpowiedź: odp a.',
     ]);
+  });
+
+  it('przy wskazywaniu najpierw chwali, potem pyta o gracza', () => {
+    expect(narrationFor(view({ awaitingPick: { chooserId: 'h', allowSelf: false } }))).toEqual(['Brawo, dobrze!', 'Komu przekazujesz pytanie?']);
+  });
+
+  it('gdy gracz odpada przed rozstrzygnięciem, nikt nie jest ogłaszany zwycięzcą', () => {
+    const base = started();
+    const game = reducePotato({ ...base, players: base.players.map((p) => (p.id === 'h' ? { ...p, eliminated: true, eliminatedAt: 1 } : p)) }, { type: 'endEarly' });
+    expect(narrationFor(view({ game, overlay: { kind: 'finished' } }))).toEqual(['Odpadasz!', 'Koniec gry.']);
+  });
+
+  it('po rozstrzygniętej grze ogłasza zwycięzcę, także gdy gracz przegrał finał', () => {
+    const base = started();
+    const others = base.players.map((p) => (p.id === 'b1' ? p : { ...p, eliminated: true, eliminatedAt: 1 }));
+    const game = { ...base, phase: 'finished' as const, holderId: null, question: null, players: others, ranking: ['b1', 'h', 'b2', 'b3', 'b4'] };
+    expect(narrationFor(view({ game, overlay: { kind: 'finished' } }))).toEqual(['Koniec gry!', 'Wygrywa Bot 1.']);
   });
 
   it('przy zmianie rundy czyta tytuł i zasady', () => {
@@ -133,6 +152,30 @@ describe('lektor z kontrolerem', () => {
     await flush();
     expect(controller.getView().deadline).toBe(3000 + 5000);
     expect(controller.getView().timerMs).toBe(5000);
+    narrator.dispose();
+  });
+
+  it('po poprawnej odpowiedzi najpierw pochwała, potem wskazanie, bez powtórki', async () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    voice.finish();
+    await flush();
+
+    controller.submitAnswer('odp a');
+    expect(voice.utterances().at(-1)).toEqual(['Brawo, dobrze!', 'Komu przekazujesz pytanie?']);
+    voice.finish();
+    await flush();
+
+    const before = voice.utterances().length;
+    controller.pick('b1');
+    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', correct: true });
+    // Po wskazaniu lektor milczy: nie chwali drugi raz i nie powtarza pytania o gracza.
+    expect(voice.utterances()).toHaveLength(before);
+    timers.advance(DEFAULT_POTATO_PACING.revealMs);
+    expect(voice.utterances().at(-1)).toEqual(['Odpowiada: Bot 1.', 'pytanie b']);
     narrator.dispose();
   });
 

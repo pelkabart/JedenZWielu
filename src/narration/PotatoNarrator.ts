@@ -1,5 +1,6 @@
 import { createLogger } from '@/lib/log';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
+import { endedEarly } from '@/game/potato/engine';
 import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 
 import type { Voice } from './voice';
@@ -18,13 +19,17 @@ export function narrationFor(view: PotatoView): string[] {
   const { overlay, awaitingPick, game } = view;
   const name = (id: string | null) => game.players.find((p) => p.id === id)?.name ?? '';
   if (overlay?.kind === 'finished') {
+    if (endedEarly(game)) return ['Odpadasz!', 'Koniec gry.'];
     return ['Koniec gry!', `Wygrywa ${name(game.ranking?.[0] ?? null)}.`];
   }
   if (overlay?.kind === 'round') return [PHASE_TITLE[overlay.phase], PHASE_RULE[overlay.phase]];
   if (overlay?.kind === 'reveal') {
-    return overlay.correct ? ['Brawo, dobrze!'] : ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
+    if (!overlay.correct) return ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
+    // Człowieka pochwalił już przy wskazywaniu.
+    const byHuman = game.players.some((p) => p.id === overlay.playerId && p.isHuman);
+    return byHuman ? [] : ['Brawo, dobrze!'];
   }
-  if (awaitingPick) return ['Komu przekazujesz pytanie?'];
+  if (awaitingPick) return ['Brawo, dobrze!', 'Komu przekazujesz pytanie?'];
   if (overlay !== null || game.question === null || game.holderId === null) return [];
   const holder = game.players.find((p) => p.id === game.holderId);
   const who = holder?.isHuman ? 'Odpowiadasz Ty!' : `Odpowiada: ${holder?.name ?? ''}.`;

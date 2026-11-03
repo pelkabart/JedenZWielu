@@ -166,6 +166,60 @@ describe('błąd, po którym gracz odpada', () => {
   });
 });
 
+describe('odpadnięcie człowieka kończy grę', () => {
+  const withHuman = (patch: Partial<PotatoState['players'][number]>, game: Partial<PotatoState> = {}) => {
+    const base = started('h', game);
+    return { ...base, players: base.players.map((p) => (p.id === 'h' ? { ...p, ...patch } : p)) };
+  };
+  const out = (id: string) => (p: PotatoState['players'][number]) => (p.id === id ? { ...p, eliminated: true, eliminatedAt: 1, lives: 0, shield: 0 } : p);
+
+  it.each([
+    ['runda 1', withHuman({ lives: 1 })],
+    ['runda 2', withHuman({ shield: 1 }, { phase: 'round2' })],
+    ['finał, gdy gra jeszcze dwóch rywali', withHuman({ lives: 1 }, { phase: 'duel', eliminations: 1, players: started().players.map(out('b1')).map(out('b2')) })],
+  ])('%s: najpierw wynik, potem od razu wyniki gry, bez nowych zegarów', (_name, game) => {
+    const { controller, advance } = setup(game);
+    controller.start();
+    controller.submitAnswer(BAD);
+    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', playerId: 'h', correct: false });
+    advance(REVEAL);
+    const view = controller.getView();
+    expect(view.overlay).toEqual({ kind: 'finished' });
+    expect(view.game.phase).toBe('finished');
+    expect(view.game.ranking).toHaveLength(PLAYERS.length);
+    // Człowiek zaraz za aktywnymi, a przed tymi, którzy odpadli wcześniej.
+    expect(view.game.ranking?.indexOf('h')).toBe(activePlayers(view.game).length);
+    expect(view.thinkingId).toBeNull();
+    const after = view.game;
+    advance(120_000);
+    expect(controller.getView().game).toBe(after);
+  });
+
+  it('odpadnięcie, po którym zaczynałby się sprint, nie uruchamia zegara sprintu', () => {
+    const players = started().players.map(out('b1'));
+    const game = withHuman({ shield: 1 }, { phase: 'round2', players });
+    const { controller, advance } = setup(game);
+    controller.start();
+    controller.submitAnswer(BAD);
+    advance(REVEAL);
+    const view = controller.getView();
+    expect(view.overlay).toEqual({ kind: 'finished' });
+    expect(view.sprintEndsAt).toBeNull();
+    advance(120_000);
+    expect(controller.getView().game).toBe(view.game);
+  });
+
+  it('odpadnięcie bota nie kończy gry', () => {
+    const base = started('b1');
+    const game = { ...base, players: base.players.map((p) => (p.id === 'b1' ? { ...p, lives: 1 } : p)) };
+    const { controller, advance } = setup(game);
+    controller.start();
+    for (let t = 0; t < 20_000 && !player(controller.getView().game, 'b1').eliminated && controller.getView().game.holderId === 'b1'; t += 100) advance(100);
+    advance(REVEAL);
+    expect(controller.getView().overlay?.kind).not.toBe('finished');
+  });
+});
+
 describe('tury botów', () => {
   it('bot myśli i odpowiada przed czasem gracza', () => {
     const { controller, advance } = setup(started('b1'));

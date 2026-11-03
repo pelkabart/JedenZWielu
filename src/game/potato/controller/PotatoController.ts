@@ -323,23 +323,29 @@ export class PotatoController {
     const before = this.view.game;
     const question = before.question!;
     const correct = text !== null && isCorrectAnswer(text, question.answers);
-    if (!this.apply({ type: 'answer', playerId, text, next })) {
-      this.takeTurn();
-      return;
-    }
-    log.debug('Odpowiedź', { playerId, correct, next });
-    this.pendingAnswer = null;
-    this.update({
+    // Stan gry i wynik zmieniają się razem: lektor nie może zobaczyć nowego stanu bez wyniku.
+    const reveal: Partial<PotatoView> = {
       overlay: { kind: 'reveal', playerId, text, correct, correctAnswer: question.answers[0] },
       awaitingPick: null,
       thinkingId: null,
       deadline: null,
       timerMs: null,
-    });
+    };
+    if (!this.apply({ type: 'answer', playerId, text, next }, reveal)) {
+      this.takeTurn();
+      return;
+    }
+    log.debug('Odpowiedź', { playerId, correct, next });
+    this.pendingAnswer = null;
     this.schedule(this.pacing.revealMs, () => this.afterReveal(before.phase));
   }
 
   private afterReveal(previousPhase: PotatoPhase) {
+    // Bez człowieka nie ma po co grać dalej: od razu wyniki.
+    if (this.view.game.phase !== 'finished' && this.view.game.players.some((p) => p.isHuman && p.eliminated)) {
+      log.info('Gracz odpadł, koniec gry', { phase: this.view.game.phase });
+      this.apply({ type: 'endEarly' });
+    }
     const game = this.view.game;
     if (game.phase === 'finished') {
       this.update({ overlay: { kind: 'finished' } });
@@ -404,11 +410,11 @@ export class PotatoController {
   // ---------- pomocnicze ----------
 
   /** Stosuje akcję silnika. Błąd zasad nie psuje stanu (silnik zwraca nowy obiekt albo rzuca). */
-  private apply(action: Parameters<typeof reducePotato>[1]): boolean {
+  private apply(action: Parameters<typeof reducePotato>[1], patch: Partial<PotatoView> = {}): boolean {
     const before = this.view.game;
     try {
       const next = reducePotato(before, action);
-      this.setGame(next, before.phase);
+      this.setGame(next, before.phase, patch);
       return true;
     } catch (error) {
       if (error instanceof PotatoRuleError) {
@@ -419,8 +425,8 @@ export class PotatoController {
     }
   }
 
-  private setGame(game: PotatoState, previousPhase: PotatoPhase) {
-    this.update({ game });
+  private setGame(game: PotatoState, previousPhase: PotatoPhase, patch: Partial<PotatoView>) {
+    this.update({ game, ...patch });
     if (game.phase === 'sprint' && previousPhase !== 'sprint') this.startSprintClock();
     if (game.phase !== 'sprint') this.clearSprintTimer();
     this.update({ sprintEndsAt: game.phase === 'sprint' ? this.clock.now() + game.sprintMsLeft : null });

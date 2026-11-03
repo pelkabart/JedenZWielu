@@ -50,7 +50,7 @@ Spis treści:
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 533 (+ 19 w `server/`) |
+| Razem testów automatycznych | 547 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -256,15 +256,15 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 |---|---|---|
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
-| `potato/__tests__/potato-test.ts` | 25 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking |
+| `potato/__tests__/potato-test.ts` | 27 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking |
 | `bots-test.ts` | 20 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
-| `potato/__tests__/controller-test.ts` | 24 | sterownik na udawanym zegarze: tury, wskazania, sprint, pauza, czekanie na lektora, pasek czasu, odpadający gracz |
+| `potato/__tests__/controller-test.ts` | 29 | sterownik na udawanym zegarze: tury, wskazania, sprint, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `integration-test.ts` | 11 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry |
+| `integration-test.ts` | 14 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry |
 | `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
-| `narration/__tests__/potato-narrator-test.ts` | 10 | lektor: kiedy mówi, przerywanie kwestii, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
+| `narration/__tests__/potato-narrator-test.ts` | 14 | lektor: kiedy mówi, przerywanie kwestii, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
 | `narration/__tests__/narration-integration-test.ts` | 10 | testy integracyjne lektora: całe gry na prawdziwej bazie, intonacja pytająca, brak paska w czasie mówienia, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
@@ -291,7 +291,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **533** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **547** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
@@ -301,7 +301,7 @@ Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
 Testy jednostkowe sprawdzają moduły osobno, często na uproszczonych danych. Testy integracyjne (`src/game/__tests__/integration-test.ts`) składają aplikację tak samo jak ekran gry (`usePotatoController`): prawdziwą bazę pytań, `createPotatoSoloGame` z losowym miejscem gracza, prawdziwe profile botów, sterownik, silnik i logi. Test prowadzi grę jak gracz na telefonie, na udawanym zegarze. Sprawdzamy:
 
 - czy pełna gra kończy się poprawnie na każdym poziomie i nie zostają uruchomione liczniki,
-- czy gracz, który nie odpowiada, odpada, a boty kończą grę same,
+- czy gracz, który nie odpowiada, odpada i od razu widzi wyniki,
 - czy to samo ziarno daje identyczny przebieg całej gry, a różne ziarna inną kolejność pytań,
 - czy logi zgadzają się z grą: kolejność rund, brak ostrzeżeń i błędów w całej grze,
 - podwójne zatwierdzenie, odbicie w ciemno oraz pauzę z pozostałym czasem.
@@ -571,6 +571,12 @@ Po błędzie ostatnią szansą `chooseNext` mógł wylosować tego samego gracza
 
 **7.55. Usunięcie klasycznego silnika**
 Klasyczny tryb „1 z 10” (`engine.ts`, `SoloController`, `NarrationDirector`, `simulate.ts`, `SoloGame`) nie był dostępny z żadnego ekranu, a testy przechodziły na nim dalej, chociaż gra działała na czymś innym. Przez to nie wykryły 7.52 i 7.54. Usunęliśmy go, a testy integracyjne (gra, lektor, odpowiedzi głosem, kategorie, skórki) przenieśliśmy na `PotatoController`. Liczba testów spadła z 659 do 533, bo zniknęły testy usuniętego kodu. Przy przenoszeniu wyszły dwie luki nowego sterownika: brak limitu czasu na zawieszonego lektora i brak wyciszania lektora, gdy słucha mikrofon. Opis jest w `docs/ARCHITEKTURA.md`, rozdział 13. Talia jest też teraz tasowana (wcześniej każda gra szła po pytaniach w tej samej kolejności).
+
+**7.56. Prowadzący najpierw kazał wskazywać, a dopiero potem chwalił**
+Po poprawnej odpowiedzi padało „Komu przekazujesz pytanie?”, a „Brawo, dobrze!” dopiero po wskazaniu. Teraz obie kwestie padają w tej kolejności przed wskazaniem, a po nim lektor milczy. Przy okazji wyszło, że `commit` zmieniał stan gry przed nałożeniem wyniku, przez co lektor na chwilę zaczynał kwestię od nowa. Stan i wynik zmieniają się teraz w jednej aktualizacji widoku.
+
+**7.57. Gra toczyła się dalej po odpadnięciu gracza**
+Gracz, który odpadł, musiał oglądać, jak boty grają dalej (zgłoszone z trzeciego etapu). Po pokazaniu wyniku gra kończy się od razu (akcja `endEarly`) i pojawiają się wyniki. Pozostałe boty nie grają już między sobą, więc nie ma zwycięzcy: są układane wg stanu gry, a ekran i lektor mówią „Odpadasz”.
 
 ## 8. Dalsze plany
 

@@ -8,7 +8,6 @@ import { questionSetStore } from '@/categories/questionSets';
 import { soloEntryRoute } from '@/categories/soloEntry';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
-import { MusicToggle } from '@/components/home/MusicToggle';
 import { PlayerAvatar } from '@/components/home/PlayerAvatar';
 import { colors } from '@/constants/theme';
 import { useQuestionSets } from '@/hooks/useQuestionSets';
@@ -42,7 +41,6 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
       <CartoonBackground />
-      <MusicToggle />
 
       <Pressable
         accessibilityRole="button"

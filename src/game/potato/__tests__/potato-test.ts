@@ -1,6 +1,6 @@
 import type { Question } from '../../types';
 import { pickTarget } from '../bots';
-import { activePlayers, createPotatoGame, POTATO, PotatoRuleError, reducePotato, type PotatoState } from '../engine';
+import { activePlayers, createPotatoGame, endedEarly, POTATO, PotatoRuleError, reducePotato, type PotatoState } from '../engine';
 
 const OK = 'ok';
 const BAD = 'zle';
@@ -29,6 +29,39 @@ function withPlayers(state: PotatoState, patch: Record<string, Partial<PotatoSta
 function player(state: PotatoState, id: string) {
   return state.players.find((p) => p.id === id)!;
 }
+
+describe('endEarly', () => {
+  it('kończy grę: aktywni wg stanu gry, potem odpadli od ostatniego', () => {
+    const base = reducePotato(createPotatoGame({ players: PLAYERS, deck: DECK }), { type: 'start', holderId: PLAYERS[1].id });
+    const [a, b, c, d, e] = PLAYERS.map((p) => p.id);
+    const state: PotatoState = {
+      ...base,
+      phase: 'round2',
+      eliminations: 2,
+      players: base.players.map((p) => {
+        if (p.id === a) return { ...p, eliminated: true, eliminatedAt: 1, shield: 0 };
+        if (p.id === b) return { ...p, eliminated: true, eliminatedAt: 2, shield: 0 };
+        if (p.id === c) return { ...p, shield: 1 };
+        if (p.id === d) return { ...p, shield: 3 };
+        return { ...p, shield: 2 };
+      }),
+    };
+    const finished = reducePotato(state, { type: 'endEarly' });
+    expect(finished.phase).toBe('finished');
+    expect(finished.holderId).toBeNull();
+    expect(finished.question).toBeNull();
+    expect(finished.ranking).toEqual([d, e, c, b, a]);
+    expect(endedEarly(finished)).toBe(true);
+    expect(endedEarly(state)).toBe(false);
+  });
+
+  it('remis rozstrzygają mniej błędów, a potem miejsce', () => {
+    const base = reducePotato(createPotatoGame({ players: PLAYERS, deck: DECK }), { type: 'start', holderId: PLAYERS[1].id });
+    const ids = PLAYERS.map((p) => p.id);
+    const state: PotatoState = { ...base, players: base.players.map((p) => (p.id === ids[0] ? { ...p, errors: 2 } : p)) };
+    expect(reducePotato(state, { type: 'endEarly' }).ranking).toEqual([ids[1], ids[2], ids[3], ids[4], ids[0]]);
+  });
+});
 
 describe('tworzenie gry', () => {
   it('odrzuca za mało graczy, zduplikowane id i brak pytań', () => {

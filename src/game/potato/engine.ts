@@ -63,7 +63,9 @@ export type PotatoAction =
   /** Odbicie w ciemno (runda 1, raz na gracza): przekazanie bez pytania i bez utraty życia. */
   | { type: 'blindPass'; playerId: string; targetId: string }
   /** Upływ czasu (sprint). */
-  | { type: 'tick'; ms: number };
+  | { type: 'tick'; ms: number }
+  /** Koniec gry przed rozstrzygnięciem (w grze solo: odpadł człowiek). */
+  | { type: 'endEarly' };
 
 export interface PotatoSetup {
   players: { id: string; name: string; isHuman: boolean; botId?: string }[];
@@ -118,6 +120,9 @@ export function reducePotato(state: PotatoState, action: PotatoAction): PotatoSt
     case 'tick':
       tick(s, action.ms);
       break;
+    case 'endEarly':
+      finish(s);
+      break;
   }
   return s;
 }
@@ -133,6 +138,11 @@ export function resourceOf(state: PotatoState, player: PotatoPlayer): number {
   if (state.phase === 'round2') return player.shield;
   if (state.phase === 'sprint') return player.points;
   return player.lives;
+}
+
+/** Gra skończona, choć zostało kilku aktywnych graczy, więc nikt jej nie wygrał. */
+export function endedEarly(state: PotatoState): boolean {
+  return state.phase === 'finished' && activePlayers(state).length > 1;
 }
 
 /** Czy błąd tego gracza oznacza odpadnięcie (ostatnia szansa albo osłona nie wyższa niż mnożnik). Sprint nikogo nie eliminuje. */
@@ -276,16 +286,17 @@ function tick(s: PotatoState, ms: number) {
 }
 
 function finish(s: PotatoState) {
-  s.phase = 'finished';
-  s.question = null;
-  s.holderId = null;
-  // Najpierw zostający (zwycięzca), potem odpadający w odwrotnej kolejności odpadania.
+  // Najpierw zostający wg stanu gry (zasób zależy od rundy, więc liczony przed jej zmianą), potem odpadający od ostatniego.
   s.ranking = [...s.players]
     .sort((a, b) => {
       if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-      return (b.eliminatedAt ?? 0) - (a.eliminatedAt ?? 0) || a.seat - b.seat;
+      if (a.eliminated) return (b.eliminatedAt ?? 0) - (a.eliminatedAt ?? 0) || a.seat - b.seat;
+      return resourceOf(s, b) - resourceOf(s, a) || b.points - a.points || a.errors - b.errors || a.seat - b.seat;
     })
     .map((p) => p.id);
+  s.phase = 'finished';
+  s.question = null;
+  s.holderId = null;
 }
 
 // ---------- pomocnicze ----------

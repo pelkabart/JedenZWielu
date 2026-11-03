@@ -155,7 +155,7 @@ Zasady „Gorącego Ziemniaka” (PDF „Quiz Frenzy”) to czysty `stan + akcja
 |---|---|
 | Silnik | `game/potato/engine.ts` – `createPotatoGame`, `reducePotato` |
 | Fazy | `round1` (ziemniak, 3 życia) → `round2` (bomba z mnożnikiem, osłona) → `sprint` (60 s) → `duel` (finał) → `finished` |
-| Akcje | `start`, `answer` (z polem `next`), `blindPass`, `tick` |
+| Akcje | `start`, `answer` (z polem `next`), `blindPass`, `tick`, `endEarly` (odpadł człowiek) |
 | Losowość | w silniku żadnej – decyzje losowe podaje sterownik w akcji; talię tasuje `createPotatoSoloGame` |
 | Stan oczekiwania | `holderId` + `question` |
 | Sterownik | `PotatoController` |
@@ -275,7 +275,7 @@ Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy two
 ### 12.4. Testy
 - Testy w folderach `__tests__` obok kodu (każdy plik tam jest testem), atrapy w `testing/`.
 - Rodzaje: jednostkowe (silnik, boty, odpowiedzi, magazyny), testy sterownika na fałszywym zegarze, testy integracyjne (`*integration-test.ts` – te same moduły co aplikacja, tylko adaptery urządzenia podmienione), test wtyczki `withVoiceModel`.
-- 533 testy aplikacji wg `npm test` (z parametryzacją), plus osobne testy `server/`.
+- 547 testów aplikacji wg `npm test` (z parametryzacją), plus osobne testy `server/`.
 - Przed zakończeniem pracy: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
 
 ### 12.5. Proces dla nowej funkcji

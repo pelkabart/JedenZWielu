@@ -132,3 +132,23 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** bez tasowania każda gra zaczyna od tych samych pytań.
 - **Zabezpieczenie:** `createPotatoSoloGame` tasuje talię generatorem gry, więc kolejność da się odtworzyć z ziarna.
 - **Test:** `game/__tests__/integration-test.ts` › „każda gra tasuje talię…”, „to samo ziarno daje identyczny przebieg całej gry”.
+
+### 25. Prowadzący każe wskazywać, zanim powie, że odpowiedź była dobra
+- **Ryzyko:** gracz słyszy „Komu przekazujesz pytanie?”, a pochwałę dopiero po wskazaniu. To się naprawdę zdarzyło (dokumentacja postępów, 7.56).
+- **Zabezpieczenie:** przy wskazaniu lektor mówi „Brawo, dobrze!”, a potem pyta o gracza; wynik po wskazaniu jest już bez głosu.
+- **Test:** `potato-narrator-test.ts` › „po poprawnej odpowiedzi najpierw pochwała, potem wskazanie, bez powtórki”.
+
+### 26. Lektor powtarza kwestię w chwili zmiany stanu gry
+- **Ryzyko:** `commit` zmieniał stan gry, a wynik nakładał dopiero w kolejnej aktualizacji. Lektor widział nowy stan bez wyniku i zaczynał kwestię od nowa, a przy wyniku bez głosu nic by jej nie przerwało.
+- **Zabezpieczenie:** stan gry i wynik zmieniają się w jednej aktualizacji widoku (`apply` z `patch`).
+- **Test:** `potato-narrator-test.ts` › „po poprawnej odpowiedzi najpierw pochwała, potem wskazanie, bez powtórki”.
+
+### 27. Gra toczy się dalej po odpadnięciu człowieka
+- **Ryzyko:** gracz patrzy, jak boty grają bez niego (także cały sprint i finał). To się naprawdę zdarzyło (dokumentacja postępów, 7.57).
+- **Zabezpieczenie:** po pokazaniu wyniku sterownik wysyła akcję `endEarly`, a ekran przechodzi do wyników. Zatrzymują się wszystkie zegary, także sprintu.
+- **Test:** `controller-test.ts` › „odpadnięcie człowieka kończy grę”; `game/__tests__/integration-test.ts` › „gracz, który nie odpowiada, odpada i od razu widzi wyniki”.
+
+### 28. Ranking gry przerwanej przed rozstrzygnięciem
+- **Ryzyko:** kilku graczy nadal gra, więc kolejność byłaby przypadkowa, a lektor ogłosiłby zwycięzcę, którego nie ma.
+- **Zabezpieczenie:** aktywni gracze są układani wg stanu gry (zasób rundy, punkty, mniej błędów, miejsce). Lektor mówi „Odpadasz” zamiast „Wygrywa”, a ekran wyników zaznacza, że kolejność to stan z chwili odpadnięcia.
+- **Test:** `potato-test.ts` › „endEarly”; `potato-narrator-test.ts` › „gdy gracz odpada przed rozstrzygnięciem…”.

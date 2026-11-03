@@ -80,11 +80,15 @@ describe('pełna gra na prawdziwej bazie i botach', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it('gracz, który nie odpowiada, odpada, a boty kończą grę same', () => {
-    const view = playUntilFinished(newController(5), 'silent');
+  it.each([5, 6, 7, 8])('gracz, który nie odpowiada, odpada i od razu widzi wyniki (ziarno %i)', (seed) => {
+    const view = playUntilFinished(newController(seed), 'silent');
     expect(human(view).eliminated).toBe(true);
+    expect(view.game.ranking).toHaveLength(5);
     expect(view.game.ranking?.[0]).not.toBe(HUMAN_ID);
+    // Gra nie jest rozegrana do końca: nie ma ostatniego gracza, są jeszcze aktywne boty.
+    expect(activePlayers(view.game).length).toBeGreaterThan(1);
     expect(jest.getTimerCount()).toBe(0);
+    expect(getLogEntries({ minLevel: 'warn' })).toEqual([]);
   });
 
   it('to samo ziarno daje identyczny przebieg całej gry', () => {

@@ -15,7 +15,7 @@ import { QuestionCard } from '@/components/solo/QuestionCard';
 import { TimerBar } from '@/components/solo/TimerBar';
 import { colors } from '@/constants/theme';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
-import { activePlayers, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
+import { activePlayers, endedEarly, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
 import { legendFor, PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState, Question } from '@/game/types';
@@ -62,13 +62,15 @@ function bubbleFor(view: PotatoView, id: string): PodiumBubble | null {
 
 function hostLine(view: PotatoView): string {
   const { overlay, awaitingPick, thinkingId, game } = view;
-  if (overlay?.kind === 'finished') return 'Mamy zwycięzcę!';
+  if (overlay?.kind === 'finished') return endedEarly(game) ? 'Odpadasz. Koniec gry.' : 'Mamy zwycięzcę!';
   if (overlay?.kind === 'round') return PHASE_RULE[overlay.phase];
   if (overlay?.kind === 'reveal') {
-    const name = game.players.find((p) => p.id === overlay.playerId)?.name ?? '';
-    return overlay.correct ? `Dobrze, ${name}!` : `Niestety. Poprawna odpowiedź: ${overlay.correctAnswer}`;
+    const player = game.players.find((p) => p.id === overlay.playerId);
+    if (!overlay.correct) return `Niestety. Poprawna odpowiedź: ${overlay.correctAnswer}`;
+    // Człowieka pochwalił już przy wskazywaniu.
+    return player?.isHuman ? 'Gramy dalej.' : `Dobrze, ${player?.name ?? ''}!`;
   }
-  if (awaitingPick) return 'Komu przekazujesz pytanie?';
+  if (awaitingPick) return 'Dobrze! Komu przekazujesz pytanie?';
   if (thinkingId) return 'Czekamy na odpowiedź…';
   return 'Gramy dalej.';
 }
@@ -218,7 +220,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
             <Host
               line={hostLine(view)}
               width={hostWidth}
-              smiling={overlay?.kind === 'finished' || (overlay?.kind === 'reveal' && overlay.correct)}
+              smiling={(overlay?.kind === 'finished' && !endedEarly(game)) || awaitingPick !== null || (overlay?.kind === 'reveal' && overlay.correct)}
             />
           </View>
 
@@ -329,8 +331,9 @@ function Finish({ game, onPlayAgain, onMenu }: { game: PotatoView['game']; onPla
   return (
     <View style={styles.backdrop}>
       <View style={styles.card}>
-        <Text style={styles.title}>Koniec gry</Text>
+        <Text style={styles.title}>{endedEarly(game) ? 'Odpadasz!' : 'Koniec gry'}</Text>
         <Text style={styles.rule}>{names.map((name, i) => `${i + 1}. ${name}`).join('   ')}</Text>
+        {endedEarly(game) && <Text style={styles.note}>Kolejność wg stanu gry w chwili Twojego odpadnięcia.</Text>}
         <View style={styles.actions}>
           <MenuButton label="Zagraj ponownie" color={colors.solo} baseColor={colors.soloBase} width={200} onPress={onPlayAgain} />
           <MenuButton label="Menu" color={colors.multi} baseColor={colors.multiBase} width={140} onPress={onMenu} />
@@ -459,6 +462,12 @@ const styles = StyleSheet.create({
     color: colors.outline,
     fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  note: {
+    color: colors.outline,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

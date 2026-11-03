@@ -27,4 +27,4 @@ Funkcjonalność: muzyka w tle na ekranie głównym i na ekranie wyboru poziomu 
 ### 5. Wyciszenie nie działa po zmianie ekranu
 - **Ryzyko:** stan wyciszenia zapisany tylko w ekranie znika przy przejściu do innego ekranu.
 - **Zabezpieczenie:** stan jest w module muzyki (`src/audio/menuMusic.ts`) i jest wspólny dla wszystkich ekranów; przycisk czyta go przez `useSyncExternalStore`.
-- **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie na ekranie głównym utrzymuje się na wyborze poziomu i w grze.
+- **Test:** ręcznie w przeglądarce (`mute-probe`): wyciszenie utrzymuje się na wyborze poziomu i w grze. Od 03.11.2026 ekran główny nie ma już tego przycisku; muzyką zarządza się w Ustawieniach.
