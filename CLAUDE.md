@@ -47,6 +47,8 @@ Host voice (lektor): everything the host says and every question is synthesized 
 scripts/narration/.venv/Scripts/python scripts/narration/prepare_voice_model.py   # venv setup: see the script's docstring
 ```
 
+Skins (`src/skins/`): the list comes from `assets/skins` at bundle time through `require.context`, so a new skin needs no code change. Add `assets/skins/<male|female|player>/<id>/<id>-<normal|smile|closed-eyes>.png` (exactly these frame names, PNG with alpha) and run `npm test`: `real-assets-test.ts` rejects missing frames and images without an alpha channel. For a black background use `python scripts/skins/remove_background.py assets/skins`, which overwrites the files, then check the result on a contrasting background. A new bot in `BOT_PROFILES` must have a `gender`, which selects its skin pool.
+
 Tests live in `__tests__` folders next to the code; any file there is treated as a test, so shared test helpers go in `src/game/testing/`. Randomness goes through a seeded `Rng` (`src/game/rng.ts`) so tests are reproducible. The `reset-project` script in `package.json` points to `scripts/reset-project.js`, which doesn't exist.
 
 The game still runs in Expo Go, but silently: sherpa-onnx is a native module, so the host voice needs a development build (`npx expo run:android`) or an APK.

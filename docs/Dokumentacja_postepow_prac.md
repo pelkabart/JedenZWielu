@@ -47,11 +47,12 @@ Spis treści:
 | Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
 | Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
-| Razem testów automatycznych | 582 |
+| Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
+| Razem testów automatycznych | 633 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
-| Grafiki postaci i pulpitów | czekamy na grafiki |
+| Grafiki pulpitów | czekamy na grafiki |
 
-Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), expo-document-picker, expo-file-system i expo-secure-store (kategorie), OpenAI Responses API, Jest (jest-expo); Python tylko do przygotowania modelu głosu.
+Technologie: React Native + Expo (SDK 57), TypeScript, Expo Router, react-native-svg, expo-image (skórki), expo-audio, react-native-sherpa-onnx (synteza mowy na telefonie), expo-document-picker, expo-file-system i expo-secure-store (kategorie), OpenAI Responses API, Jest (jest-expo); Python tylko do przygotowania modelu głosu.
 
 ## 2. Ekran główny
 
@@ -152,7 +153,7 @@ Czasem bot też po prostu nie zdąży odpowiedzieć.
 
 ## 5. Ekran rozgrywki
 
-Po wybraniu poziomu trudności zaczyna się gra. Na razie wszystko jest narysowane prostymi kształtami. Grafiki postaci i pulpitów podmienimy, kiedy będą gotowe.
+Po wybraniu poziomu trudności zaczyna się gra. Postacie to skórki z `assets/skins` (patrz „Skórki postaci”), a pulpity są na razie narysowane prostymi kształtami i podmienimy je, kiedy będą gotowe grafiki.
 
 Układ ekranu (w poziomie):
 
@@ -235,6 +236,14 @@ Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w te
 
 Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy (commit z testami, które jeszcze nie przechodziły), potem kod.
 
+### Skórki postaci
+
+Skórki leżą w `assets/skins/<male|female|player>/<id>/<id>-<normal|smile|closed-eyes>.png`, prowadzący w `assets/skins/host/`. Lista powstaje przy budowaniu paczki (`require.context`), więc nowy folder działa bez zmian w kodzie. Na ekranie głównym obok menu stoi postać gracza, a wieszak pod nią otwiera ekran wyboru (`src/app/skins.tsx`). Wybór zostaje na telefonie.
+
+Boty mają w profilu płeć i dostają skórkę ze swojej puli, każdą najwyżej raz w grze. Losowanie botów ma limit płci równy liczbie skórek. Skórki losuje osobny generator, więc gry z tego samego ziarna i symulacje działają jak wcześniej.
+
+Mimika: dobra odpowiedź to uśmiech, pomyłka to zamknięte oczy, a w spoczynku postać mruga co 2,5–6 s. Prowadzący uśmiecha się przy dobrej odpowiedzi i na koniec gry. Postać, która odpadła, ma otwarte oczy i jest przyciemniona (pod obrazkiem leży jej ciemna sylwetka).
+
 ## 6. Testy i analiza dynamiczna
 
 Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same testy integracyjne: `npm run test:integration`, pokrycie kodu: `npm run test:coverage`. Testy są w folderach `__tests__` obok testowanego kodu.
@@ -244,7 +253,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
 | `engine-test.ts` | 29 | zasady etapów I, II i finału, limit pytań bez człowieka, odrzucanie niedozwolonych ruchów, ranking |
-| `bots-test.ts` | 25 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju |
+| `bots-test.ts` | 30 | decyzje botów, osobowości, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
 | `simulate-test.ts` | 20 | pełne gry rozgrywane przez boty |
 | `controller-test.ts` | 47 | sterownik gry na udawanym zegarze: plansze, zapowiedzi, czytanie pytania, czekanie na prowadzącego, liczniki, pauzy, ruchy botów, zgłaszanie się |
 | `view-test.ts` | 16 | teksty prowadzącego i ich podział na zdania, wybór pytania do wyświetlenia i do czytania, losowe miejsce gracza |
@@ -272,7 +281,13 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `audio/__tests__/volume-test.ts` | 8 | głośność odtwarzaczy: skalowanie poziomu muzyki, wyciszenie, lektor, podpięcie lektora do ustawień |
 | `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
 | `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, wyciszenie, głośność po ponownym uruchomieniu, nieudany zapis |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **582** | |
+| `skins/__tests__/catalog-test.ts` | 7 | skórki: układanie katalogu ze ścieżek, nowy folder, brakujące klatki, nieznane pliki |
+| `skins/__tests__/assignSkins-test.ts` | 7 | skórki: zgodność płci, brak powtórek, wybór gracza, użycie wszystkich skórek, brak skórki |
+| `skins/__tests__/IdleFace-test.ts` | 10 | mimika: mruganie, uśmiech, kasowanie zegarów, mimika w reakcji na odpowiedź |
+| `skins/__tests__/SkinSelectionStore-test.ts` | 12 | wybór skórki: zapis, uszkodzony zapis, usunięta skórka, błędy magazynu, kolejność zapisów |
+| `skins/__tests__/real-assets-test.ts` | 4 | prawdziwy folder skórek: komplet klatek, kanał alfa, liczba skórek, nazwy zasobów Androida |
+| `skins/__tests__/skins-integration-test.ts` | 6 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **633** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -517,6 +532,23 @@ Lektor czytał pytania tak samo jak zwykłe zdania. Przyczyna leży w danych tre
 ### Kategorie: import i eksport
 - **Problem:** przy sprawdzaniu zmian `npx tsc --noEmit` zgłaszał 5 błędów typów tras (np. `"/categories/new"` nie pasuje do typu `router.push`), także na czystym `main`, a `npx expo lint` – „Unable to resolve path to module 'expo-document-picker'”. Przyczyna: `node_modules` nie zgadzał się z `package-lock.json` (brakowało m.in. `expo-document-picker`, `expo-secure-store`, `expo-speech-recognition`), więc wygenerowany plik `.expo/types/router.d.ts` był stary, a ESLint trzymał w pamięci podręcznej stare wyniki.
 - **Rozwiązanie:** `npm install`, krótkie uruchomienie `npx expo start` (generuje typy tras na nowo) i `npx expo lint --no-cache`. Wniosek: po `git pull` z nowymi zależnościami zawsze `npm install`, a dziwne błędy typów tras to najpierw sygnał nieaktualnych `.expo/types`.
+
+### Skórki postaci
+
+**7.47. Trzy skórki miały czarne tło zamiast przezroczystości**
+Pliki `male/002`, `male/003` i `player/201` były zapisane w trybie RGB, więc na scenie byłyby czarnym kwadratem. Napisaliśmy `scripts/skins/remove_background.py`, który wycina tło wypełnieniem od rogów. Przy wyższym progu wypełnienie wchodziło w czarny sweter skórki `201`, dlatego próg to 12. Test `real-assets-test.ts` sprawdza teraz kanał alfa każdego pliku.
+
+**7.48. Test ostrzeżeń sprawdzał pole, którego nie ma**
+Testy filtrowały wpisy logów po `entry.module`, a pole nazywa się `tag`. Filtr zawsze zwracał pustą listę, więc test „brak ostrzeżeń” dla prawdziwych skórek przechodził bez sprawdzania czegokolwiek. Wyszło to na testach, które oczekiwały ostrzeżenia. Używamy teraz `getLogEntries({ tag, minLevel })`.
+
+**7.49. Prowadzący ze skórką wchodził pod kartę pytania, a pulpity sięgały krawędzi**
+Na ekranie o wysokości 360 pierwsza wersja prowadzącego (do pasa) wypychała jego dymek pod kartę pytania, a wyższe popiersie graczy dosuwało pulpity do dołu ekranu. Prowadzący jest teraz popiersiem, a wzór na szerokość pulpitu uwzględnia wyższą postać. Sprawdzone na zrzutach ekranu 800×360, 915×412 i 1280×720.
+
+**7.50. Przezroczystość to nie przyciemnienie**
+Postać, która odpadła, miała `opacity` 0,35, ale na jasnym tle wyglądała na wyblakłą i prześwitywało przez nią tło. Pod obrazkiem leży teraz ciemna sylwetka tej samej postaci (`tintColor` w `expo-image`).
+
+**7.51. Wersja webowa nie uruchamia się od czasu dodania kategorii (nienaprawione)**
+`fileStorage` tworzy `new File(Paths.document, ...)` już przy imporcie, a `expo-file-system` nie działa na webie, więc serwer zwraca błąd 500 („this.validatePath is not a function”). `questionSets` używa go na ekranie głównym także bez skórek. Ekrany skórek oglądaliśmy z tymczasową wersją `fileStorage.web.ts`, której nie ma w repozytorium.
 
 ## 8. Dalsze plany
 

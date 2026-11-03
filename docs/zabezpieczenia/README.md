@@ -33,3 +33,4 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [kategorie-import-eksport.md](kategorie-import-eksport.md) | import i eksport kategorii do plików `.kat` (JSON) |
 | [ustawienia-klucz-api.md](ustawienia-klucz-api.md) | ekran ustawień: klucz API OpenAI zapisany na telefonie (Android Keystore) |
 | [ustawienia-glosnosc.md](ustawienia-glosnosc.md) | ekran ustawień: głośność muzyki i lektora (suwaki 0–100%, zapis na telefonie) |
+| [skorki.md](skorki.md) | skórki postaci: katalog z folderu, przydział wg płci bez powtórek, wybór gracza, mimika |

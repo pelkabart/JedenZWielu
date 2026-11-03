@@ -1,4 +1,4 @@
-import { pickOpponents } from './bots/profiles';
+import { pickOpponents, type GenderLimits } from './bots/profiles';
 import { createGame } from './engine';
 import { DIFFICULTY_PRESETS, SOLO_PLAYER_COUNT } from './rules';
 import { randomInt, type Rng } from './rng';
@@ -12,11 +12,13 @@ export interface SoloSetup {
   questions: Question[];
   rng: Rng;
   rules?: Partial<Rules>;
+  /** Limit botów każdej płci (tyle, ile jest skórek). */
+  botLimits?: GenderLimits;
 }
 
 /** Gra jednoosobowa: człowiek + 4 losowo dobrane boty. */
-export function createSoloGame({ difficulty, humanName, questions, rng, rules }: SoloSetup): GameState {
-  const bots: PlayerSetup[] = pickOpponents(rng, SOLO_PLAYER_COUNT - 1).map((profile) => ({
+export function createSoloGame({ difficulty, humanName, questions, rng, rules, botLimits }: SoloSetup): GameState {
+  const bots: PlayerSetup[] = pickOpponents(rng, SOLO_PLAYER_COUNT - 1, botLimits).map((profile) => ({
     id: profile.id,
     name: profile.name,
     isHuman: false,

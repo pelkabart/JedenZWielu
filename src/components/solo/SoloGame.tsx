@@ -62,7 +62,7 @@ function isHighlighted(view: SoloView, player: PlayerState): boolean {
 }
 
 export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
-  const { controller, view } = useSoloController(difficulty, questions);
+  const { controller, view, skins } = useSoloController(difficulty, questions);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
@@ -123,7 +123,7 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
     64,
     Math.min(
       (usableWidth - 24 - PODIUM_GAP * (SEAT_SCALE.length - 1)) / (scaleSum + 2 * centerScale),
-      (usableHeight - 230) / 1.35,
+      (usableHeight - 230) / 1.45,
       160,
     ),
   );
@@ -200,7 +200,11 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
         ) : (
           <Pressable style={styles.stage} onPress={() => controller.skip()} accessible={false}>
             <View style={[styles.hostSlot, { width: hostWidth }]}>
-              <Host line={hostLine(view)} size={hostWidth * 0.42} />
+              <Host
+                line={hostLine(view)}
+                width={hostWidth}
+                smiling={game.phase === 'finished' || (overlay?.kind === 'reveal' && overlay.correct)}
+              />
             </View>
 
             <View style={styles.main}>
@@ -218,6 +222,7 @@ export function SoloGame({ difficulty, questions, onPlayAgain }: Props) {
                   <View key={player.id} style={{ transform: [{ translateY: ARC[player.seat] ?? 0 }] }}>
                     <Podium
                       player={player}
+                      skin={skins[player.id] ?? null}
                       color={SEAT_COLORS[player.seat % SEAT_COLORS.length]}
                       width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
                       highlighted={isHighlighted(view, player)}

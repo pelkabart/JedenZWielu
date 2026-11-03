@@ -9,16 +9,25 @@ import { soloEntryRoute } from '@/categories/soloEntry';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
 import { MusicToggle } from '@/components/home/MusicToggle';
+import { PlayerAvatar } from '@/components/home/PlayerAvatar';
 import { colors } from '@/constants/theme';
 import { useQuestionSets } from '@/hooks/useQuestionSets';
 import { useMenuMusic } from '@/hooks/useMenuMusic';
+import { useSelectedSkin } from '@/hooks/useSelectedSkin';
 
 /** Poniżej tej wysokości (telefon w poziomie) cztery przyciski i tytuł muszą się ścisnąć. */
 const COMPACT_HEIGHT = 400;
+/** Wysokość przycisku z wieszakiem razem z odstępem i marginesami. */
+const AVATAR_RESERVED_HEIGHT = 80;
+/** Szerokość przycisków menu (domyślna w `MenuButton`). */
+const MENU_WIDTH = 320;
+/** Poniżej tej szerokości obok menu nie ma miejsca na postać. */
+const MIN_WIDTH_FOR_AVATAR = 720;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const skin = useSelectedSkin();
   const compact = height - insets.top - insets.bottom < COMPACT_HEIGHT;
   useMenuMusic();
   // Wczytuje kategorie już na ekranie głównym, żeby wybór trybu jednoosobowego ich nie czekał.
@@ -49,6 +58,12 @@ export default function HomeScreen() {
         <Ionicons name="settings-sharp" size={26} color={colors.outline} />
       </Pressable>
 
+      {skin && width >= MIN_WIDTH_FOR_AVATAR && (
+        <View style={[styles.avatar, { left: insets.left, width: (width - MENU_WIDTH) / 2 - insets.left }]}>
+          <PlayerAvatar skin={skin} height={Math.min(height - insets.top - insets.bottom - AVATAR_RESERVED_HEIGHT, 360)} />
+        </View>
+      )}
+
       <View style={[styles.content, compact && styles.contentCompact, { paddingLeft: insets.left, paddingRight: insets.right }]}>
         <Text style={[styles.title, compact && styles.titleCompact]}>Jeden z Wielu</Text>
 
@@ -77,6 +92,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.navy,
+  },
+  avatar: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    zIndex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,

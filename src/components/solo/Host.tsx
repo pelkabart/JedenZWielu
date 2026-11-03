@@ -1,24 +1,48 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { SkinFigure } from '@/components/skins/SkinFigure';
 import { colors } from '@/constants/theme';
+import { useIdleFace } from '@/hooks/useIdleFace';
+import { hostExpression } from '@/skins/expression';
+import { skinCatalog } from '@/skins/skinAssets';
+
+/** Popiersie prowadzącego: wysokość okna i bok obrazka względem szerokości miejsca. */
+const FIGURE_HEIGHT = 0.9;
+const FIGURE_IMAGE_SIZE = 2;
 
 type Props = {
   line: string;
-  size: number;
+  /** Szerokość miejsca na prowadzącego. */
+  width: number;
+  smiling: boolean;
 };
 
-// Placeholder prowadzącego; grafika postaci wejdzie w etapie 6.
-export function Host({ line, size }: Props) {
+export function Host({ line, width, smiling }: Props) {
+  const skin = skinCatalog.host;
+  const idle = useIdleFace();
+  const size = width * 0.42;
   return (
     <View style={styles.root}>
       <View style={styles.bubble}>
         <Text style={styles.line}>{line}</Text>
         <View style={styles.tail} />
       </View>
-      <View style={[styles.head, { width: size, height: size, borderRadius: size / 2 }]}>
-        <Text style={[styles.headLabel, { fontSize: size * 0.22 }]}>PROW.</Text>
-      </View>
-      <View style={[styles.body, { width: size * 1.5, height: size * 0.8 }]} />
+      {skin ? (
+        <SkinFigure
+          skin={skin}
+          expression={hostExpression(smiling, idle)}
+          width={width}
+          height={width * FIGURE_HEIGHT}
+          imageSize={width * FIGURE_IMAGE_SIZE}
+        />
+      ) : (
+        <>
+          <View style={[styles.head, { width: size, height: size, borderRadius: size / 2 }]}>
+            <Text style={[styles.headLabel, { fontSize: size * 0.22 }]}>PROW.</Text>
+          </View>
+          <View style={[styles.body, { width: size * 1.5, height: size * 0.8 }]} />
+        </>
+      )}
     </View>
   );
 }

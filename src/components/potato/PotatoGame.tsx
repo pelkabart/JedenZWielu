@@ -77,7 +77,7 @@ function hostLine(view: PotatoView): string {
 }
 
 export function PotatoGame({ difficulty, onPlayAgain }: Props) {
-  const { controller, view } = usePotatoController(difficulty);
+  const { controller, view, skins } = usePotatoController(difficulty);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
@@ -151,7 +151,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
     64,
     Math.min(
       (usableWidth - 24 - PODIUM_GAP * (SEAT_SCALE.length - 1)) / (scaleSum + 2 * centerScale),
-      (usableHeight - 230) / 1.35,
+      (usableHeight - 230) / 1.45,
       160,
     ),
   );
@@ -218,7 +218,11 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
 
         <View style={styles.stage}>
           <View style={[styles.hostSlot, { width: hostWidth }]}>
-            <Host line={hostLine(view)} size={hostWidth * 0.42} />
+            <Host
+              line={hostLine(view)}
+              width={hostWidth}
+              smiling={overlay?.kind === 'finished' || (overlay?.kind === 'reveal' && overlay.correct)}
+            />
           </View>
 
           <View style={styles.main}>
@@ -255,6 +259,7 @@ export function PotatoGame({ difficulty, onPlayAgain }: Props) {
                 <View key={player.id} style={{ transform: [{ translateY: ARC[player.seat] ?? 0 }] }}>
                   <Podium
                     player={toPodium(player, phase)}
+                    skin={skins[player.id] ?? null}
                     color={SEAT_COLORS[player.seat % SEAT_COLORS.length]}
                     width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
                     highlighted={game.holderId === player.id}

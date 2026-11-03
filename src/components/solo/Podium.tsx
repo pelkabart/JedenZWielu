@@ -1,12 +1,22 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { SkinFigure } from '@/components/skins/SkinFigure';
 import { colors } from '@/constants/theme';
 import type { PlayerState } from '@/game/types';
+import { useIdleFace } from '@/hooks/useIdleFace';
+import type { Skin } from '@/skins/catalog';
+import { podiumExpression } from '@/skins/expression';
 
 export type PodiumBubble = { kind: 'thinking' } | { kind: 'answer'; text: string | null; correct: boolean };
 
+/** Popiersie nad pulpitem: wysokość okna i bok obrazka względem szerokości pulpitu. */
+const BUST_HEIGHT = 0.72;
+const BUST_IMAGE_SIZE = 1.7;
+
 type Props = {
   player: PlayerState;
+  /** `null`: rysunek zastępczy, gdy zabrakło skórek. */
+  skin: Skin | null;
   color: string;
   width: number;
   /** Gracz, na którego teraz patrzymy (odpowiada albo wskazuje). */
@@ -17,10 +27,11 @@ type Props = {
   onPress?: () => void;
 };
 
-// Placeholder: postać i pulpit narysowane kształtami; w etapie 6 podmienimy je na grafiki.
-export function Podium({ player, color, width, highlighted, selectable, showScore, bubble, onPress }: Props) {
+export function Podium({ player, skin, color, width, highlighted, selectable, showScore, bubble, onPress }: Props) {
   const head = width * 0.4;
   const label = player.isHuman ? 'TY' : player.name.charAt(0);
+  // Postać, która odpadła, nie mruga: zostaje z otwartymi oczami, przyciemniona.
+  const idle = useIdleFace(!player.eliminated);
 
   return (
     <Pressable
@@ -28,7 +39,7 @@ export function Podium({ player, color, width, highlighted, selectable, showScor
       onPress={onPress}
       accessibilityRole={selectable ? 'button' : undefined}
       accessibilityLabel={selectable ? `Wskaż: ${player.name}` : player.name}
-      style={[styles.root, { width }, player.eliminated && styles.eliminated]}
+      style={[styles.root, { width }]}
     >
       {bubble && (
         <View
@@ -43,15 +54,29 @@ export function Podium({ player, color, width, highlighted, selectable, showScor
         </View>
       )}
 
-      <View style={[styles.head, { width: head, height: head, borderRadius: head / 2, backgroundColor: color }]}>
-        <Text style={[styles.headLabel, { fontSize: head * (player.isHuman ? 0.36 : 0.5) }]}>{label}</Text>
-      </View>
-      <View style={[styles.body, { width: width * 0.66, height: width * 0.28, backgroundColor: color }]} />
+      {skin ? (
+        <SkinFigure
+          skin={skin}
+          expression={podiumExpression(bubble, idle)}
+          width={width}
+          height={width * BUST_HEIGHT}
+          imageSize={width * BUST_IMAGE_SIZE}
+          dimmed={player.eliminated}
+        />
+      ) : (
+        <>
+          <View style={[styles.head, player.eliminated && styles.eliminated, { width: head, height: head, borderRadius: head / 2, backgroundColor: color }]}>
+            <Text style={[styles.headLabel, { fontSize: head * (player.isHuman ? 0.36 : 0.5) }]}>{label}</Text>
+          </View>
+          <View style={[styles.body, player.eliminated && styles.eliminated, { width: width * 0.66, height: width * 0.28, backgroundColor: color }]} />
+        </>
+      )}
 
       <View
         style={[
           styles.desk,
           { height: width * 0.62 },
+          player.eliminated && styles.eliminated,
           highlighted && styles.deskHighlighted,
           selectable && styles.deskSelectable,
         ]}
