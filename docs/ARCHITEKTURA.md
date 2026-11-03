@@ -23,7 +23,7 @@ flowchart LR
     App -->|klucz API| SS[(SecureStore / Android Keystore)]
 ```
 
-Nie ma własnego backendu. Jedyna usługa sieciowa to OpenAI, wywoływane z telefonu kluczem gracza (albo programisty z `.env.local`). Supabase + PostgreSQL to plan na multiplayer i pośrednika do OpenAI.
+Własny backend jest na etapie szkieletu: `server/` (Node + TypeScript, `/health` i WebSocket `/ws`) wdrażany jako kontener na **Azure Container Apps** (Azure for Students), instrukcja w `docs/backend-azure-instrukcja.md`. Aplikacja na razie tylko sprawdza z nim połączenie (Ustawienia → „Sprawdź połączenie”, adres z `EXPO_PUBLIC_SERVER_URL`). OpenAI dalej jest wywoływane z telefonu kluczem gracza (albo programisty z `.env.local`). Plan dla serwera: pośrednik OpenAI, baza pytań, Eliminacje, konta i autorytatywny multiplayer.
 
 ## 2. Stos technologiczny
 
@@ -121,6 +121,8 @@ src/
   lib/log.ts              logowanie
   data/questions.json     domyślna baza pytań (wersja 2, 50 pytań)
   constants/theme.ts      kolory
+server/                   serwer gry (osobny pakiet npm, Docker → Azure Container Apps); poza tsc/jest/lint aplikacji
+src/backend/              checkServer (połączenie z serwerem), adres serwera z .env.local
 plugins/withVoiceModel.js wtyczka konfiguracyjna: kopiuje model głosu do zasobów Androida
 scripts/narration/        przygotowanie modelu Piper dla sherpa-onnx (Python)
 voiceModel/               voice.onnx (źródło); vits-piper-pl/ generowany, w .gitignore
@@ -300,7 +302,7 @@ Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 3. **„Gorący Ziemniak” nie jest opisany w `Dokumentacja_postepow_prac.md`** (jest tylko `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
 4. **Duplikacja silników.** Dwa modele gracza (`PlayerState` i `PotatoPlayer`), dwa sterowniki i dwa lektory z podobną logiką czasu i pauz. `PotatoController` importuje `realClock` z `SoloController` – warto wydzielić wspólny moduł (zegar, harmonogram kroków, czekanie na lektora).
 5. **Klucz OpenAI na telefonie.** Gracz potrzebuje własnego klucza; klucz programisty w APK jest jawny. Docelowo pośrednik po stronie serwera (np. funkcja Supabase).
-6. **Brak backendu i multiplayera.** Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
+6. **Backend tylko jako szkielet, brak multiplayera.** Serwer testowy (`server/`) działa, ale nie ma jeszcze żadnej logiki gry. Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
 7. **Rozmiar modelu głosu** (63 MB) w APK. Rozważana kwantyzacja int8; AAB dla Google Play.
 8. **Brak testów komponentów** (np. React Native Testing Library) – UI sprawdzany ręcznie.
 9. **Martwy skrypt:** `reset-project` w `package.json` wskazuje nieistniejący `scripts/reset-project.js`.

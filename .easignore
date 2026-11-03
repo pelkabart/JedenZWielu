@@ -61,3 +61,12 @@ scripts/narration/__pycache__/
 # voiceModel/vits-piper-pl/model.onnx
 # voiceModel/vits-piper-pl/tokens.txt
 # voiceModel/vits-piper-pl/espeak-ng-data/
+
+# Backend (osobny pakiet, budujemy tylko aplikację)
+/server/
+
+# Eksperymenty z klonowaniem głosu — kilka GB, niepotrzebne do builda
+/voice/
+
+# Zbudowane lokalnie APK
+/androidApk/

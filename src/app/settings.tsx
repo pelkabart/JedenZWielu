@@ -3,6 +3,8 @@ import { useState, useSyncExternalStore } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { checkServer, normalizeServerUrl, type HealthResult } from '@/backend/serverHealth';
+import { CONFIG_SERVER_URL } from '@/backend/serverUrl';
 import { BackButton } from '@/components/home/BackButton';
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
@@ -28,8 +30,18 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const volume = useSyncExternalStore(volumeStore.subscribe, volumeStore.getSettings);
   const volumeSaveFailed = useSyncExternalStore(volumeStore.subscribe, volumeStore.didSaveFail);
+  const [serverResult, setServerResult] = useState<HealthResult | null>(null);
+  const [serverChecking, setServerChecking] = useState(false);
+  const serverUrl = normalizeServerUrl(CONFIG_SERVER_URL);
   // Muzyka menu gra dalej w ustawieniach, żeby od razu było słychać zmianę głośności.
   useMenuMusic();
+
+  const testServer = async () => {
+    setServerChecking(true);
+    setServerResult(null);
+    setServerResult(await checkServer(CONFIG_SERVER_URL));
+    setServerChecking(false);
+  };
 
   const check = input.trim() === '' ? null : validateApiKey(input);
 
@@ -154,6 +166,30 @@ export default function SettingsScreen() {
             Klucz zostaje tylko na tym telefonie, w szyfrowanym magazynie Androida (Keystore). Nie trafia do kopii
             zapasowej ani do logów.
           </Text>
+        </View>
+
+        <View style={styles.panel}>
+          <Text style={styles.label}>Serwer gry</Text>
+          <Text style={styles.hint}>
+            {serverUrl ? serverUrl.replace(/^https?:\/\//i, '') : 'Brak adresu – wpisz EXPO_PUBLIC_SERVER_URL w pliku .env.local.'}
+          </Text>
+          <View style={styles.buttons}>
+            <MenuButton
+              label={serverChecking ? 'Sprawdzam…' : 'Sprawdź połączenie'}
+              color={colors.categories}
+              baseColor={colors.categoriesBase}
+              width={260}
+              disabled={serverChecking || !serverUrl}
+              onPress={() => void testServer()}
+            />
+          </View>
+          {serverResult && (
+            <Text style={serverResult.ok ? styles.success : styles.error}>
+              {serverResult.ok
+                ? `Połączono z serwerem w wersji ${serverResult.version} (${serverResult.latencyMs} ms).`
+                : serverResult.message}
+            </Text>
+          )}
         </View>
       </ScrollView>
     </View>

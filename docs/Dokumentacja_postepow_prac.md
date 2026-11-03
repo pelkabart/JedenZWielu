@@ -48,7 +48,8 @@ Spis treści:
 | Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
-| Razem testów automatycznych | 633 |
+| Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
+| Razem testów automatycznych | 659 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -287,7 +288,10 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/SkinSelectionStore-test.ts` | 12 | wybór skórki: zapis, uszkodzony zapis, usunięta skórka, błędy magazynu, kolejność zapisów |
 | `skins/__tests__/real-assets-test.ts` | 4 | prawdziwy folder skórek: komplet klatek, kanał alfa, liczba skórek, nazwy zasobów Androida |
 | `skins/__tests__/skins-integration-test.ts` | 6 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **633** | |
+| `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
+| `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **659** | |
+| `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
