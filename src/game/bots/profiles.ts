@@ -9,9 +9,16 @@ import type { Category } from '../types';
  */
 export type Personality = 'predator' | 'tactician' | 'avenger' | 'chaotic';
 
+export type Gender = 'male' | 'female';
+
+/** Ilu botów danej płci może wejść do gry (każdy musi dostać własną skórkę). */
+export type GenderLimits = Record<Gender, number>;
+
 export interface BotProfile {
   id: string;
   name: string;
+  /** Decyduje o puli skórek. */
+  gender: Gender;
   personality: Personality;
   /** Bazowa szansa na poprawną odpowiedź (0–1) przy pytaniu o średniej trudności. */
   knowledge: number;
@@ -33,6 +40,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'profesor',
     name: 'Profesor Zenon',
+    gender: 'male',
     personality: 'tactician',
     knowledge: 0.72,
     categoryBonus: { Historia: 0.15, Nauka: 0.15, Sport: -0.2 },
@@ -45,6 +53,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'krysia',
     name: 'Pani Krysia',
+    gender: 'female',
     personality: 'avenger',
     knowledge: 0.62,
     categoryBonus: { Kultura: 0.2, Przyroda: 0.1, Nauka: -0.1 },
@@ -57,6 +66,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'bartek',
     name: 'Bartek',
+    gender: 'male',
     personality: 'predator',
     knowledge: 0.58,
     categoryBonus: { Sport: 0.25, Kultura: -0.1 },
@@ -69,6 +79,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'ola',
     name: 'Ola',
+    gender: 'female',
     personality: 'chaotic',
     knowledge: 0.55,
     categoryBonus: { Rozmaitości: 0.15, Geografia: 0.1 },
@@ -81,6 +92,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'marek',
     name: 'Kapitan Marek',
+    gender: 'male',
     personality: 'predator',
     knowledge: 0.66,
     categoryBonus: { Geografia: 0.2, Historia: 0.05, Kultura: -0.1 },
@@ -93,6 +105,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'zosia',
     name: 'Zosia',
+    gender: 'female',
     personality: 'tactician',
     knowledge: 0.64,
     categoryBonus: { Nauka: 0.15, Przyroda: 0.15, Historia: -0.1 },
@@ -105,6 +118,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'wiesiek',
     name: 'Wiesiek',
+    gender: 'male',
     personality: 'avenger',
     knowledge: 0.52,
     categoryBonus: { Sport: 0.15, Rozmaitości: 0.1, Nauka: -0.15 },
@@ -117,6 +131,7 @@ export const BOT_PROFILES: BotProfile[] = [
   {
     id: 'julia',
     name: 'Julia',
+    gender: 'female',
     personality: 'chaotic',
     knowledge: 0.6,
     categoryBonus: { Kultura: 0.15, Geografia: 0.05, Sport: -0.1 },
@@ -132,6 +147,7 @@ export const BOT_PROFILES: BotProfile[] = [
 export const AVERAGE_PLAYER_PROFILE: BotProfile = {
   id: 'average-human',
   name: 'Gracz',
+  gender: 'male',
   personality: 'predator',
   knowledge: 0.6,
   categoryBonus: {},
@@ -148,7 +164,17 @@ export function getBotProfile(id: string): BotProfile {
   return profile;
 }
 
-export function pickOpponents(rng: Rng, count: number): BotProfile[] {
+/**
+ * Losuje przeciwników. `limits` ogranicza liczbę botów każdej płci; jeśli limity nie wystarczą
+ * na cały skład, brakujące miejsca dostają pozostałe boty, bo gra musi wystartować.
+ */
+export function pickOpponents(rng: Rng, count: number, limits?: GenderLimits): BotProfile[] {
   if (count > BOT_PROFILES.length) throw new Error(`Za mało profili botów (${BOT_PROFILES.length})`);
-  return shuffle(rng, BOT_PROFILES).slice(0, count);
+  const shuffled = shuffle(rng, BOT_PROFILES);
+  if (!limits) return shuffled.slice(0, count);
+
+  const left = { ...limits };
+  const allowed = shuffled.filter((profile) => left[profile.gender]-- > 0);
+  const rest = shuffled.filter((profile) => !allowed.includes(profile));
+  return [...allowed, ...rest].slice(0, count);
 }

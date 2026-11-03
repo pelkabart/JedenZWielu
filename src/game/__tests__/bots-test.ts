@@ -60,6 +60,46 @@ describe('profile botów', () => {
   });
 });
 
+describe('pickOpponents z limitem płci', () => {
+  const countOf = (opponents: BotProfile[], gender: BotProfile['gender']) => opponents.filter((p) => p.gender === gender).length;
+
+  it('nigdy nie przekracza limitu', () => {
+    for (let seed = 0; seed < 1000; seed++) {
+      const opponents = pickOpponents(createRng(seed), 4, { male: 3, female: 3 });
+      expect(opponents).toHaveLength(4);
+      expect(new Set(opponents.map((p) => p.id)).size).toBe(4);
+      expect(countOf(opponents, 'male')).toBeLessThanOrEqual(3);
+      expect(countOf(opponents, 'female')).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('limit nie zmienia składu, gdy nie ma potrzeby', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const free = pickOpponents(createRng(seed), 4);
+      expect(pickOpponents(createRng(seed), 4, { male: 8, female: 8 })).toEqual(free);
+    }
+  });
+
+  it('zużywa tyle samo losowań, więc dalszy przebieg gry się nie zmienia', () => {
+    const plain = createRng(5);
+    const limited = createRng(5);
+    pickOpponents(plain, 4);
+    pickOpponents(limited, 4, { male: 1, female: 3 });
+    expect(limited()).toBe(plain());
+  });
+
+  it('za małe limity: skład i tak jest pełny, bo gra musi ruszyć', () => {
+    const opponents = pickOpponents(createRng(1), 4, { male: 1, female: 0 });
+    expect(opponents).toHaveLength(4);
+    expect(new Set(opponents.map((p) => p.id)).size).toBe(4);
+  });
+
+  it('każdy profil ma płeć, a obu płci jest po równo', () => {
+    expect(BOT_PROFILES.filter((p) => p.gender === 'male')).toHaveLength(4);
+    expect(BOT_PROFILES.filter((p) => p.gender === 'female')).toHaveLength(4);
+  });
+});
+
 describe('correctChance', () => {
   const profesor = getBotProfile('profesor');
 
