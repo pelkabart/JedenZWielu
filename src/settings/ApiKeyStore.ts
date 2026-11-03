@@ -59,7 +59,18 @@ export class ApiKeyStore {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly listeners = new Set<() => void>();
 
-  constructor(private readonly storage: SecretStorage) {}
+  /** Klucz z `.env.local` (po walidacji); pusty, gdy go nie ma albo jest niepoprawny. */
+  readonly configKey: string;
+
+  /** `configKey` – klucz z `.env.local`, używany, gdy na telefonie nie zapisano własnego. */
+  constructor(
+    private readonly storage: SecretStorage,
+    configKey = '',
+  ) {
+    const check = configKey.trim() === '' ? null : validateApiKey(configKey);
+    if (check && !check.ok) log.warn('Klucz z .env.local jest niepoprawny – pomijam go', { reason: check.reason });
+    this.configKey = check?.ok ? check.key : '';
+  }
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -68,8 +79,13 @@ export class ApiKeyStore {
     };
   };
 
-  /** Pusty tekst, gdy klucza nie ma (albo jeszcze nie wczytano). */
-  getKey = (): string => this.key;
+  /** Klucz z telefonu, a gdy go nie ma – z `.env.local`. Pusty tekst, gdy żadnego nie ma (albo jeszcze nie wczytano). */
+  getKey = (): string => (this.loaded ? this.key || this.configKey : '');
+
+  /** Czy używany klucz pochodzi z `.env.local` (a nie z ustawień na telefonie). */
+  isFromConfig(): boolean {
+    return this.loaded && this.key === '' && this.configKey !== '';
+  }
 
   isLoaded() {
     return this.loaded;
@@ -130,7 +146,7 @@ export class ApiKeyStore {
       log.warn('Nie udało się odczytać klucza API', { error: errorMessage(error) });
     }
     this.loaded = true;
-    log.info('Wczytano ustawienia', { saved: key !== '' });
+    log.info('Wczytano ustawienia', { saved: key !== '', config: this.configKey !== '' });
     this.setKey(key);
   }
 }

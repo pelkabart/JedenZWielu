@@ -42,3 +42,27 @@ Klucz API OpenAI wpisuje się raz, na ekranie „Ustawienia” (zębatka w prawy
 **Ryzyko:** wcześniejsza wersja zapisywała klucz z ekranu „Nowa kategoria”. Po aktualizacji gracz musiałby wpisywać go od nowa.
 **Zabezpieczenie:** adapter używa tej samej nazwy wpisu w `SecureStore` (`openai_api_key`), więc stary klucz jest od razu widoczny w ustawieniach.
 **Test:** ręcznie: APK z ustawieniami zainstalowany na emulatorze na wersję, w której klucz wpisano na ekranie „Nowa kategoria” – ustawienia od razu pokazały zapisany klucz (`sk-…` + 4 ostatnie znaki), a log `[ustawienia] Wczytano ustawienia {"saved":true}`.
+
+## Klucz wpisany w pliku `.env.local` (dla programistów)
+
+Zamiast wpisywać klucz na każdym telefonie/emulatorze, można go wpisać raz w pliku `.env.local` w katalogu głównym projektu:
+
+```
+EXPO_PUBLIC_OPENAI_API_KEY=sk-...
+```
+
+Expo CLI wczytuje ten plik przy `npx expo start` / `npx expo run:android` / budowaniu APK i wstawia wartość do kodu (`src/settings/configApiKey.ts`). Wzór pliku (bez klucza) to `.env.example`. Klucz zapisany w ustawieniach na telefonie ma pierwszeństwo; gdy go nie ma, gra używa klucza z `.env.local`.
+
+### 8. Klucz z pliku trafia do repozytorium
+**Ryzyko:** ktoś commituje `.env.local` (np. `git add -f`) albo wkleja klucz bezpośrednio do pliku `.ts`; klucz trafia na GitHuba i OpenAI go blokuje (albo ktoś go używa na nasz koszt).
+**Zabezpieczenie:** `.gitignore` ignoruje `.env` i `.env.*` (poza `.env.example`). Dodatkowo hak `.githooks/pre-commit` (włączany automatycznie przez `npm install` – skrypt `prepare` ustawia `core.hooksPath`) odrzuca commit, który zawiera plik `.env*` inny niż `.env.example` albo w dodanych liniach ma tekst wyglądający na klucz OpenAI (`sk-` + co najmniej 20 znaków).
+**Test:** ręcznie: `git add -f .env.local && git commit` → commit odrzucony; plik `.ts` z `sk-` + 30 znaków → odrzucony.
+
+### 9. Klucz z pliku jest niepoprawny
+**Ryzyko:** literówka albo spacja w `.env.local` – gra myśli, że ma klucz, a OpenAI odpowiada 401 po kilku minutach.
+**Zabezpieczenie:** klucz z pliku przechodzi przez tę samą `validateApiKey`; niepoprawny jest pomijany z ostrzeżeniem `[ustawienia] Klucz z .env.local jest niepoprawny` (bez treści klucza).
+**Test:** `ApiKeyStore-test.ts › klucz z konfiguracji`.
+
+### 10. Klucz z pliku jest w zbudowanym APK
+**Ryzyko:** zmienne `EXPO_PUBLIC_*` są wpisywane do paczki JS jawnym tekstem – każdy, kto dostanie APK, może klucz wyciągnąć.
+**Zabezpieczenie:** to opcja tylko dla programistów; APK dla innych osób budujemy z pustym `EXPO_PUBLIC_OPENAI_API_KEY` (ostrzeżenie w README i w `.env.example`). Ekran ustawień pokazuje, że klucz pochodzi z pliku, i nie pozwala go „usunąć” z telefonu.

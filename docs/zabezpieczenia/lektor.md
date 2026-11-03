@@ -105,3 +105,27 @@ Sterownik nie zna z góry długości wypowiedzi, więc czeka na sygnał końca: 
 **Ryzyko:** development build bierze `expoConfig` (a więc `extra.voiceModelAsset`) z serwera Metro uruchomionego na komputerze, a folder modelu w APK powstaje przy prebuildzie na serwerze EAS (Linux). Skrót liczony z `path.relative` dawał na Windowsie inny wynik (ścieżki z „”) niż na Linuksie (`vits-piper-pl-976a80a8` kontra `vits-piper-pl-91b2fede`). sherpa-onnx dla nieistniejącego assetu nie zgłasza błędu: tworzy pusty katalog i przy następnych uruchomieniach zwraca go bez sprawdzania, więc lektor milczał na zawsze.
 **Zabezpieczenie:** wtyczka liczy skrót ze ścieżek zawsze z „/”, więc wynik jest taki sam na każdym systemie. Aplikacja nie ufa samej konfiguracji: sprawdza `listAssetModels()`, jakie foldery `vits-piper-pl-*` naprawdę są w APK (`pickModelAsset`), i przy niezgodności bierze folder z APK z ostrzeżeniem w logu. Przed `resolveModelPath` niekompletna kopia w pamięci telefonu jest usuwana, a stare wersje (w tym pusty katalog) kasuje `removeOldModels`.
 **Test:** `withVoiceModel-test.ts` (skrót niezależny od separatora ścieżek), `modelAsset-test.ts` (wybór folderu przy zgodnej i niezgodnej nazwie, brak modelu); ręcznie na telefonie: w logach „Wymagane pliki modelu istnieją” i „Model głosu wczytany poprawnie”.
+
+## Intonacja pytająca (podniesienie tonu na końcu pytania)
+
+Model głosu nauczył się na spokojnym monologu (200 nagrań, tylko 10 pytań), więc pytania czytał płasko, z tonem opadającym na końcu. Sam model nie ma przełącznika intonacji. Dlatego po syntezie zdania kończącego się „?” końcówka (ostatnie 450 ms mowy) jest odtwarzana coraz szybciej, jak przyspieszana taśma: ton płynnie rośnie do 4 półtonów na ostatniej sylabie (`src/narration/questionIntonation.ts`). Wariant wybrany na podstawie próbek z komputera (sherpa-onnx 1.12.35, ta sama wersja co w telefonie) i pomiaru wysokości głosu: przy 4 półtonach koniec pytania „Czy Wisła…?” idzie z ok. 145 Hz do ok. 170 Hz, przy 6 półtonach pomiar gubił już ostatnią sylabę (brzmi sztucznie).
+
+### 20. Podniesienie tonu trafia w ciszę zamiast w ostatnią sylabę
+**Ryzyko:** sherpa-onnx dokleja na końcu nagrania ciszę. Gdyby brać po prostu ostatnie 450 ms pliku, wzrost tonu objąłby głównie ciszę i nie byłoby go słychać.
+**Zabezpieczenie:** `speechEnd` szuka końca mowy po energii w ramkach 10 ms (ostatnia ramka głośniejsza niż 2% najgłośniejszej). Obróbka kończy się tam, a cisza po mowie zostaje bez zmian.
+**Test:** `questionIntonation-test.ts › podnosi ton końcówki mowy, a nie ciszy po niej`, `› cisza po mowie zostaje bez zmian`.
+
+### 21. Obróbka psuje początek zdania albo zdania, które nie są pytaniami
+**Ryzyko:** pomyłka w zakresie obróbki zmieniłaby całe zdanie albo podnosiła ton w zwykłych kwestiach prowadzącego („Brawo!”).
+**Zabezpieczenie:** obróbka dotyczy tylko tekstu kończącego się „?” (także z cudzysłowem albo nawiasem po nim, `isQuestion`). Wszystko przed ostatnimi 450 ms mowy jest kopiowane bez zmian.
+**Test:** `questionIntonation-test.ts › początek zdania zostaje bez zmian`, `› rozpoznaje pytania`.
+
+### 22. Cisza, pusty albo bardzo krótki dźwięk
+**Ryzyko:** dla samej ciszy nie ma końca mowy, a dla dźwięku krótszego niż 450 ms początek obróbki wypadłby przed początkiem nagrania. Skutek to wyjątek albo indeks poza tablicą i lektor milknie.
+**Zabezpieczenie:** cisza wraca bez zmian, a początek obróbki jest przycięty do zera. Czytanie próbek poza tablicą bierze ostatnią próbkę.
+**Test:** `questionIntonation-test.ts › cisza i pusty dźwięk wracają bez zmian`, `› krótkie pytanie też idzie w górę`.
+
+### 23. Pytania z bazy nie kończą się „?” i nie dostają intonacji
+**Ryzyko:** wzrost tonu włącza się po znaku zapytania. Pytanie zapisane bez niego byłoby przeczytane płasko.
+**Zabezpieczenie:** wszystkie pytania z bazy kończą się „?”; sprawdza to test integracyjny lektora na prawdziwej bazie i prawdziwej rozgrywce. Pytania wygenerowane przez OpenAI z własnych plików mogą nie mieć „?”: wtedy są czytane jak dotąd.
+**Test:** `narration-integration-test.ts › każde czytane pytanie dostaje intonację pytającą`.

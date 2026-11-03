@@ -8,6 +8,11 @@ import { createLogger } from '@/lib/log';
 import { MODEL_FOLDER_PREFIX, pickModelAsset } from './modelAsset';
 import type { Voice } from './NarrationDirector';
 import { toSpeakable } from './pronunciation';
+import {
+  isQuestion,
+  QUESTION_RISE,
+  riseQuestionEnding,
+} from './questionIntonation';
 
 const log = createLogger('lektor');
 
@@ -417,7 +422,7 @@ function synthesize(
       chars: speakable.length,
     });
 
-    const audio = await engine.generateSpeech(
+    let audio = await engine.generateSpeech(
       speakable
     );
 
@@ -429,6 +434,31 @@ function synthesize(
       throw new Error(
         'Silnik TTS zwrócił pusty lub nieprawidłowy dźwięk'
       );
+    }
+
+    /**
+     * Model czyta pytania płasko,
+     * więc podnosimy ton ich końcówki.
+     */
+    if (isQuestion(speakable)) {
+      const before = audio.samples.length;
+
+      audio = {
+        ...audio,
+        samples: riseQuestionEnding(
+          audio.samples,
+          audio.sampleRate
+        ),
+      };
+
+      log.debug('Intonacja pytająca', {
+        semitones: QUESTION_RISE.semitones,
+        shortenedMs: Math.round(
+          ((before - audio.samples.length) /
+            audio.sampleRate) *
+            1000
+        ),
+      });
     }
 
     const path =

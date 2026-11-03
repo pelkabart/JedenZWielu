@@ -15,7 +15,9 @@ import type { Difficulty } from '@/game/types';
 import { getLogEntries, resetLog } from '@/lib/log';
 
 import { NarrationDirector } from '../NarrationDirector';
+import { isQuestion, riseQuestionEnding } from '../questionIntonation';
 import { FakeVoice } from '../testing/FakeVoice';
+import { pitchHz, toneThenSilence } from '../testing/tone';
 
 const STEP_MS = 100;
 const MAX_GAME_MS = 4 * 60 * 60 * 1000;
@@ -102,6 +104,27 @@ describe('lektor w pełnej grze', () => {
     const read = voice.utterances().flatMap((texts) => texts.filter((t) => QUESTION_TEXTS.has(t)).map((t) => byText.get(t)));
     expect(asked.length).toBeGreaterThan(20);
     expect(read).toEqual(asked);
+  });
+
+  it('każde czytane pytanie dostaje intonację pytającą', async () => {
+    const { controller, voice } = newGame(11);
+    await playUntilFinished(controller);
+
+    // Teksty idą do syntezy osobno; tak samo sherpaVoice decyduje, czy podnieść ton.
+    const said = voice.utterances().flat();
+    const questions = said.filter((t) => QUESTION_TEXTS.has(t));
+    expect(questions.length).toBeGreaterThan(20);
+    expect(questions.filter((t) => !isQuestion(t))).toEqual([]);
+    // Kwestie prowadzącego bez „?” (powitanie, „Brawo!”…) zostają bez zmian.
+    expect(said.filter((t) => !isQuestion(t)).length).toBeGreaterThan(20);
+
+    // Dźwięk pytania (tu: ton 150 Hz i cisza) kończy się wyżej, niż się zaczął.
+    const rate = 22000;
+    const spoken = riseQuestionEnding(toneThenSilence(rate, 150, 1500, 300), rate);
+    const speechEndAt = spoken.length - Math.round(rate * 0.3);
+    const start = pitchHz(spoken.slice(0, rate / 10), rate);
+    const end = pitchHz(spoken.slice(speechEndAt - rate / 10, speechEndAt), rate);
+    expect(end / start).toBeGreaterThan(2 ** (2 / 12));
   });
 
   it('gdy gracz może odpowiadać, pytanie już nie jest czytane', async () => {

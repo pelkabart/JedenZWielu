@@ -28,3 +28,6 @@ export class MemorySecretStorage implements SecretStorage {
 
 /** Klucz w poprawnym formacie (nie prawdziwy). */
 export const VALID_KEY = 'sk-proj-TESTOWY0123456789abcdWXYZ';
+
+/** Drugi poprawny klucz – udaje klucz wpisany w `.env.local` (nie prawdziwy). */
+export const CONFIG_KEY = 'sk-proj-ZPLIKUENV0123456789abcdQRST';

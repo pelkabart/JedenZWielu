@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const savedKey = useApiKey();
+  const fromConfig = apiKeyStore.isFromConfig();
   const [input, setInput] = useState('');
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,7 +77,11 @@ export default function SettingsScreen() {
               color={savedKey ? colors.categories : colors.starYellow}
             />
             <Text style={styles.statusText}>
-              {savedKey ? `Zapisany na telefonie: ${maskApiKey(savedKey)}` : 'Brak zapisanego klucza'}
+              {!savedKey
+                ? 'Brak zapisanego klucza'
+                : fromConfig
+                  ? `Z pliku .env.local: ${maskApiKey(savedKey)}`
+                  : `Zapisany na telefonie: ${maskApiKey(savedKey)}`}
             </Text>
           </View>
 
@@ -106,7 +111,7 @@ export default function SettingsScreen() {
               disabled={busy || !check?.ok}
               onPress={() => void run(() => apiKeyStore.save(input), 'Klucz zapisany na telefonie.')}
             />
-            {savedKey !== '' && (
+            {savedKey !== '' && !fromConfig && (
               <MenuButton
                 label="Usuń klucz"
                 color={colors.danger}

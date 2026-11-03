@@ -1,7 +1,7 @@
 import { formatEntry, getLogEntries, resetLog } from '@/lib/log';
 
 import { ApiKeyError, ApiKeyStore, maskApiKey, validateApiKey } from '../ApiKeyStore';
-import { MemorySecretStorage, VALID_KEY } from '../testing/fakes';
+import { CONFIG_KEY, MemorySecretStorage, VALID_KEY } from '../testing/fakes';
 
 async function loaded(storage = new MemorySecretStorage()) {
   const store = new ApiKeyStore(storage);
@@ -190,5 +190,49 @@ describe('ApiKeyStore', () => {
     const dump = entries.map(formatEntry).join('\n');
     expect(dump).not.toContain(VALID_KEY);
     expect(dump).not.toContain('TESTOWY');
+  });
+
+  describe('klucz z konfiguracji (.env.local)', () => {
+    it('używany, gdy na telefonie nie ma klucza – ale dopiero po wczytaniu', async () => {
+      const store = new ApiKeyStore(new MemorySecretStorage(), `  ${CONFIG_KEY}\n`);
+      expect(store.getKey()).toBe('');
+      await store.load();
+      expect(store.getKey()).toBe(CONFIG_KEY);
+      expect(store.isFromConfig()).toBe(true);
+    });
+
+    it('klucz zapisany na telefonie ma pierwszeństwo', async () => {
+      const store = new ApiKeyStore(new MemorySecretStorage(VALID_KEY), CONFIG_KEY);
+      await store.load();
+      expect(store.getKey()).toBe(VALID_KEY);
+      expect(store.isFromConfig()).toBe(false);
+    });
+
+    it('po usunięciu klucza z telefonu wraca klucz z pliku', async () => {
+      const storage = new MemorySecretStorage(VALID_KEY);
+      const store = new ApiKeyStore(storage, CONFIG_KEY);
+      await store.load();
+      await store.clear();
+      expect(storage.value).toBeNull();
+      expect(store.getKey()).toBe(CONFIG_KEY);
+    });
+
+    it('niepoprawny klucz z pliku jest pomijany z ostrzeżeniem bez treści klucza', async () => {
+      const bad = `${CONFIG_KEY} ups`;
+      const store = new ApiKeyStore(new MemorySecretStorage(), bad);
+      await store.load();
+      expect(store.getKey()).toBe('');
+      expect(store.isFromConfig()).toBe(false);
+      const warns = getLogEntries({ tag: 'ustawienia' }).filter((e) => e.level === 'warn');
+      expect(warns).toHaveLength(1);
+      expect(warns.map(formatEntry).join('\n')).not.toContain(CONFIG_KEY);
+    });
+
+    it('pusty klucz z pliku: brak klucza, bez ostrzeżenia', async () => {
+      const store = new ApiKeyStore(new MemorySecretStorage(), '');
+      await store.load();
+      expect(store.getKey()).toBe('');
+      expect(getLogEntries({ tag: 'ustawienia' }).filter((e) => e.level === 'warn')).toHaveLength(0);
+    });
   });
 });

@@ -58,7 +58,8 @@
     "lint": "expo lint",
     "test": "jest",
     "test:integration": "jest integration-test",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "private": true,
   "jest": {

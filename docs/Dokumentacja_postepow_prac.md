@@ -40,10 +40,12 @@ Spis treści:
 | Testy integracyjne (prawdziwa baza, boty, sterownik, logi) | zrobione |
 | Pliki zabezpieczeń dla każdej funkcjonalności (`docs/zabezpieczenia/`) | zrobione |
 | Lektor: głos prowadzącego i pytań na żywo (Piper + sherpa-onnx) | zrobione, sprawdzone na emulatorze |
+| Lektor: intonacja pytająca (ton rośnie na końcu pytania) | zrobione, sprawdzone na próbkach z komputera, do odsłuchania na telefonie |
 | Odpowiadanie na pytania głosem (mikrofon, rozpoznawanie mowy Androida) | zrobione, do sprawdzenia na telefonie |
 | Kategorie: własne zestawy pytań generowane przez OpenAI z plików (do 3), wybór kategorii przed grą | zrobione, do sprawdzenia na telefonie z kluczem API |
 | Ustawienia: klucz API OpenAI zapisany na telefonie (Android Keystore) | zrobione, sprawdzone na emulatorze |
-| Razem testów automatycznych | 393 |
+| Klucz API OpenAI w pliku `.env.local` dla programistów (w `.gitignore`, hak pre-commit blokuje commit klucza) | zrobione, testy automatyczne + ręczny test haka |
+| Razem testów automatycznych | 404 |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki postaci i pulpitów | czekamy na grafiki |
 
@@ -196,6 +198,7 @@ Jak to działa w grze:
 - Sterownik nie zna z góry długości wypowiedzi. Lektor zgłasza mu początek i koniec mowy (`setSpeaking`). Krok „czytanie pytania” (nakładka `reading`) i pauzy po wyniku, wskazaniu, zgłoszeniu i zapowiedzi trwają co najmniej swój dotychczasowy czas, a potem czekają, aż prowadzący skończy. Najdłużej czekają 20 s, na wypadek gdyby lektor się zawiesił.
 - W czasie czytania pytanie już widać, przy kategorii jest ikona głośnika, a licznik i boty czekają. Gracz nie może jeszcze odpowiadać ani się zgłaszać, tak jak w teleturnieju. Dotknięcie ekranu pomija czytanie i każdą pauzę. Pauza (okno „Przerwać grę?”) wstrzymuje też głos. Każde pytanie jest czytane raz: w finale przed zgłoszeniami.
 - Cyfry rzymskie po imieniu są czytane jako liczebniki („Mieszko I” → „Mieszko Pierwszy”), bo espeak czytałby je jak literę „i”. Zapowiedzi etapów są słowami („Przechodzimy do drugiego etapu!”).
+- Intonacja pytająca: model czytał pytania płasko, z tonem opadającym na końcu, bo uczył się na spokojnym monologu (200 nagrań, tylko 10 pytań). Po syntezie zdania zakończonego „?” `riseQuestionEnding` (`questionIntonation.ts`) odtwarza ostatnie 450 ms mowy coraz szybciej, jak przyspieszaną taśmę. Ton płynnie rośnie do 4 półtonów na ostatniej sylabie, a cisza po mowie zostaje bez zmian. Wariant wybraliśmy z próbek wygenerowanych na komputerze (sherpa-onnx 1.12.35, ta sama wersja co w telefonie) i pomiaru wysokości głosu: koniec pytania „Czy Wisła jest najdłuższą rzeką w Polsce?” idzie z ok. 145 Hz do ok. 170 Hz. Same parametry modelu (`noiseScale`, `noiseScaleW`) nie pomagały (7.46).
 
 ### Odpowiadanie głosem
 
@@ -220,6 +223,8 @@ Nowa kategoria powstaje z plików gracza:
 
 Klucz API wpisuje się raz, na ekranie „Ustawienia” (zębatka na ekranie głównym). Gra sprawdza go przed zapisem (bez spacji, zaczyna się od `sk-`, rozsądna długość), więc wklejony fragment albo spacja na końcu wychodzi od razu, a nie po kilku minutach generowania. Na Androidzie `expo-secure-store` trzyma klucz w `SharedPreferences` zaszyfrowanych kluczem z Android Keystore; wtyczka w `app.json` wyłącza ten magazyn z kopii zapasowej. Klucz zostaje po zamknięciu gry i po aktualizacji APK (ta sama nazwa wpisu co wcześniej). Ekran pokazuje go tylko zamaskowany (`sk-…abcd`) i pozwala go zmienić albo usunąć. Logika jest w `src/settings/ApiKeyStore.ts` (magazyn wstrzykiwany, w testach w pamięci), a ekrany czytają klucz przez `useSyncExternalStore` (`useApiKey`), więc po powrocie z ustawień ekran „Nowa kategoria” od razu go widzi.
 
+Programista może zamiast tego wpisać klucz raz w pliku `.env.local` (`EXPO_PUBLIC_OPENAI_API_KEY=sk-…`, wzór w `.env.example`). Expo CLI wstawia go do kodu (`src/settings/configApiKey.ts`); klucz zapisany na telefonie ma pierwszeństwo, a ekran ustawień pokazuje „Z pliku .env.local: sk-…abcd”. Plik jest w `.gitignore`, a hak `.githooks/pre-commit` (włączany przez `npm install`, skrypt `prepare`) odrzuca commit z plikiem `.env*` albo z tekstem wyglądającym na klucz `sk-…` poza testami. Uwaga: taki klucz jest w zbudowanym APK jawnym tekstem, więc APK dla innych budujemy bez niego.
+
 Gdy oprócz domyślnej jest choć jedna własna kategoria, „Tryb Jednoosobowy” pokazuje najpierw listę kategorii. Pytania w grze są losowane tylko z wybranej; z niej biorą też pomyłki boty. Bez własnych kategorii gra od razu przechodzi do wyboru poziomu.
 
 Moduły: `src/categories/` (logika bez zależności od telefonu, z atrapami w testach) i `src/categories/device/` (wybór plików, zapis), klucz API w `src/settings/`. W kodzie kategoria to „zestaw pytań” (`QuestionSet`), żeby nie mylić jej z polem `category` pytania (dziedzina: Historia, Sport…).
@@ -242,9 +247,10 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
 | `integration-test.ts` | 9 | testy integracyjne: całe gry na prawdziwej bazie i botach, zgodność logów z przebiegiem gry |
+| `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
 | `narration/__tests__/NarrationDirector-test.ts` | 15 | sterowanie lektorem: kiedy mówi, przerywanie kwestii, pauza, wznowienie, pominięte czytanie, mikrofon, błąd syntezy, zwolnienie |
-| `narration/__tests__/narration-integration-test.ts` | 9 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz, kwestie nieucinane, pauza, wyjście |
+| `narration/__tests__/narration-integration-test.ts` | 10 | testy integracyjne lektora: całe gry na prawdziwej bazie, każde pytanie czytane raz i z intonacją pytającą, kwestie nieucinane, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
@@ -254,9 +260,9 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/QuestionSetStore-test.ts` | 34 | kategorie: domyślna nieusuwalna, limit 3, jednoczesne dodania, zapis i uszkodzony zapis, nazwy |
 | `categories/__tests__/soloEntry-test.ts` | 4 | kategorie: kiedy pokazać listę kategorii przed grą |
 | `categories/__tests__/categories-integration-test.ts` | 16 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza) |
-| `settings/__tests__/ApiKeyStore-test.ts` | 25 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz poza logami |
-| `settings/__tests__/settings-integration-test.ts` | 5 | testy integracyjne: klucz z ustawień w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
-| **Razem** | **393** | |
+| `settings/__tests__/ApiKeyStore-test.ts` | 30 | ustawienia: sprawdzanie i maskowanie klucza API, zapis, usuwanie, kolejność zapisów, błędy magazynu, klucz z `.env.local`, klucz poza logami |
+| `settings/__tests__/settings-integration-test.ts` | 6 | testy integracyjne: klucz z ustawień albo z `.env.local` w zapytaniu do OpenAI (atrapa), klucz po ponownym uruchomieniu, usunięcie klucza, brak klucza w logach |
+| **Razem** | **404** | |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 5–35 sekund, z czego najwięcej zajmują symulacje.
 
@@ -489,9 +495,15 @@ APK z lektorem na wszystkie 4 architektury procesora ma ok. 320 MB, a tylko dla 
 **7.45. `Buffer` w teście przechodził w Jest, ale nie w TypeScript**
 Test integracyjny kategorii kodował treść udawanego pliku przez `Buffer.from(...).toString('base64')`. Jest działa w Node, więc test przechodził, ale `npx tsc --noEmit` zgłosił „Cannot find name 'Buffer'”: projekt ma typy dla React Native, a nie dla Node, i dobrze, bo w aplikacji `Buffer` nie istnieje. Zamieniliśmy go na `btoa`, które jest i w Node, i w React Native.
 
+### Lektor: intonacja pytająca
+
+**7.46. Pytania czytane płasko; same parametry modelu nie pomagały**
+Lektor czytał pytania tak samo jak zwykłe zdania. Przyczyna leży w danych treningowych głosu: 200 nagrań monologu o finansach, w tym tylko 10 pytań i ani jednego wykrzyknika. Najpierw sprawdziliśmy parametry syntezy (`noiseScale` 0.667–0.95, `noiseScaleW` 0.8–1.2, `lengthScale`). Na próbkach z komputera pytanie „Czy…?” we wszystkich wariantach kończyło się spadkiem tonu o 2–4 półtony, bo te parametry dodają tylko losowe wahania. Pierwsza próba obróbki dźwięku (zmiana wysokości „ziarnami” po 40 ms) rozmywała głos i pomiar tonu gubił ostatnią sylabę. Zadziałała dopiero „przyspieszana taśma” na końcówce. Po drodze: pakiet `piper-tts` na macOS szuka danych espeak pod ścieżką z maszyny, na której go zbudowano, a `sherpa-onnx` 2.x w Pythonie nie zamienia już tekstu na fonemy dla tego modelu, więc próbki robiliśmy w wersji 1.12.35, tej samej co w aplikacji. Wniosek: przy syntezie mowy oceniać zmiany pomiarem (tu wysokość tonu), a nie tylko nazwą parametru.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
+- Lektor: intonację pytającą odsłuchać na telefonie; jeśli to za mało, nagrać zdania w stylu prowadzącego (pytania, okrzyki) i dotrenować model.
 - Lektor: mniejszy model (kwantyzacja do int8 zmniejszyłaby go ok. 4 razy, kosztem jakości głosu — do odsłuchania), paczka AAB do Google Play, włącznik lektora w ustawieniach.
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.

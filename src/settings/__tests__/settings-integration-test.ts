@@ -13,13 +13,13 @@ import { QUESTION_BANK } from '@/game/questions';
 import { formatEntry, getLogEntries, resetLog } from '@/lib/log';
 
 import { ApiKeyStore } from '../ApiKeyStore';
-import { MemorySecretStorage, VALID_KEY } from '../testing/fakes';
+import { CONFIG_KEY, MemorySecretStorage, VALID_KEY } from '../testing/fakes';
 
 const picked = (name: string): PickedFile => ({ name, size: 2048, uri: `file:///cache/${name}` });
 
 /** Jedno „uruchomienie gry”: magazyny wczytują to, co jest zapisane na telefonie. */
-async function launch(secrets = new MemorySecretStorage(), sets = new MemoryStorage()) {
-  const apiKey = new ApiKeyStore(secrets);
+async function launch(secrets = new MemorySecretStorage(), sets = new MemoryStorage(), configKey = '') {
+  const apiKey = new ApiKeyStore(secrets, configKey);
   const store = new QuestionSetStore({ storage: sets, defaultQuestions: QUESTION_BANK });
   await Promise.all([apiKey.load(), store.load()]);
   const openai = fakeFetch(jsonResponse(questionsResponse(generatedItems(QUESTIONS_TO_REQUEST))));
@@ -98,5 +98,17 @@ describe('klucz API z ustawień', () => {
     const dump = getLogEntries().map(formatEntry).join('\n');
     expect(dump).toContain('[ustawienia]');
     expect(dump).not.toContain(VALID_KEY);
+  });
+
+  it('klucz z .env.local: kategorię da się utworzyć bez wpisywania klucza w ustawieniach', async () => {
+    const game = await launch(new MemorySecretStorage(), new MemoryStorage(), CONFIG_KEY);
+    await game.create('Geografia');
+    expect(game.openai.calls[0].init.headers).toEqual(expect.objectContaining({ Authorization: `Bearer ${CONFIG_KEY}` }));
+    expect(game.secrets.value).toBeNull();
+
+    await game.apiKey.save(VALID_KEY);
+    await game.create('Astronomia');
+    expect(game.openai.calls[1].init.headers).toEqual(expect.objectContaining({ Authorization: `Bearer ${VALID_KEY}` }));
+    expect(getLogEntries().map(formatEntry).join('\n')).not.toContain(CONFIG_KEY);
   });
 });
