@@ -54,12 +54,20 @@ export interface PotatoState {
   sprintMsLeft: number;
   eliminations: number;
   ranking: string[] | null;
+  /** Ile pytań z rzędu trafiło do botów, bez człowieka. Limit egzekwuje `pickTarget`. */
+  questionsWithoutHuman: number;
+  /** Bieżąca odpowiedź jest już nagrodzona (`award`) i zostało tylko przekazanie pytania (`pass`). */
+  awarded: boolean;
 }
 
 export type PotatoAction =
   | { type: 'start'; holderId: string }
   /** `text` = `null` gdy minął czas. `next` = kto dostaje ziemniak (po poprawnej: rywal, „na siebie” w finale; po błędzie: wybrany przez wywołującego). */
   | { type: 'answer'; playerId: string; text: string | null; next: string }
+  /** Poprawna odpowiedź gracza, który dopiero wskaże następnego: nagroda od razu, bez przekazania pytania. */
+  | { type: 'award'; playerId: string; text: string }
+  /** Przekazanie pytania po `award`. */
+  | { type: 'pass'; playerId: string; next: string }
   /** Odbicie w ciemno (runda 1, raz na gracza): przekazanie bez pytania i bez utraty życia. */
   | { type: 'blindPass'; playerId: string; targetId: string }
   /** Upływ czasu (sprint). */
@@ -97,6 +105,8 @@ export function createPotatoGame({ players, deck }: PotatoSetup): PotatoState {
     sprintMsLeft: POTATO.sprintMs,
     eliminations: 0,
     ranking: null,
+    questionsWithoutHuman: 0,
+    awarded: false,
   };
 }
 
@@ -113,6 +123,12 @@ export function reducePotato(state: PotatoState, action: PotatoAction): PotatoSt
       break;
     case 'answer':
       answer(s, action.playerId, action.text, action.next);
+      break;
+    case 'award':
+      award(s, action.playerId, action.text);
+      break;
+    case 'pass':
+      pass(s, action.playerId, action.next);
       break;
     case 'blindPass':
       blindPass(s, action.playerId, action.targetId);
@@ -156,9 +172,11 @@ export function errorEliminates(state: PotatoState, player: PotatoPlayer): boole
 function answer(s: PotatoState, playerId: string, text: string | null, next: string) {
   if (!s.question || s.holderId === null) throw new PotatoRuleError('Teraz nie ma pytania');
   if (playerId !== s.holderId) throw new PotatoRuleError(`Teraz odpowiada ${s.holderId}, nie ${playerId}`);
+  if (s.awarded) throw new PotatoRuleError('Ta odpowiedź jest już rozliczona');
   const holder = getPlayer(s, playerId);
   const correct = text !== null && isCorrectAnswer(text, s.question.answers);
-  if (!correct) holder.errors++;
+  if (correct) reward(s, holder);
+  else holder.errors++;
 
   switch (s.phase) {
     case 'round1':
@@ -172,6 +190,29 @@ function answer(s: PotatoState, playerId: string, text: string | null, next: str
     default:
       throw new PotatoRuleError('Teraz nie ma rundy z pytaniami');
   }
+}
+
+/** Co daje poprawna odpowiedź: mnożnik w rundzie 2, punkt w sprincie i finale. W rundzie 1 nic poza przekazaniem. */
+function reward(s: PotatoState, holder: PotatoPlayer) {
+  if (s.phase === 'round2') s.multiplier++;
+  if (s.phase === 'sprint' || s.phase === 'duel') holder.points++;
+}
+
+function award(s: PotatoState, playerId: string, text: string) {
+  if (!s.question || playerId !== s.holderId) throw new PotatoRuleError(`Teraz nie odpowiada ${playerId}`);
+  if (s.awarded) throw new PotatoRuleError('Ta odpowiedź jest już rozliczona');
+  if (!isCorrectAnswer(text, s.question.answers)) throw new PotatoRuleError('Nagroda należy się tylko za poprawną odpowiedź');
+  reward(s, getPlayer(s, playerId));
+  s.awarded = true;
+}
+
+function pass(s: PotatoState, playerId: string, next: string) {
+  if (!s.awarded || playerId !== s.holderId) throw new PotatoRuleError(`${playerId} nie przekazuje teraz pytania`);
+  const holder = getPlayer(s, playerId);
+  // Tylko w finale można wziąć pytanie na siebie.
+  if (s.phase === 'duel') requireActive(s, next);
+  else requireOther(s, holder, next);
+  hand(s, next);
 }
 
 /** Runda 1: poprawna odpowiedź przekazuje ziemniaka rywalowi; błąd kosztuje życie i resetuje ziemniaka. */
@@ -202,7 +243,6 @@ function enterRound2(s: PotatoState, next: string) {
 function answerRound2(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
   if (correct) {
     requireOther(s, holder, next);
-    s.multiplier++;
     hand(s, next);
     return;
   }
@@ -229,8 +269,7 @@ function enterSprint(s: PotatoState, next: string) {
 
 /** Sprint: +1 za dobrą odpowiedź, −1 s za błąd albo brak odpowiedzi. Ziemniak zawsze rotuje do innego gracza. */
 function answerSprint(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
-  if (correct) holder.points++;
-  else s.sprintMsLeft = Math.max(0, s.sprintMsLeft - POTATO.sprintPenaltyMs);
+  if (!correct) s.sprintMsLeft = Math.max(0, s.sprintMsLeft - POTATO.sprintPenaltyMs);
   requireOther(s, holder, next);
   if (s.sprintMsLeft === 0) {
     finishSprint(s);
@@ -255,11 +294,7 @@ function finishSprint(s: PotatoState) {
  * Błąd odbiera szansę. `next` to rywal (atak) albo odpowiadający („na siebie”).
  */
 function answerDuel(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
-  if (correct) {
-    holder.points++;
-  } else {
-    loseLife(s, holder);
-  }
+  if (!correct) loseLife(s, holder);
   if (activePlayers(s).length === 1) {
     finish(s);
     return;
@@ -271,6 +306,7 @@ function answerDuel(s: PotatoState, holder: PotatoPlayer, correct: boolean, next
 function blindPass(s: PotatoState, playerId: string, targetId: string) {
   if (s.phase !== 'round1') throw new PotatoRuleError('Odbicie w ciemno jest tylko w rundzie 1');
   if (playerId !== s.holderId) throw new PotatoRuleError(`Ziemniaka nie ma ${playerId}`);
+  if (s.awarded) throw new PotatoRuleError('Ta odpowiedź jest już rozliczona');
   const player = getPlayer(s, playerId);
   if (player.blindPassUsed) throw new PotatoRuleError(`${playerId} już użył odbicia w ciemno`);
   requireOther(s, player, targetId);
@@ -297,6 +333,7 @@ function finish(s: PotatoState) {
   s.phase = 'finished';
   s.question = null;
   s.holderId = null;
+  s.awarded = false;
 }
 
 // ---------- pomocnicze ----------
@@ -321,6 +358,8 @@ function hand(s: PotatoState, id: string) {
   s.holderId = id;
   s.question = s.deck[s.cursor % s.deck.length];
   s.cursor++;
+  s.awarded = false;
+  s.questionsWithoutHuman = getPlayer(s, id).isHuman ? 0 : s.questionsWithoutHuman + 1;
 }
 
 function loseLife(s: PotatoState, player: PotatoPlayer) {

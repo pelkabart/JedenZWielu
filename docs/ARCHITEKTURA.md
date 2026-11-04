@@ -287,7 +287,7 @@ Brak modułu natywnego (Expo Go) nie przerywa gry: lektor w `try/catch` przy two
 Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 
 1. **Zawieszony lektor blokuje grę.** Kroki czekają na `setSpeaking(false)` bez limitu czasu. Odrzucona obietnica jest obsłużona, ale obietnica, która nigdy się nie skończy, zatrzyma rozgrywkę. Limit 20 s był tylko w usuniętym sterowniku.
-2. **Mikrofon nie ucisza lektora.** `PotatoGame` nie przekazuje `onListening` do `AnswerPanel`, a `PotatoController` nie ma `setListening`. Na poziomie Ekspert gracz może włączyć mikrofon w czasie czytania pytania i rozpoznawanie słyszy wtedy lektora. Tak samo było przed usunięciem starego silnika.
+2. **Mikrofon a lektor (naprawione 04.11.2026).** `AnswerPanel` zgłasza słuchanie, a `PotatoNarrator.silence()` przerywa wtedy bieżącą kwestię. Do sprawdzenia na telefonie.
 3. **„Gorący Ziemniak” nie ma pełnego opisu w `Dokumentacja_postepow_prac.md`** (rozdziały 3–5 opisują usunięte zasady; aktualne ryzyka są w `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
 4. **Brak symulacji balansu.** Symulator działał tylko na starym silniku i został usunięty; nowych zasad nie sprawdzono na setkach gier pod kątem balansu.
 5. **Klucz OpenAI w APK.** Klucz jest tylko w `.env.local` i trafia do paczki jawnym tekstem, więc gra z kategoriami z plików nie nadaje się do rozdawania. Build EAS bez zmiennych środowiskowych nie ma klucza wcale. Docelowo pośrednik po stronie serwera.

@@ -407,7 +407,8 @@ function synthesize(
     cacheDir,
     saveAudioToFile,
   }: NativeTts,
-  text: string
+  text: string,
+  speed: number
 ): Promise<string> {
   const job = synthQueue.then(async () => {
     const started = Date.now();
@@ -422,10 +423,12 @@ function synthesize(
 
     log.debug('Rozpoczynam syntezę', {
       chars: speakable.length,
+      speed,
     });
 
     let audio = await engine.generateSpeech(
-      speakable
+      speakable,
+      { speed }
     );
 
     if (
@@ -552,8 +555,9 @@ export function createSherpaVoice(): Voice {
     });
 
   return {
-    async say(texts) {
+    async say(texts, options) {
       const mine = ++token;
+      const speed = options?.speed ?? 1;
 
       if (disposed || texts.length === 0) {
         return;
@@ -571,7 +575,7 @@ export function createSherpaVoice(): Voice {
         }
 
         let next: Promise<string> | null =
-          synthesize(tts, texts[0]);
+          synthesize(tts, texts[0], speed);
 
         for (
           let i = 0;
@@ -595,7 +599,8 @@ export function createSherpaVoice(): Voice {
             i + 1 < texts.length
               ? synthesize(
                   tts,
-                  texts[i + 1]
+                  texts[i + 1],
+                  speed
                 )
               : null;
 

@@ -58,8 +58,8 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 
 ### 10. Boty wybierają cel źle
 - **Ryzyko:** bot wskazuje siebie albo odpadniętego, albo zawsze tego samego gracza.
-- **Zabezpieczenie:** `pickTarget` losuje wyłącznie z aktywnych innych (lub wszystkich aktywnych przy resecie), priorytet lider 60% / rywal o najmniejszym zasobie 40%, z awaryjnym losowaniem.
-- **Test:** `potato-test.ts` › „bot wybiera tylko aktywnych rywali”.
+- **Zabezpieczenie:** `pickTarget` losuje wyłącznie z aktywnych innych (lub wszystkich aktywnych przy resecie), priorytet lider 60% / rywal o najmniejszym zasobie 40%, z awaryjnym losowaniem. Po 2 pytaniach z rzędu dla botów `pickTarget` wskazuje gracza (zob. [limit-pytan-botow.md](limit-pytan-botow.md)).
+- **Test:** `potato-test.ts` › „zawsze wskazuje aktywnego, innego gracza (albo dowolnego aktywnego przy resecie)”.
 
 ## Sterownik rund (`src/game/potato/controller/PotatoController.ts`)
 
@@ -90,8 +90,8 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 
 ### 16. Gracz wskazuje w nieskończoność
 - **Ryzyko:** po poprawnej odpowiedzi gra czeka na wybór rywala bez końca.
-- **Zabezpieczenie:** 10 s na wybór (`PICK_TIMEOUT_MS`); po upływie `pickAtRandom` losuje spośród legalnych celów (w finale może być sam odpowiadający).
-- **Test:** `potato/__tests__/controller-test.ts` › „bez wyboru w 10 s przekazanie idzie do losowego aktywnego rywala”; „wybór przed upływem 10 s anuluje losowanie”.
+- **Zabezpieczenie:** 10 s na wybór (`PICK_TIMEOUT_MS`), w finale 5 s (`DUEL_PICK_TIMEOUT_MS`); po upływie `pickAtRandom` losuje rywala, nigdy samego odpowiadającego.
+- **Test:** `potato/__tests__/controller-test.ts` › „bez wyboru w 10 s przekazanie idzie do losowego aktywnego rywala”; „wybór przed upływem 10 s anuluje losowanie”; „finał: 5 s na decyzję, potem losowy rywal”.
 
 ### 17. Ekran zostaje z działającymi zegarami po wyjściu
 - **Ryzyko:** po zamknięciu ekranu zegary nadal odpalają tury i sprint.
@@ -135,7 +135,7 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 
 ### 25. Prowadzący każe wskazywać, zanim powie, że odpowiedź była dobra
 - **Ryzyko:** gracz słyszy „Komu przekazujesz pytanie?”, a pochwałę dopiero po wskazaniu. To się naprawdę zdarzyło (dokumentacja postępów, 7.56).
-- **Zabezpieczenie:** przy wskazaniu lektor mówi „Brawo, dobrze!”, a potem pyta o gracza; wynik po wskazaniu jest już bez głosu.
+- **Zabezpieczenie:** „Brawo, dobrze!” pada przy wyniku, z zielonym dymkiem, a potem lektor pyta o gracza. Po wskazaniu od razu czyta nowe pytanie (zob. [poprawki-rozgrywki.md](poprawki-rozgrywki.md), punkt 24).
 - **Test:** `potato-narrator-test.ts` › „po poprawnej odpowiedzi najpierw pochwała, potem wskazanie, bez powtórki”.
 
 ### 26. Lektor powtarza kwestię w chwili zmiany stanu gry

@@ -37,12 +37,19 @@ function newGame(seed: number, difficulty: Difficulty = 'normal') {
 const QUESTION_TEXTS = new Set(QUESTION_BANK.map((q) => q.question));
 const advance = (ms: number) => jest.advanceTimersByTimeAsync(ms);
 
+const voiceDone = (view: PotatoView) => !view.speaking;
+
 const humanTurn = ({ game, overlay, awaitingPick }: PotatoView) =>
   overlay === null && awaitingPick === null && game.holderId === HUMAN_ID && game.question !== null;
 
 /** Jak gracz na telefonie: czeka na koniec czytania, odpowiada dobrze i wskazuje pierwszego rywala. */
 async function playStep(c: PotatoController, useBlindPass = false) {
   const view = c.getView();
+  // Gracz czeka, aż lektor skończy zasady, i dopiero zamyka planszę.
+  if (view.overlay?.kind === 'round' && voiceDone(view)) {
+    c.acceptRound();
+    return;
+  }
   if (view.awaitingPick) {
     const { chooserId } = view.awaitingPick;
     c.pick(activePlayers(view.game).find((p) => p.id !== chooserId)!.id);
@@ -139,6 +146,21 @@ describe('lektor w pełnej grze', () => {
     });
     expect(speakingSteps).toBeGreaterThan(100);
     expect(game.players.find((p) => p.id === HUMAN_ID)?.blindPassUsed).toBe(true);
+  });
+
+  it('pominięcie planszy od razu przerywa zasady i czyta pytanie gracza', async () => {
+    const { controller, voice, narrator } = newGame(5);
+    await advance(300);
+    expect(voice.utterances()).toHaveLength(1);
+    expect(voice.utterances()[0][0]).toBe('Runda 1 · Odsiew');
+    controller.acceptRound();
+    expect(voice.utterances().at(-1)?.[0]).toBe('Odpowiadasz Ty!');
+    expect(voice.state).toBe('speaking');
+    expect(controller.getView().deadline).toBeNull();
+    // Licznik rusza dopiero, gdy lektor przeczyta pytanie.
+    for (let t = 0; t < 60_000 && controller.getView().speaking; t += STEP_MS) await advance(STEP_MS);
+    expect(controller.getView().deadline).not.toBeNull();
+    narrator.dispose();
   });
 
   it('pauza wycisza lektora; po wznowieniu gra idzie dalej', async () => {

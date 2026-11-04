@@ -17,19 +17,3 @@ export const PHASE_RULE: Record<PotatoPhase, string> = {
   duel: 'Dobra odpowiedź daje punkt. Błąd odbiera szansę. Zostaje ostatni gracz.',
   finished: '',
 };
-
-/** Legenda na pasku: co oznaczają kropki i liczby oraz jaki jest aktualny mnożnik. */
-export function legendFor(phase: PotatoPhase, multiplier: number): string {
-  switch (phase) {
-    case 'round1':
-      return 'Kropki to życia. Odpadasz przy 0.';
-    case 'round2':
-      return `Mnożnik: ×${multiplier}. Kropki to osłona. Odpadasz przy 0.`;
-    case 'sprint':
-      return 'Liczba przy graczu to punkty w sprincie.';
-    case 'duel':
-      return 'Kropki to szanse, odpadasz przy 0. Liczba przy graczu to punkty.';
-    case 'finished':
-      return '';
-  }
-}

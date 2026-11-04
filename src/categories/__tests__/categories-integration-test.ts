@@ -57,7 +57,9 @@ function playWholeGame(questions: typeof QUESTION_BANK, seed: number) {
     if (elapsed > MAX_GAME_MS) throw new Error('Gra utknęła');
     const { game: state, overlay, awaitingPick } = c.getView();
     if (state.question && state.question.id !== asked.at(-1)) asked.push(state.question.id);
-    if (awaitingPick) {
+    if (overlay?.kind === 'round') {
+      c.acceptRound();
+    } else if (awaitingPick) {
       c.pick(activePlayers(state).find((p) => p.id !== awaitingPick.chooserId)!.id);
     } else if (overlay === null && state.question && state.holderId === HUMAN_ID) {
       c.submitAnswer(state.question.answers[0]);

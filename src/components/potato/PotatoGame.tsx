@@ -1,11 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
+import { blindModeOn, shownQuestion, spotlightId } from '@/components/potato/gameDisplay';
+import { MultiplierBadge, MultiplierBurst } from '@/components/potato/MultiplierBadge';
+import { PickCountdown } from '@/components/potato/PickCountdown';
 import { AnswerPanel } from '@/components/solo/AnswerPanel';
 import { answerLayout, KEYBOARD_GAP } from '@/components/solo/answerLayout';
 import { Host } from '@/components/solo/Host';
@@ -15,7 +18,7 @@ import { TimerBar } from '@/components/solo/TimerBar';
 import { colors } from '@/constants/theme';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { activePlayers, endedEarly, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
-import { legendFor, PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
+import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState, Question } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -66,28 +69,28 @@ function hostLine(view: PotatoView): string {
   if (overlay?.kind === 'reveal') {
     const player = game.players.find((p) => p.id === overlay.playerId);
     if (!overlay.correct) return `Niestety. Poprawna odpowiedź: ${overlay.correctAnswer}`;
-    // Człowieka pochwalił już przy wskazywaniu.
-    return player?.isHuman ? 'Gramy dalej.' : `Dobrze, ${player?.name ?? ''}!`;
+    return player?.isHuman ? 'Brawo, dobrze!' : `Dobrze, ${player?.name ?? ''}!`;
   }
-  if (awaitingPick) return 'Dobrze! Komu przekazujesz pytanie?';
+  if (awaitingPick) return 'Komu przekazujesz pytanie?';
   if (thinkingId) return 'Czekamy na odpowiedź…';
   return 'Gramy dalej.';
 }
 
 export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
-  const { controller, view, skins } = usePotatoController(difficulty, questions);
+  const { controller, view, skins, silenceHost } = usePotatoController(difficulty, questions);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
-  const [blindMode, setBlindMode] = useState(false);
+  // Numer pytania, przy którym włączono odbicie w ciemno.
+  const [blindArmedAt, setBlindArmedAt] = useState<number | null>(null);
+  const [appActive, setAppActive] = useState(true);
 
   const { game, overlay, awaitingPick } = view;
   const phase = game.phase;
   const me = game.players.find((p) => p.isHuman)!;
   const humanTurn = overlay === null && awaitingPick === null && game.holderId === me.id && game.question !== null;
   const blindAvailable = humanTurn && phase === 'round1' && !me.blindPassUsed;
-  // Tryb odbicia działa tylko wtedy, gdy odbicie jest dostępne (poza tym zostaje wyłączony).
-  const blindOn = blindMode && blindAvailable;
+  const blindOn = blindModeOn(blindArmedAt, game.cursor, blindAvailable);
   const finished = overlay?.kind === 'finished';
 
   const [exitAsked, setExitAsked] = useState(false);
@@ -116,7 +119,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (exitAsked) stayInGame();
+      if (view.paused) stayInGame();
       else askExit();
       return true;
     });
@@ -124,14 +127,23 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
   });
 
   useEffect(() => {
-    if (!humanTurn) Keyboard.dismiss();
-  }, [humanTurn]);
+    if (!humanTurn || view.paused) Keyboard.dismiss();
+  }, [humanTurn, view.paused]);
 
-  // Muzyka gry: gra razem z rozgrywką, pauzuje się z grą, a przy wyjściu się zatrzymuje.
+  // Aplikacja w tle albo wygaszony ekran: gra staje, a po powrocie gracz widzi ekran pauzy.
   useEffect(() => {
-    if (view.paused) stopGameMusic();
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+      if (state !== 'active') controller.pause();
+    });
+    return () => subscription.remove();
+  }, [controller]);
+
+  // Muzyka gry: gra razem z rozgrywką, pauzuje się z grą i w tle, a przy wyjściu się zatrzymuje.
+  useEffect(() => {
+    if (view.paused || !appActive) stopGameMusic();
     else startGameMusic();
-  }, [view.paused]);
+  }, [view.paused, appActive]);
 
   useEffect(() => () => stopGameMusic(), []);
 
@@ -171,7 +183,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
       return;
     }
     if (blindOn) {
-      setBlindMode(false);
+      setBlindArmedAt(null);
       controller.blindPass(id);
     }
   };
@@ -196,21 +208,26 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
             >
               <Ionicons name="close" size={22} color={colors.outline} />
             </Pressable>
+            <Pressable
+              onPress={() => controller.pause()}
+              disabled={finished}
+              accessibilityRole="button"
+              accessibilityLabel="Pauza"
+              hitSlop={10}
+              style={({ pressed }) => [styles.exit, pressed && styles.exitPressed]}
+            >
+              <Ionicons name="pause" size={20} color={colors.outline} />
+            </Pressable>
             <Text style={styles.phase}>{PHASE_TITLE[phase]}</Text>
             <Text style={styles.meta}>
               {difficultyLabel}
             </Text>
-          </View>
-        )}
-
-        {!(humanTurn && answering.keyboardOpen) && legendFor(phase, game.multiplier) !== '' && (
-          <View style={styles.legend}>
-            <Text style={styles.legendText}>{legendFor(phase, game.multiplier)}</Text>
+            {phase === 'round2' && overlay?.kind !== 'round' && <MultiplierBadge multiplier={game.multiplier} />}
           </View>
         )}
 
         {phase === 'sprint' && view.sprintEndsAt !== null && !(humanTurn && answering.keyboardOpen) && (
-          <TimerBar deadline={view.sprintEndsAt} totalMs={POTATO.sprintMs} paused={false} />
+          <TimerBar deadline={view.sprintEndsAt} totalMs={POTATO.sprintMs} paused={view.paused} />
         )}
 
         <View style={styles.stage}>
@@ -236,18 +253,21 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
                   question={game.question}
                   deadline={view.deadline}
                   totalMs={view.timerMs}
-                  paused={false}
+                  paused={view.paused}
                   compact={answering.compact}
                   choices={choices}
                   onSubmit={(text) => controller.submitAnswer(text)}
+                  onListening={(listening) => {
+                    if (listening) silenceHost();
+                  }}
                 />
               </View>
             ) : (
               <QuestionCard
-                question={game.question}
+                question={shownQuestion(overlay, game.question, awaitingPick !== null)}
                 deadline={view.deadline}
                 totalMs={view.timerMs}
-                paused={false}
+                paused={view.paused}
               />
             )}
 
@@ -259,7 +279,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
                     skin={skins[player.id] ?? null}
                     color={SEAT_COLORS[player.seat % SEAT_COLORS.length]}
                     width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
-                    highlighted={game.holderId === player.id}
+                    highlighted={spotlightId(overlay, game.holderId) === player.id}
                     selectable={targets.includes(player.id)}
                     showScore={phase === 'sprint' || phase === 'duel' || phase === 'finished'}
                     bubble={bubbleFor(view, player.id)}
@@ -272,7 +292,8 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
             <View style={styles.actions}>
               {awaitingPick ? (
                 <>
-                  <Text style={styles.hint}>Dotknij gracza, którego wybierasz</Text>
+                  <PickCountdown deadline={view.deadline} totalMs={view.timerMs} paused={view.paused} />
+                  <Text style={styles.hint}>{awaitingPick.allowSelf ? 'Wskaż rywala albo weź pytanie. Po czasie odpowie losowy rywal.' : 'Dotknij gracza, którego wybierasz'}</Text>
                   {awaitingPick.allowSelf && (
                     <MenuButton
                       label="Biorę na siebie"
@@ -286,37 +307,47 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
               ) : blindOn ? (
                 <>
                   <Text style={styles.hint}>Dotknij, komu odbijasz pytanie</Text>
-                  <MenuButton label="Anuluj" color={colors.multi} baseColor={colors.multiBase} width={160} onPress={() => setBlindMode(false)} />
+                  <MenuButton label="Anuluj" color={colors.multi} baseColor={colors.multiBase} width={160} onPress={() => setBlindArmedAt(null)} />
                 </>
               ) : blindAvailable ? (
-                <MenuButton label="Odbicie w ciemno" color={colors.multi} baseColor={colors.multiBase} width={220} onPress={() => setBlindMode(true)} />
+                <MenuButton label="Odbicie w ciemno" color={colors.multi} baseColor={colors.multiBase} width={220} onPress={() => setBlindArmedAt(game.cursor)} />
               ) : null}
             </View>
           </View>
         </View>
       </View>
 
+      {phase === 'round2' && <MultiplierBurst multiplier={game.multiplier} />}
+
       {overlay?.kind === 'round' && (
-        <View style={styles.backdrop} pointerEvents="none">
+        // Tło przepuszcza dotknięcia, żeby na planszy działały też pauza i wyjście.
+        <View style={styles.backdrop} pointerEvents="box-none">
           <View style={styles.card}>
             <Text style={styles.title}>{PHASE_TITLE[overlay.phase]}</Text>
             <Text style={styles.rule}>{PHASE_RULE[overlay.phase]}</Text>
+            <MenuButton
+              label={view.speaking ? 'Pomiń' : 'Gramy!'}
+              color={colors.solo}
+              baseColor={colors.soloBase}
+              width={170}
+              onPress={() => controller.acceptRound()}
+            />
           </View>
         </View>
       )}
 
-      {exitAsked && (
-        // Dotknięcie tła poza okienkiem wznawia grę; samo okienko pochłania dotknięcia.
-        <Pressable style={styles.backdrop} onPress={stayInGame} accessible={false}>
-          <Pressable style={styles.card} onPress={() => {}} accessible={false}>
-            <Text style={styles.title}>Przerwać grę?</Text>
-            <Text style={styles.rule}>Postęp tej rozgrywki zostanie utracony.</Text>
+      {view.paused && (
+        // Tło zasłania pytanie: inaczej pauza dawałaby nieograniczony czas na odpowiedź.
+        <View style={[styles.backdrop, styles.pauseBackdrop]}>
+          <View style={styles.card}>
+            <Text style={styles.title}>{exitAsked ? 'Przerwać grę?' : 'Pauza'}</Text>
+            <Text style={styles.rule}>{exitAsked ? 'Postęp tej rozgrywki zostanie utracony.' : 'Czas stoi. Wyjście z gry kasuje postęp.'}</Text>
             <View style={styles.actions}>
               <MenuButton label="Graj dalej" color={colors.solo} baseColor={colors.soloBase} width={170} onPress={stayInGame} />
               <MenuButton label="Wyjdź" color={colors.multi} baseColor={colors.multiBase} width={170} onPress={leave} />
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       )}
 
       {finished && <Finish game={game} onPlayAgain={onPlayAgain} onMenu={leave} />}
@@ -351,6 +382,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   topBar: {
+    zIndex: 5,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -381,20 +413,6 @@ const styles = StyleSheet.create({
   meta: {
     marginLeft: 'auto',
     color: colors.sky,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  legend: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.outline,
-    backgroundColor: colors.navyDeep,
-  },
-  legendText: {
-    color: colors.starYellow,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -429,9 +447,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hint: {
+    flexShrink: 1,
     color: colors.white,
     fontSize: 14,
     fontWeight: '800',
+  },
+  pauseBackdrop: {
+    backgroundColor: colors.navyDeep,
   },
   backdrop: {
     ...StyleSheet.absoluteFill,

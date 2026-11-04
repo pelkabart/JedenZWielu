@@ -7,6 +7,14 @@ import type { Voice } from './voice';
 
 const log = createLogger('lektor');
 
+/** Tempo mowy w sprincie: czas biegnie także w czasie czytania, więc lektor mówi szybciej. */
+export const SPRINT_SPEECH_SPEED = 1.25;
+
+/** Plansza sprintu idzie w normalnym tempie: czas jeszcze stoi, a zasady mają być zrozumiałe. */
+export function speechSpeedFor(view: PotatoView): number {
+  return view.game.phase === 'sprint' && view.overlay?.kind !== 'round' ? SPRINT_SPEECH_SPEED : 1;
+}
+
 /** To, co z gry rund udostępnia sterownik lektorowi. */
 export interface PotatoSource {
   subscribe(listener: () => void): () => void;
@@ -24,12 +32,9 @@ export function narrationFor(view: PotatoView): string[] {
   }
   if (overlay?.kind === 'round') return [PHASE_TITLE[overlay.phase], PHASE_RULE[overlay.phase]];
   if (overlay?.kind === 'reveal') {
-    if (!overlay.correct) return ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
-    // Człowieka pochwalił już przy wskazywaniu.
-    const byHuman = game.players.some((p) => p.id === overlay.playerId && p.isHuman);
-    return byHuman ? [] : ['Brawo, dobrze!'];
+    return overlay.correct ? ['Brawo, dobrze!'] : ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
   }
-  if (awaitingPick) return ['Brawo, dobrze!', 'Komu przekazujesz pytanie?'];
+  if (awaitingPick) return ['Komu przekazujesz pytanie?'];
   if (overlay !== null || game.question === null || game.holderId === null) return [];
   const holder = game.players.find((p) => p.id === game.holderId);
   const who = holder?.isHuman ? 'Odpowiadasz Ty!' : `Odpowiada: ${holder?.name ?? ''}.`;
@@ -64,6 +69,14 @@ export class PotatoNarrator {
     this.source.setSpeaking(false);
   }
 
+  /** Ucisza bieżącą kwestię, np. gdy słucha mikrofon. Liczniki ruszają po zgłoszeniu ciszy. */
+  silence() {
+    if (!this.speaking) return;
+    this.speaking = false;
+    this.voicePaused = false;
+    this.safely('stop', () => this.voice.stop());
+  }
+
   private readonly sync = () => {
     const view = this.source.getView();
     const texts = narrationFor(view);
@@ -71,7 +84,7 @@ export class PotatoNarrator {
 
     if (key !== null && key !== this.lastKey) {
       this.lastKey = key;
-      this.say(texts);
+      this.say(texts, speechSpeedFor(view));
     }
     if (view.paused && this.speaking && !this.voicePaused) {
       this.voicePaused = true;
@@ -82,16 +95,16 @@ export class PotatoNarrator {
     }
   };
 
-  private say(texts: string[]) {
+  private say(texts: string[], speed: number) {
     const id = ++this.currentId;
     if (this.speaking) this.safely('stop', () => this.voice.stop());
     this.speaking = true;
     this.voicePaused = false;
     this.source.setSpeaking(true);
-    log.debug('Prowadzący mówi', { sentences: texts.length });
+    log.debug('Prowadzący mówi', { sentences: texts.length, speed });
     let spoken: Promise<void>;
     try {
-      spoken = this.voice.say(texts);
+      spoken = this.voice.say(texts, { speed });
     } catch (error) {
       spoken = Promise.reject(error);
     }

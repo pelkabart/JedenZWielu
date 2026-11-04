@@ -2,7 +2,7 @@ import { DEFAULT_POTATO_PACING, PotatoController, type PotatoView } from '@/game
 import { createPotatoGame, reducePotato, type PotatoState } from '@/game/potato/engine';
 import type { Question } from '@/game/types';
 import { getLogEntries, resetLog } from '@/lib/log';
-import { PotatoNarrator, narrationFor } from '@/narration/PotatoNarrator';
+import { PotatoNarrator, SPRINT_SPEECH_SPEED, narrationFor, speechSpeedFor } from '@/narration/PotatoNarrator';
 import { FakeVoice } from '@/narration/testing/FakeVoice';
 import { createRng } from '@/game/rng';
 
@@ -83,19 +83,18 @@ describe('co mówi prowadzący', () => {
   });
 
   it('po wyniku mówi o poprawności i poprawnej odpowiedzi', () => {
-    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'b1', text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([
+    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'b1', question: DECK[0], text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([
       'Brawo, dobrze!',
     ]);
-    // Pochwałę dla człowieka lektor mówi już przy wskazywaniu.
-    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual([]);
-    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', text: 'x', correct: false, correctAnswer: 'odp a' } }))).toEqual([
+    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', question: DECK[0], text: OK, correct: true, correctAnswer: 'odp a' } }))).toEqual(['Brawo, dobrze!']);
+    expect(narrationFor(view({ overlay: { kind: 'reveal', playerId: 'h', question: DECK[0], text: 'x', correct: false, correctAnswer: 'odp a' } }))).toEqual([
       'Niestety.',
       'Poprawna odpowiedź: odp a.',
     ]);
   });
 
-  it('przy wskazywaniu najpierw chwali, potem pyta o gracza', () => {
-    expect(narrationFor(view({ awaitingPick: { chooserId: 'h', allowSelf: false } }))).toEqual(['Brawo, dobrze!', 'Komu przekazujesz pytanie?']);
+  it('przy wskazywaniu tylko pyta o gracza: pochwała padła już przy wyniku', () => {
+    expect(narrationFor(view({ awaitingPick: { chooserId: 'h', allowSelf: false } }))).toEqual(['Komu przekazujesz pytanie?']);
   });
 
   it('gdy gracz odpada przed rozstrzygnięciem, nikt nie jest ogłaszany zwycięzcą', () => {
@@ -113,6 +112,33 @@ describe('co mówi prowadzący', () => {
 
   it('przy zmianie rundy czyta tytuł i zasady', () => {
     expect(narrationFor(view({ overlay: { kind: 'round', phase: 'sprint' } }))[0]).toBe('Runda 3 · Sprint');
+  });
+});
+
+describe('tempo lektora', () => {
+  const inPhase = (phase: PotatoState['phase']) => ({ ...started(), phase });
+
+  it('w sprincie czyta szybciej', () => {
+    expect(speechSpeedFor(view({ game: inPhase('sprint') }))).toBe(SPRINT_SPEECH_SPEED);
+    expect(SPRINT_SPEECH_SPEED).toBeGreaterThan(1);
+  });
+
+  it('zasady sprintu na planszy czyta normalnie', () => {
+    expect(speechSpeedFor(view({ game: inPhase('sprint'), overlay: { kind: 'round', phase: 'sprint' } }))).toBe(1);
+  });
+
+  it.each(['round1', 'round2', 'duel'] as const)('w %s czyta normalnie', (phase) => {
+    expect(speechSpeedFor(view({ game: inPhase(phase) }))).toBe(1);
+  });
+
+  it('tempo trafia do syntezy', () => {
+    const timers = fakeClock();
+    const game = { ...started(), phase: 'sprint' as const };
+    const controller = new PotatoController({ game, difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    expect(voice.lastSpeed()).toBe(SPRINT_SPEECH_SPEED);
+    narrator.dispose();
   });
 });
 
@@ -164,18 +190,93 @@ describe('lektor z kontrolerem', () => {
     voice.finish();
     await flush();
 
+    const before = voice.utterances().length;
     controller.submitAnswer('odp a');
-    expect(voice.utterances().at(-1)).toEqual(['Brawo, dobrze!', 'Komu przekazujesz pytanie?']);
+    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', correct: true });
+    expect(voice.utterances().at(-1)).toEqual(['Brawo, dobrze!']);
     voice.finish();
     await flush();
 
-    const before = voice.utterances().length;
-    controller.pick('b1');
-    expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', correct: true });
-    // Po wskazaniu lektor milczy: nie chwali drugi raz i nie powtarza pytania o gracza.
-    expect(voice.utterances()).toHaveLength(before);
     timers.advance(DEFAULT_POTATO_PACING.revealMs);
+    expect(voice.utterances().at(-1)).toEqual(['Komu przekazujesz pytanie?']);
+    voice.finish();
+    await flush();
+
+    controller.pick('b1');
+    // Po wskazaniu od razu nowe pytanie: bez drugiej pochwały i bez powtórki.
+    expect(voice.utterances().slice(before)).toEqual([['Brawo, dobrze!'], ['Komu przekazujesz pytanie?'], ['Odpowiada: Bot 1.', 'pytanie b']]);
+    narrator.dispose();
+  });
+
+  it('wskazanie w trakcie pytania o gracza przerywa lektora i gra nie czeka', async () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    voice.finish();
+    await flush();
+
+    controller.submitAnswer('odp a');
+    voice.finish();
+    await flush();
+    timers.advance(DEFAULT_POTATO_PACING.revealMs);
+    expect(voice.state).toBe('speaking');
+    controller.pick('b1');
+    expect(voice.actions().slice(-2)).toEqual(['stop', 'say']);
     expect(voice.utterances().at(-1)).toEqual(['Odpowiada: Bot 1.', 'pytanie b']);
+    narrator.dispose();
+  });
+
+  it('nowa gra zaczyna od planszy, bez czytania pytania', () => {
+    const timers = fakeClock();
+    const game = createPotatoGame({ players: PLAYERS, deck: DECK });
+    const controller = new PotatoController({ game, difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    expect(voice.actions()).toEqual(['say']);
+    expect(voice.utterances()[0][0]).toBe('Runda 1 · Odsiew');
+    narrator.dispose();
+  });
+
+  it('pominięcie planszy przerywa lektora i czyta pytanie; koniec starej kwestii nie zwalnia licznika', async () => {
+    const timers = fakeClock();
+    const game = createPotatoGame({ players: PLAYERS, deck: DECK });
+    const controller = new PotatoController({ game, difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+
+    controller.acceptRound();
+    expect(voice.actions()).toEqual(['say', 'stop', 'say']);
+    expect(voice.utterances().at(-1)).toEqual(['Odpowiadasz Ty!', 'pytanie a']);
+    await flush();
+    expect(controller.getView().speaking).toBe(true);
+    expect(controller.getView().deadline).toBeNull();
+
+    voice.finish();
+    await flush();
+    expect(controller.getView().deadline).not.toBeNull();
+    narrator.dispose();
+  });
+
+  it('silence ucisza lektora i zwalnia licznik; bez mowy nic nie robi', async () => {
+    const timers = fakeClock();
+    const controller = new PotatoController({ game: started(), difficulty: 'normal', rng: createRng(4), clock: timers.clock });
+    const voice = new FakeVoice(null);
+    const narrator = new PotatoNarrator(controller, voice);
+    controller.start();
+    expect(controller.getView().deadline).toBeNull();
+
+    narrator.silence();
+    expect(voice.actions()).toEqual(['say', 'stop']);
+    await flush();
+    expect(controller.getView().speaking).toBe(false);
+    expect(controller.getView().deadline).not.toBeNull();
+
+    narrator.silence();
+    expect(voice.actions()).toEqual(['say', 'stop']);
     narrator.dispose();
   });
 

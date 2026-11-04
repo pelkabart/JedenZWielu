@@ -1,6 +1,6 @@
-import type { Voice } from '../voice';
+import type { SayOptions, Voice } from '../voice';
 
-export type FakeVoiceCall = { action: 'say'; texts: string[]; at: number } | { action: 'pause' | 'resume' | 'stop' | 'dispose'; at: number };
+export type FakeVoiceCall = { action: 'say'; texts: string[]; at: number; speed: number } | { action: 'pause' | 'resume' | 'stop' | 'dispose'; at: number };
 
 /**
  * Atrapa lektora. Zapisuje wywołania (z czasem wg `Date.now`) i udaje mowę:
@@ -20,15 +20,16 @@ export class FakeVoice implements Voice {
 
   constructor(private readonly msPerChar: number | null = null) {}
 
-  say(texts: string[]): Promise<void> {
-    this.record({ action: 'say', texts, at: Date.now() });
+  say(texts: string[], options?: SayOptions): Promise<void> {
+    const speed = options?.speed ?? 1;
+    this.record({ action: 'say', texts, at: Date.now(), speed });
     if (this.failOn === 'say') return Promise.reject(new Error('Awaria syntezy'));
     this.texts = texts;
     this.state = 'speaking';
     return new Promise<void>((resolve) => {
       this.resolve = resolve;
       if (this.msPerChar !== null) {
-        this.remainingMs = texts.join(' ').length * this.msPerChar;
+        this.remainingMs = (texts.join(' ').length * this.msPerChar) / speed;
         this.run();
       }
     });
@@ -69,6 +70,11 @@ export class FakeVoice implements Voice {
 
   actions() {
     return this.calls.map((c) => c.action);
+  }
+
+  /** Tempo ostatniej wypowiedzi. */
+  lastSpeed() {
+    return this.calls.flatMap((c) => (c.action === 'say' ? [c.speed] : [])).at(-1);
   }
 
   /** Teksty kolejnych wypowiedzi. */

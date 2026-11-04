@@ -56,6 +56,7 @@ function answerPanel(controller: PotatoController) {
 async function untilHumanMayAnswer(controller: PotatoController) {
   for (let elapsed = 0; !humanMayAnswer(controller.getView()); elapsed += STEP_MS) {
     if (elapsed > MAX_GAME_MS) throw new Error('Gracz nie dostał pytania');
+    controller.acceptRound();
     await advance(STEP_MS);
   }
 }
@@ -77,7 +78,9 @@ describe('odpowiadanie głosem w pełnej grze', () => {
     for (let elapsed = 0; controller.getView().overlay?.kind !== 'finished'; elapsed += STEP_MS) {
       if (elapsed > MAX_GAME_MS) throw new Error('Gra utknęła');
       const view = controller.getView();
-      if (view.awaitingPick) {
+      if (view.overlay?.kind === 'round') {
+        controller.acceptRound();
+      } else if (view.awaitingPick) {
         const { chooserId } = view.awaitingPick;
         controller.pick(activePlayers(view.game).find((p) => p.id !== chooserId)!.id);
       } else if (humanMayAnswer(view)) {

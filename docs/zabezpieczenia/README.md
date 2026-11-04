@@ -21,6 +21,8 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [baza-pytan.md](baza-pytan.md) | format i walidacja bazy pytań |
 | [sprawdzanie-odpowiedzi.md](sprawdzanie-odpowiedzi.md) | normalizacja i tolerancja literówek |
 | [rundy-goracy-ziemniak.md](rundy-goracy-ziemniak.md) | zasady i sterownik rund „Gorący Ziemniak” (jedyny tryb gry) |
+| [limit-pytan-botow.md](limit-pytan-botow.md) | najwyżej 2 pytania z rzędu dla botów, potem bot musi wskazać gracza |
+| [poprawki-rozgrywki.md](poprawki-rozgrywki.md) | plansza rundy z pomijaniem lektora, start sprintu, 5 s na decyzję w finale, pauza, mnożnik na środku, start od gracza, błędy przebiegu gry |
 | [silnik-gry.md](silnik-gry.md) | zasady etapów I, II i finału (kod usunięty) |
 | [boty.md](boty.md) | decyzje i osobowości botów |
 | [symulator.md](symulator.md) | rozgrywanie całych gier botami (kod usunięty) |

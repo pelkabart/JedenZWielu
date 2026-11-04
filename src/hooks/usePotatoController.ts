@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { createRng } from '@/game/rng';
 import { PotatoNarrator } from '@/narration/PotatoNarrator';
@@ -31,6 +31,8 @@ export function usePotatoController(difficulty: Difficulty, questions: Question[
     return { controller: new PotatoController({ game, difficulty, rng }), skins };
   });
 
+  const narratorRef = useRef<PotatoNarrator | null>(null);
+
   useEffect(() => {
     let narrator: PotatoNarrator | null = null;
     try {
@@ -39,13 +41,16 @@ export function usePotatoController(difficulty: Difficulty, questions: Question[
       // Bez głosu da się grać, tylko cicho.
       log.error('Nie udało się uruchomić lektora', { error: error instanceof Error ? error.message : String(error) });
     }
+    narratorRef.current = narrator;
     controller.start();
     return () => {
+      narratorRef.current = null;
       controller.stop();
       narrator?.dispose();
     };
   }, [controller]);
 
   const view = useSyncExternalStore(controller.subscribe, controller.getView);
-  return { controller, view, skins };
+  const silenceHost = () => narratorRef.current?.silence();
+  return { controller, view, skins, silenceHost };
 }

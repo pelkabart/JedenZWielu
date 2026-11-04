@@ -1,5 +1,5 @@
 import type { Question } from '../../types';
-import { pickTarget } from '../bots';
+import { MAX_QUESTIONS_WITHOUT_HUMAN, pickTarget } from '../bots';
 import { activePlayers, createPotatoGame, endedEarly, POTATO, PotatoRuleError, reducePotato, type PotatoState } from '../engine';
 
 const OK = 'ok';
@@ -266,6 +266,63 @@ describe('boty wybierają cel', () => {
     expect(pickTarget(s, 'h', () => 0.1)).toBe('b1');
     expect(pickTarget(s, 'h', () => 0.9)).toBe('b2');
   });
+
+  it('przy limicie zawsze wskazuje gracza, bez względu na losowanie i także po błędzie bota', () => {
+    const s = { ...started('b1'), questionsWithoutHuman: MAX_QUESTIONS_WITHOUT_HUMAN };
+    for (const roll of [0.1, 0.9]) {
+      expect(pickTarget(s, 'b1', () => roll)).toBe('h');
+      expect(pickTarget(s, null, () => roll)).toBe('h');
+    }
+  });
+
+  it('poniżej limitu działa zwykły wybór 60/40', () => {
+    const base = withPlayers(started('b1'), { h: { lives: 2 }, b2: { lives: 3 }, b3: { lives: 1 }, b4: { lives: 2 } });
+    const s = { ...base, questionsWithoutHuman: MAX_QUESTIONS_WITHOUT_HUMAN - 1 };
+    expect(pickTarget(s, 'b1', () => 0.9)).toBe('b3');
+  });
+
+  it('bez aktywnego gracza limit nie blokuje wyboru', () => {
+    const s = { ...withPlayers(started('b1'), { h: { eliminated: true } }), questionsWithoutHuman: 5 };
+    const target = pickTarget(s, 'b1', () => 0.5);
+    expect(target).not.toBe('h');
+    expect(target).not.toBe('b1');
+  });
+});
+
+describe('licznik pytań bez gracza', () => {
+  const pass = (s: PotatoState, next: string) => reducePotato(s, { type: 'answer', playerId: s.holderId!, text: OK, next });
+
+  it('start: bot liczy się jako pierwsze pytanie, człowiek nie', () => {
+    expect(started('b1').questionsWithoutHuman).toBe(1);
+    expect(started('h').questionsWithoutHuman).toBe(0);
+  });
+
+  it('rośnie przy botach i zeruje się, gdy pytanie dostaje gracz', () => {
+    const second = pass(started('b1'), 'b2');
+    expect(second.questionsWithoutHuman).toBe(2);
+    expect(pass(second, 'h').questionsWithoutHuman).toBe(0);
+  });
+
+  it('odbicie w ciemno do bota też się liczy', () => {
+    expect(reducePotato(started('h'), { type: 'blindPass', playerId: 'h', targetId: 'b1' }).questionsWithoutHuman).toBe(1);
+  });
+
+  it('zmiana rundy nie zeruje serii', () => {
+    const s = withPlayers(started('b1'), { b1: { lives: 1 } });
+    const round2 = reducePotato(s, { type: 'answer', playerId: 'b1', text: BAD, next: 'b2' });
+    expect(round2.phase).toBe('round2');
+    expect(round2.questionsWithoutHuman).toBe(2);
+  });
+
+  it('koniec sprintu nie zeruje serii, więc zwycięzca-bot musi potem wskazać gracza', () => {
+    const base = withPlayers(started('b1'), { b3: { eliminated: true }, b4: { eliminated: true }, b1: { points: 5 } });
+    const sprint: PotatoState = { ...base, phase: 'sprint', questionsWithoutHuman: 2 };
+    const duel = reducePotato(sprint, { type: 'tick', ms: POTATO.sprintMs });
+    expect(duel.phase).toBe('duel');
+    expect(duel.holderId).toBe('b1');
+    expect(duel.questionsWithoutHuman).toBe(3);
+    expect(pickTarget(duel, 'b1', () => 0.1)).toBe('h');
+  });
 });
 
 describe('pełna gra zaskryptowana od początku do końca', () => {
@@ -289,5 +346,61 @@ describe('pełna gra zaskryptowana od początku do końca', () => {
     expect(new Set(s.ranking).size).toBe(PLAYERS.length);
     const winner = s.ranking![0];
     expect(player(s, winner).eliminated).toBe(false);
+  });
+});
+
+describe('nagroda przed przekazaniem pytania', () => {
+  const inPhase = (phase: PotatoState['phase']): PotatoState => ({ ...started(), phase });
+
+  it.each(['sprint', 'duel'] as const)('%s: punkt od razu, pytanie zostaje do wskazania', (phase) => {
+    const before = inPhase(phase);
+    const s = reducePotato(before, { type: 'award', playerId: 'h', text: OK });
+    expect(player(s, 'h').points).toBe(1);
+    expect(s.holderId).toBe('h');
+    expect(s.cursor).toBe(before.cursor);
+    expect(player(before, 'h').points).toBe(0);
+  });
+
+  it('runda 2: mnożnik rośnie od razu', () => {
+    expect(reducePotato(inPhase('round2'), { type: 'award', playerId: 'h', text: OK }).multiplier).toBe(2);
+  });
+
+  it('runda 1: bez punktów, samo prawo do przekazania', () => {
+    const s = reducePotato(started(), { type: 'award', playerId: 'h', text: OK });
+    expect(player(s, 'h').points).toBe(0);
+    expect(reducePotato(s, { type: 'pass', playerId: 'h', next: 'b1' }).holderId).toBe('b1');
+  });
+
+  it.each(['round2', 'sprint', 'duel'] as const)('%s: przekazanie nie nagradza drugi raz', (phase) => {
+    const awarded = reducePotato(inPhase(phase), { type: 'award', playerId: 'h', text: OK });
+    const s = reducePotato(awarded, { type: 'pass', playerId: 'h', next: 'b1' });
+    expect(s.holderId).toBe('b1');
+    expect(s.awarded).toBe(false);
+    expect(player(s, 'h').points).toBe(player(awarded, 'h').points);
+    expect(s.multiplier).toBe(awarded.multiplier);
+  });
+
+  it('atomowa odpowiedź daje tę samą nagrodę co award i pass', () => {
+    for (const phase of ['round2', 'sprint', 'duel'] as const) {
+      const atomic = reducePotato(inPhase(phase), { type: 'answer', playerId: 'h', text: OK, next: 'b1' });
+      const split = reducePotato(reducePotato(inPhase(phase), { type: 'award', playerId: 'h', text: OK }), { type: 'pass', playerId: 'h', next: 'b1' });
+      expect(split).toEqual(atomic);
+    }
+  });
+
+  it('nie nagradza błędnej odpowiedzi, cudzej tury ani dwa razy', () => {
+    expect(() => reducePotato(inPhase('duel'), { type: 'award', playerId: 'h', text: BAD })).toThrow(PotatoRuleError);
+    expect(() => reducePotato(inPhase('duel'), { type: 'award', playerId: 'b1', text: OK })).toThrow(PotatoRuleError);
+    const awarded = reducePotato(inPhase('duel'), { type: 'award', playerId: 'h', text: OK });
+    expect(() => reducePotato(awarded, { type: 'award', playerId: 'h', text: OK })).toThrow(PotatoRuleError);
+    expect(() => reducePotato(awarded, { type: 'answer', playerId: 'h', text: OK, next: 'b1' })).toThrow(PotatoRuleError);
+  });
+
+  it('przekazanie wymaga nagrody; na siebie tylko w finale', () => {
+    expect(() => reducePotato(inPhase('duel'), { type: 'pass', playerId: 'h', next: 'b1' })).toThrow(PotatoRuleError);
+    const inSprint = reducePotato(inPhase('sprint'), { type: 'award', playerId: 'h', text: OK });
+    expect(() => reducePotato(inSprint, { type: 'pass', playerId: 'h', next: 'h' })).toThrow(PotatoRuleError);
+    const inDuel = reducePotato(inPhase('duel'), { type: 'award', playerId: 'h', text: OK });
+    expect(reducePotato(inDuel, { type: 'pass', playerId: 'h', next: 'h' }).holderId).toBe('h');
   });
 });

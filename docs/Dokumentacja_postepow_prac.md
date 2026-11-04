@@ -23,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (03.11.2026)
+## 1. Stan projektu (04.11.2026)
 
 | Element | Stan |
 |---|---|
@@ -34,6 +34,14 @@ Spis treści:
 | Silnik gry „Gorący Ziemniak” (rundy 1–2, sprint, finał) – jedyny tryb gry | zrobione |
 | Klasyczny silnik „1 z 10”, jego sterownik, lektor i symulator | usunięte 03.11.2026 |
 | Boty (wiedza, dziedziny, wybór celu) | zrobione |
+| Limit pytań bez gracza (najwyżej 2 z rzędu dla botów) | zrobione |
+| Plansza rundy czeka na gracza, przycisk pomija lektora; sprint liczy czas dopiero po jej zamknięciu | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Finał: 5 s na decyzję z licznikiem, potem odpowiada losowy rywal | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Pauza z przycisku i przy przejściu aplikacji w tło, ekran pauzy zasłania pytanie | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Mnożnik w rundzie 2 na środku ekranu, z animacją; bez panelu z zasadami w rogu | zrobione; animację trzeba obejrzeć na telefonie |
+| Pierwsza runda zaczyna się od gracza | zrobione |
+| Punkty i mnożnik naliczane od razu po dobrej odpowiedzi, przed wskazaniem | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Lektor czyta w sprincie szybciej (tempo 1,25, plansza normalnie) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
 | Teksty prowadzącego | wersja tymczasowa, do rozbudowy w etapie 5 |
 | Testy jednostkowe i testy z udawanym zegarem | zrobione |
@@ -51,7 +59,7 @@ Spis treści:
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 521 (+ 19 w `server/`) |
+| Razem testów automatycznych | 650 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -156,6 +164,8 @@ Kiedy bot się myli, podaje odpowiedź tego samego rodzaju co poprawna (pole `an
 
 Czasem bot też po prostu nie zdąży odpowiedzieć.
 
+Najwyżej 2 pytania z rzędu mogą trafić do botów. Silnik liczy tę serię (`questionsWithoutHuman`), a `pickTarget` po jej wyczerpaniu wskazuje gracza, także po błędzie bota i przy zmianie rundy. Jedyny wyjątek to pierwsze pytanie finału: należy do zwycięzcy sprintu, więc seria może wtedy wynieść 3, a ten bot musi potem wskazać gracza.
+
 ## 5. Ekran rozgrywki
 
 Po wybraniu poziomu trudności zaczyna się gra. Postacie to skórki z `assets/skins` (patrz „Skórki postaci”), a pulpity są na razie narysowane prostymi kształtami i podmienimy je, kiedy będą gotowe grafiki.
@@ -257,16 +267,17 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 |---|---|---|
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
-| `potato/__tests__/potato-test.ts` | 27 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking |
+| `potato/__tests__/potato-test.ts` | 45 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
 | `bots-test.ts` | 20 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
-| `potato/__tests__/controller-test.ts` | 29 | sterownik na udawanym zegarze: tury, wskazania, sprint, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
+| `potato/__tests__/controller-test.ts` | 72 | sterownik na udawanym zegarze: tury, kolejność wynik → wskazanie → tura, nagroda od razu, wskazania, limit pytań bez gracza, plansza rundy, start od gracza, sprint (start po planszy, kary, koniec w czasie wskazywania), 5 s w finale, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
+| `components/potato/__tests__/gameDisplay-test.ts` | 20 | co widać na ekranie: pytanie w czasie wyniku i planszy, podświetlenie, tryb odbicia, licznik wskazywania, kolor i napis mnożnika |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `integration-test.ts` | 14 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry |
+| `integration-test.ts` | 51 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry, limit pytań bez gracza (10 ziaren na każdy poziom), plansze rund, pauza w trakcie całej gry, brak decyzji w finale |
 | `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
-| `narration/__tests__/potato-narrator-test.ts` | 14 | lektor: kiedy mówi, przerywanie kwestii, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
-| `narration/__tests__/narration-integration-test.ts` | 10 | testy integracyjne lektora: całe gry na prawdziwej bazie, intonacja pytająca, brak paska w czasie mówienia, pauza, wyjście |
+| `narration/__tests__/potato-narrator-test.ts` | 24 | lektor: kiedy mówi, tempo w sprincie, przerywanie kwestii, pominięcie planszy, uciszanie, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
+| `narration/__tests__/narration-integration-test.ts` | 11 | testy integracyjne lektora: całe gry na prawdziwej bazie, intonacja pytająca, brak paska w czasie mówienia, pominięcie planszy, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
 | `speech/__tests__/voice-answer-integration-test.ts` | 3 | testy integracyjne: cała gra z odpowiedziami głosem i lektorem, odpowiedź po czasie, pauza |
@@ -292,7 +303,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **521** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **650** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
@@ -585,6 +596,27 @@ Każdy ekran sam włączał muzykę, a robiły to tylko menu główne, wybór po
 **7.59. Klucz API tylko ze zmiennej środowiskowej**
 Usunęliśmy ekran wpisywania klucza, zapis w `expo-secure-store` i tę zależność, więc potrzebny jest nowy build. Oznacza to odejście od wcześniejszej zasady „klucza nie ma w APK”: klucz z `.env.local` jest teraz w paczce jawnym tekstem, a build EAS bez zmiennych środowiskowych nie ma klucza wcale. Klucz zapisany wcześniej na telefonie zostaje w magazynie do odinstalowania aplikacji albo wyczyszczenia jej danych.
 
+**7.60. Boty grały między sobą, a gracz tylko patrzył**
+`pickTarget` wybierał lidera albo najsłabszego i nie sprawdzał, kiedy gracz ostatnio dostał pytanie, więc seria pytań dla botów nie miała górnej granicy. Teraz po 2 pytaniach z rzędu bot musi wskazać gracza (zob. `docs/zabezpieczenia/limit-pytan-botow.md`). Pierwsza wersja testu sterownika nie przeszła, bo przy równych życiach gracz był liderem albo najsłabszym i dostawał pytanie bez udziału limitu. Wyszło też, że `chooseNext` wybiera cel przed odjęciem życia, czyli na stanie sprzed odpowiedzi. Test ustawia teraz życia tak, żeby bez limitu gracz nie dostał tych pytań.
+
+**7.61. Czas sprintu leciał, zanim można było grać**
+Sterownik włączał zegar sprintu w chwili zmiany rundy, czyli już przy wyniku odpowiedzi kończącej rundę 2. Czas biegł więc przez wynik, planszę i czytanie zasad (zgłoszone z telefonu). Zegar rusza teraz dopiero po zamknięciu planszy. Plansza nie znika już sama: czeka na przycisk, który w trakcie mówienia pomija lektora. Pauza też nie uruchamia zegara przed planszą.
+
+**7.62. Zegar sprintu rozjeżdżał się z karami i wskazywaniem**
+Analiza przebiegu pokazała trzy błędy. Kara odejmowała sekundę w silniku, ale zaplanowany koniec zostawał stary, więc sprint trwał dłużej, niż pokazywał pasek. Wskazanie rywala nie synchronizowało zegara, więc pasek odskakiwał do tyłu. Dobra odpowiedź czekająca na wskazanie przepadała, gdy w tym czasie mijał czas sprintu. Do tego odpowiedź, która pierwsza zauważyła koniec sprintu, mogła zostać oceniona na pytaniu z finału, jeśli zwycięzcą sprintu był ten sam gracz.
+
+**7.63. Następne pytanie było widać przed czasem**
+Silnik rozdaje kolejne pytanie już przy zatwierdzeniu odpowiedzi, a ekran pokazywał pytanie ze stanu gry. W czasie wyniku i planszy gracz mógł więc czytać swoje następne pytanie, zanim ruszył jego czas, a lektor mówił wtedy o poprzednim. Wynik niesie teraz pytanie, na które odpowiadano, a na planszy pytania nie widać. Przy planszy czekającej na dotknięcie byłby to czas na namysł bez limitu.
+
+**7.64. Finał: nowe pytanie „znikąd”**
+Bez decyzji przez 10 s losowanie mogło wskazać samego gracza, a licznika nie było widać poza cienkim paskiem. Wyglądało to jak nowe pytanie bez powodu (zgłoszone z telefonu). W finale jest teraz 5 s, duży licznik, a po czasie odpowiada zawsze losowy rywal. Test skórek wskazywał pierwszego aktywnego gracza, czyli czasem siebie, i przy graczu bez błędów grał w nieskończoność; teraz wskazuje rywala.
+
+**7.65. Pozostałe poprawki przebiegu gry**
+Przycisk pauzy i pauza przy przejściu aplikacji w tło (sterownik miał pauzę, ale tylko okno wyjścia z niej korzystało; paski dostawały na stałe `paused={false}`). Pierwsze pytanie gry i pytanie finału nie są już zaczynane przez lektora tuż przed planszą. Wskazanie rywala przerywa „Komu przekazujesz pytanie?”, zamiast czekać na koniec zdania. Mikrofon ucisza lektora. Tryb odbicia w ciemno nie przechodzi na kolejne pytanie. Podświetlony jest ten, kto właśnie odpowiedział, a nie ten, kto dostanie następne pytanie.
+
+**7.66. Punkty i mnożnik dopiero po wskazaniu gracza**
+Sterownik odkładał całą poprawną odpowiedź człowieka do chwili wskazania następnego gracza, bo silnik miał jedną akcję `answer`, która nagradzała i przekazywała pytanie naraz. Prowadzący mówił „Brawo, dobrze!”, a punkt w sprincie i finale oraz mnożnik w rundzie 2 zmieniały się kilka sekund później (zgłoszone z telefonu). Silnik ma teraz akcje `award` (nagroda od razu) i `pass` (samo przekazanie). Boty nadal odpowiadają jedną akcją, bo nic nie wskazują po czasie, a test pilnuje, że obie drogi dają ten sam stan. Zmieniła się też kolejność na ekranie, bo zielony dymek również czekał na wskazanie: najpierw wynik z dymkiem i pochwałą, potem pytanie znika i gracz wskazuje następnego, a po wskazaniu od razu idzie kolejna tura, bez drugiego wyniku. Czas na wskazanie startuje po pytaniu lektora o gracza, a w sprincie czas biegnie także w trakcie wyniku.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
@@ -594,7 +626,7 @@ Usunęliśmy ekran wpisywania klucza, zapis w `expo-secure-store` i tę zależno
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
 - Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
 - Sprawdzenie balansu zasad „Gorący Ziemniak” (nowy symulator albo testy z graczami).
-- Lektor: limit czasu na zawieszony głos i wyciszanie, gdy słucha mikrofon.
+- Lektor: limit czasu na zawieszony głos.
 - Rozbudowa bazy pytań.
 - Kategorie: sprawdzenie na telefonie z prawdziwym kluczem (czas generowania, jakość pytań z różnych formatów plików). Docelowo zapytania do OpenAI przez własny serwer (np. funkcja Supabase), żeby gracz nie musiał mieć własnego klucza.
 - Testy komponentów ekranu (np. React Native Testing Library) i zapis logów z telefonu do pliku albo ekranu diagnostycznego.

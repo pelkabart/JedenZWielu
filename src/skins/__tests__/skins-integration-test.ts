@@ -87,13 +87,15 @@ describe('skórki w całej grze', () => {
     for (let elapsed = 0; elapsed < MAX_GAME_MS && controller.getView().overlay?.kind !== 'finished'; elapsed += STEP_MS) {
       const view = controller.getView();
       const { overlay, awaitingPick, game: state } = view;
-      if (overlay?.kind === 'reveal') {
+      if (overlay?.kind === 'round') {
+        controller.acceptRound();
+      } else if (overlay?.kind === 'reveal') {
         const expression = podiumExpression({ kind: 'answer', correct: overlay.correct }, 'normal');
         expect(expression).toBe(overlay.correct ? 'smile' : 'closed-eyes');
         seen.add(expression);
         expect(skins[overlay.playerId]).toBeTruthy();
       } else if (awaitingPick) {
-        const target = activePlayers(state).find((p) => awaitingPick.allowSelf || p.id !== awaitingPick.chooserId);
+        const target = activePlayers(state).find((p) => p.id !== awaitingPick.chooserId);
         controller.pick(target!.id);
       } else if (overlay === null && state.question && state.holderId === HUMAN_ID) {
         controller.submitAnswer(state.question.answers[0]);
