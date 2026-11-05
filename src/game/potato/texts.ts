@@ -12,8 +12,8 @@ export const PHASE_TITLE: Record<PotatoPhase, string> = {
 /** Krótki opis rundy: pokazywany na początku rundy i czytany przez lektora. */
 export const PHASE_RULE: Record<PotatoPhase, string> = {
   round1: 'Każdy błąd kosztuje życie. Kto straci wszystkie, odpada.',
-  round2: 'Każda dobra odpowiedź podnosi mnożnik. Błąd to wybuch: tracisz osłonę równą mnożnikowi.',
+  round2: 'Każda dobra odpowiedź podnosi mnożnik, najwyżej do 3. Błąd to wybuch: tracisz osłonę równą mnożnikowi.',
   sprint: '60 sekund na punkty. Dobra odpowiedź to punkt, błąd to 1 sekunda mniej.',
-  duel: 'Dobra odpowiedź daje punkt. Błąd odbiera szansę. Zostaje ostatni gracz.',
+  duel: 'Dobra odpowiedź daje 10 punktów. Błąd odbiera szansę. Zostaje ostatni gracz.',
   finished: '',
 };

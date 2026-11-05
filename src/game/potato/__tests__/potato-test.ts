@@ -140,6 +140,20 @@ describe('runda 2: bomba', () => {
     expect(s.holderId).toBe('b1');
   });
 
+  it('mnożnik zatrzymuje się na ×3 przy obu drogach nagrody', () => {
+    const atLimit = { ...round2(), multiplier: POTATO.maxMultiplier };
+    expect(POTATO.maxMultiplier).toBe(3);
+    expect(reducePotato(atLimit, { type: 'answer', playerId: 'h', text: OK, next: 'b1' }).multiplier).toBe(3);
+    expect(reducePotato(atLimit, { type: 'award', playerId: 'h', text: OK }).multiplier).toBe(3);
+  });
+
+  it('wybuch przy ×3 zabiera całą osłonę i wraca do ×1', () => {
+    const s0 = { ...round2(), multiplier: POTATO.maxMultiplier };
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
+    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: 0 });
+    expect(s.multiplier).toBe(1);
+  });
+
   it('wybuch odejmuje mnożnik od osłony i resetuje mnożnik do ×1', () => {
     const s0 = { ...round2(), multiplier: 2 };
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
@@ -209,10 +223,10 @@ describe('runda 4: finałowy krąg', () => {
     phase: 'duel',
   });
 
-  it('poprawna odpowiedź w finale daje tylko punkt, bez odzyskiwania szans', () => {
+  it('poprawna odpowiedź w finale daje 10 punktów, bez odzyskiwania szans', () => {
     const s0 = withPlayers(duel(), { h: { lives: 2, points: 4 }, b3: { lives: 2 }, b4: { lives: 3 } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
-    expect(player(s, 'h')).toMatchObject({ lives: 2, points: 5 });
+    expect(player(s, 'h')).toMatchObject({ lives: 2, points: 14 });
     expect(player(s, 'b3').lives).toBe(2);
     expect(player(s, 'b4').lives).toBe(3);
   });
@@ -352,10 +366,13 @@ describe('pełna gra zaskryptowana od początku do końca', () => {
 describe('nagroda przed przekazaniem pytania', () => {
   const inPhase = (phase: PotatoState['phase']): PotatoState => ({ ...started(), phase });
 
-  it.each(['sprint', 'duel'] as const)('%s: punkt od razu, pytanie zostaje do wskazania', (phase) => {
+  it.each([
+    ['sprint', POTATO.sprintPoints],
+    ['duel', POTATO.duelPoints],
+  ] as const)('%s: punkty od razu, pytanie zostaje do wskazania', (phase, points) => {
     const before = inPhase(phase);
     const s = reducePotato(before, { type: 'award', playerId: 'h', text: OK });
-    expect(player(s, 'h').points).toBe(1);
+    expect(player(s, 'h').points).toBe(points);
     expect(s.holderId).toBe('h');
     expect(s.cursor).toBe(before.cursor);
     expect(player(before, 'h').points).toBe(0);

@@ -157,7 +157,7 @@ Zasady „Gorącego Ziemniaka” (PDF „Quiz Frenzy”) to czysty `stan + akcja
 | Stan oczekiwania | `holderId` + `question` |
 | Sterownik | `PotatoController` |
 | Lektor | `PotatoNarrator` + `potato/texts.ts` |
-| Ekran | `components/potato/PotatoGame.tsx` (trasa `solo/game.tsx`) |
+| Ekran | `components/potato/PotatoGame.tsx` (trasa `solo/game.tsx`), tabela wyników w `components/potato/Scoreboard.tsx` |
 
 Komponenty `Podium`, `QuestionCard`, `AnswerPanel`, `Host`, `TimerBar` są w `components/solo/`; `PotatoGame` mapuje swojego gracza na `PlayerState` (`toPodium`). Klasyczny silnik „1 z 10” został usunięty 03.11.2026; jego kod jest w historii gita.
 

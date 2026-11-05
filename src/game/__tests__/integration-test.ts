@@ -3,11 +3,12 @@
  * prawdziwa baza pytań, losowe miejsce gracza, prawdziwe profile botów, sterownik, silnik
  * i logi — na udawanym zegarze Jesta.
  */
+import { scoreboardHeadline, scoreboardRows } from '@/components/potato/scoreboardData';
 import { getLogEntries, resetLog } from '@/lib/log';
 
 import { MAX_QUESTIONS_WITHOUT_HUMAN } from '../potato/bots';
 import { PotatoController, type PotatoView } from '../potato/controller/PotatoController';
-import { activePlayers } from '../potato/engine';
+import { activePlayers, POTATO } from '../potato/engine';
 import { createPotatoSoloGame, HUMAN_ID } from '../potato/solo';
 import { QUESTION_BANK } from '../questions';
 import { DIFFICULTIES, DIFFICULTY_PRESETS } from '../rules';
@@ -111,6 +112,44 @@ describe('pełna gra na prawdziwej bazie i botach', () => {
     for (const deck of decks) expect([...deck].sort()).toEqual(bank);
     expect(new Set(decks.map((deck) => deck.join())).size).toBe(decks.length);
     expect(decks[0]).not.toEqual(QUESTION_BANK.map((q) => q.id));
+  });
+});
+
+describe('tabela wyników i punkty', () => {
+  it.each(DIFFICULTIES)('tabela zgadza się z rankingiem po wygranej (poziom %s)', (difficulty) => {
+    const { game } = playUntilFinished(newController(11, difficulty), 'right');
+    const rows = scoreboardRows(game);
+    expect(rows.map((r) => r.id)).toEqual(game.ranking);
+    expect(rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5]);
+    expect(rows[0]).toMatchObject({ id: HUMAN_ID, winner: true });
+    expect(scoreboardHeadline(game)).toMatchObject({ title: 'Wygrywasz!', heroId: HUMAN_ID, won: true });
+  });
+
+  it.each([5, 6, 7, 8])('tabela zgadza się z rankingiem po odpadnięciu gracza (ziarno %i)', (seed) => {
+    const { game } = playUntilFinished(newController(seed), 'silent');
+    const rows = scoreboardRows(game);
+    expect(rows.map((r) => r.id)).toEqual(game.ranking);
+    expect(rows.some((r) => r.winner)).toBe(false);
+    expect(scoreboardHeadline(game)).toMatchObject({ title: 'Odpadasz!', heroId: HUMAN_ID, won: false });
+  });
+
+  it.each([1, 2, 3, 4, 5])('mnożnik nigdy nie przekracza limitu, a finał daje po 10 punktów (ziarno %i)', (seed) => {
+    const c = newController(seed);
+    let highest = 0;
+    let duelPoints: number | null = null;
+    const steps: number[] = [];
+    c.subscribe(() => {
+      const view = c.getView();
+      highest = Math.max(highest, view.game.multiplier);
+      if (view.game.phase !== 'duel') return;
+      const { points } = human(view);
+      if (duelPoints !== null && points !== duelPoints) steps.push(points - duelPoints);
+      duelPoints = points;
+    });
+    playUntilFinished(c, 'right');
+    expect(highest).toBeGreaterThan(1);
+    expect(highest).toBeLessThanOrEqual(POTATO.maxMultiplier);
+    expect(new Set(steps)).toEqual(new Set([POTATO.duelPoints]));
   });
 });
 

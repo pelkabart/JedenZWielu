@@ -33,7 +33,10 @@ export function secondsLeft(deadline: number | null, now: number, totalMs: numbe
   return Math.max(0, Math.ceil(left / 1000));
 }
 
-const MULTIPLIER_COLORS = ['#FFC83D', '#FF9F2E', '#FF6B3D', '#FF3D57'];
+/** Kolory miejsc przy stole, gdy postać nie ma skórki. */
+export const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
+
+const MULTIPLIER_COLORS = ['#FFC83D', '#FF9F2E', '#FF3D57'];
 
 /** Im wyższy mnożnik, tym groźniejszy kolor: od żółtego do czerwonego. */
 export function multiplierColor(multiplier: number): string {

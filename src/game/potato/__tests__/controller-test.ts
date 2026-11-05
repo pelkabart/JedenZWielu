@@ -756,7 +756,7 @@ describe('finał: decyzja po dobrej odpowiedzi', () => {
     expect(controller.getView().awaitingPick?.allowSelf).toBe(true);
     controller.pick('h');
     expect(controller.getView().game.holderId).toBe('h');
-    expect(player(controller.getView().game, 'h').points).toBe(1);
+    expect(player(controller.getView().game, 'h').points).toBe(10);
   });
 
   it('poza finałem na decyzję jest nadal 10 s', () => {
@@ -821,16 +821,19 @@ describe('pauza z przycisku', () => {
 describe('nagroda od razu po dobrej odpowiedzi', () => {
   const inPhase = (phase: PotatoState['phase']) => started('h', { phase });
 
-  it.each(['sprint', 'duel'] as const)('%s: punkt razem z wynikiem, a wskazanie go nie zmienia', (phase) => {
+  it.each([
+    ['sprint', 1],
+    ['duel', 10],
+  ] as const)('%s: punkt razem z wynikiem, a wskazanie go nie zmienia', (phase, points) => {
     const { controller, advance } = setup(inPhase(phase));
     controller.start();
     controller.submitAnswer(OK);
     expect(controller.getView().overlay).toMatchObject({ kind: 'reveal', correct: true });
-    expect(player(controller.getView().game, 'h').points).toBe(1);
+    expect(player(controller.getView().game, 'h').points).toBe(points);
     advance(REVEAL);
-    expect(player(controller.getView().game, 'h').points).toBe(1);
+    expect(player(controller.getView().game, 'h').points).toBe(points);
     controller.pick('b1');
-    expect(player(controller.getView().game, 'h').points).toBe(1);
+    expect(player(controller.getView().game, 'h').points).toBe(points);
     expect(controller.getView().game.holderId).toBe('b1');
   });
 
@@ -854,8 +857,8 @@ describe('nagroda od razu po dobrej odpowiedzi', () => {
     });
     controller.submitAnswer(OK);
     expect(seen).not.toContainEqual([0, 'reveal']);
-    expect(seen).not.toContainEqual([1, null]);
-    expect(seen).toContainEqual([1, 'reveal']);
+    expect(seen).not.toContainEqual([10, null]);
+    expect(seen).toContainEqual([10, 'reveal']);
   });
 
   it('kolejność: wynik, potem wskazywanie bez wyniku, potem następna tura', () => {
@@ -907,12 +910,12 @@ describe('nagroda od razu po dobrej odpowiedzi', () => {
     expect(player(view.game, 'h').points).toBe(1);
   });
 
-  it('po czasie na wybór punkt jest jeden, a nie dwa', () => {
+  it('po czasie na wybór punkty są naliczone raz', () => {
     const { controller, advance } = setup(inPhase('duel'));
     controller.start();
     controller.submitAnswer(OK);
     advance(REVEAL + DUEL_PICK_TIMEOUT_MS);
-    expect(player(controller.getView().game, 'h').points).toBe(1);
+    expect(player(controller.getView().game, 'h').points).toBe(10);
     expect(controller.getView().game.holderId).not.toBe('h');
   });
 

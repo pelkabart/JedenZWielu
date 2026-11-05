@@ -6,9 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
-import { blindModeOn, shownQuestion, spotlightId } from '@/components/potato/gameDisplay';
+import { blindModeOn, SEAT_COLORS, shownQuestion, spotlightId } from '@/components/potato/gameDisplay';
 import { MultiplierBadge, MultiplierBurst } from '@/components/potato/MultiplierBadge';
 import { PickCountdown } from '@/components/potato/PickCountdown';
+import { Scoreboard } from '@/components/potato/Scoreboard';
 import { AnswerPanel } from '@/components/solo/AnswerPanel';
 import { answerLayout, KEYBOARD_GAP } from '@/components/solo/answerLayout';
 import { Host } from '@/components/solo/Host';
@@ -25,7 +26,6 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { setGameMusicDucked, startGameMusic, stopGameMusic } from '@/audio/gameMusic';
 import { usePotatoController } from '@/hooks/usePotatoController';
 
-const SEAT_COLORS = ['#FF7A9C', '#4FD1E8', '#FFC83D', '#8BE07A', '#B98CFF'];
 /** Przesunięcie pulpitów w pionie — układają się w łuk. */
 const ARC = [16, 6, 0, 6, 16];
 const PODIUM_GAP = 22;
@@ -350,24 +350,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
         </View>
       )}
 
-      {finished && <Finish game={game} onPlayAgain={onPlayAgain} onMenu={leave} />}
-    </View>
-  );
-}
-
-function Finish({ game, onPlayAgain, onMenu }: { game: PotatoView['game']; onPlayAgain: () => void; onMenu: () => void }) {
-  const names = (game.ranking ?? []).map((id) => game.players.find((p) => p.id === id)?.name ?? id);
-  return (
-    <View style={styles.backdrop}>
-      <View style={styles.card}>
-        <Text style={styles.title}>{endedEarly(game) ? 'Odpadasz!' : 'Koniec gry'}</Text>
-        <Text style={styles.rule}>{names.map((name, i) => `${i + 1}. ${name}`).join('   ')}</Text>
-        {endedEarly(game) && <Text style={styles.note}>Kolejność wg stanu gry w chwili Twojego odpadnięcia.</Text>}
-        <View style={styles.actions}>
-          <MenuButton label="Zagraj ponownie" color={colors.solo} baseColor={colors.soloBase} width={200} onPress={onPlayAgain} />
-          <MenuButton label="Menu" color={colors.multi} baseColor={colors.multiBase} width={140} onPress={onMenu} />
-        </View>
-      </View>
+      {finished && <Scoreboard game={game} skins={skins} onPlayAgain={onPlayAgain} onMenu={leave} />}
     </View>
   );
 }
@@ -482,12 +465,6 @@ const styles = StyleSheet.create({
     color: colors.outline,
     fontSize: 15,
     fontWeight: '700',
-    textAlign: 'center',
-  },
-  note: {
-    color: colors.outline,
-    fontSize: 12,
-    fontWeight: '600',
     textAlign: 'center',
   },
 });

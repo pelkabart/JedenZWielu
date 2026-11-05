@@ -13,10 +13,16 @@ export const POTATO = {
   lives: 3,
   /** Punkty osłony w rundzie 2. */
   shield: 3,
+  /** Najwyższy mnożnik w rundzie 2. */
+  maxMultiplier: 3,
   /** Czas sprintu (runda 3). */
   sprintMs: 60_000,
   /** Kara za błąd lub brak odpowiedzi w sprincie. */
   sprintPenaltyMs: 1_000,
+  /** Punkty za dobrą odpowiedź w sprincie. */
+  sprintPoints: 1,
+  /** Punkty za dobrą odpowiedź w finale. */
+  duelPoints: 10,
   /** Szanse w rundzie 4 wg miejsca w sprincie (1., 2., 3.). */
   awards: [3, 2, 1],
 } as const;
@@ -33,7 +39,7 @@ export interface PotatoPlayer {
   lives: number;
   /** Punkty osłony (runda 2). */
   shield: number;
-  /** Punkty w sprincie. */
+  /** Punkty ze sprintu i finału. */
   points: number;
   errors: number;
   eliminated: boolean;
@@ -192,10 +198,11 @@ function answer(s: PotatoState, playerId: string, text: string | null, next: str
   }
 }
 
-/** Co daje poprawna odpowiedź: mnożnik w rundzie 2, punkt w sprincie i finale. W rundzie 1 nic poza przekazaniem. */
+/** Co daje poprawna odpowiedź: mnożnik w rundzie 2, punkty w sprincie i finale. W rundzie 1 nic poza przekazaniem. */
 function reward(s: PotatoState, holder: PotatoPlayer) {
-  if (s.phase === 'round2') s.multiplier++;
-  if (s.phase === 'sprint' || s.phase === 'duel') holder.points++;
+  if (s.phase === 'round2') s.multiplier = Math.min(POTATO.maxMultiplier, s.multiplier + 1);
+  if (s.phase === 'sprint') holder.points += POTATO.sprintPoints;
+  if (s.phase === 'duel') holder.points += POTATO.duelPoints;
 }
 
 function award(s: PotatoState, playerId: string, text: string) {
@@ -290,7 +297,7 @@ function finishSprint(s: PotatoState) {
 }
 
 /**
- * Finał jak w „1 z 10”: poprawna odpowiedź daje punkt, nikt nie odzyskuje szans ani ich nie traci.
+ * Finał jak w „1 z 10”: poprawna odpowiedź daje punkty, nikt nie odzyskuje szans ani ich nie traci.
  * Błąd odbiera szansę. `next` to rywal (atak) albo odpowiadający („na siebie”).
  */
 function answerDuel(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {

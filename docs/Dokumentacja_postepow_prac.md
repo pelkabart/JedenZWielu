@@ -23,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (04.11.2026)
+## 1. Stan projektu (05.11.2026)
 
 | Element | Stan |
 |---|---|
@@ -40,6 +40,8 @@ Spis treści:
 | Pauza z przycisku i przy przejściu aplikacji w tło, ekran pauzy zasłania pytanie | zrobione, testy automatyczne; do sprawdzenia na telefonie |
 | Mnożnik w rundzie 2 na środku ekranu, z animacją; bez panelu z zasadami w rogu | zrobione; animację trzeba obejrzeć na telefonie |
 | Pierwsza runda zaczyna się od gracza | zrobione |
+| Tabela wyników na końcu gry (miejsca, postacie, błędy, punkty, odsłanianie od ostatniego miejsca) | zrobione, testy automatyczne, zrzuty z wersji webowej; animację trzeba obejrzeć na telefonie |
+| Finał: 10 punktów za dobrą odpowiedź; mnożnik w rundzie 2 najwyżej ×3 | zrobione, testy automatyczne |
 | Punkty i mnożnik naliczane od razu po dobrej odpowiedzi, przed wskazaniem | zrobione, testy automatyczne; do sprawdzenia na telefonie |
 | Lektor czyta w sprincie szybciej (tempo 1,25, plansza normalnie) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Ekran rozgrywki na prostych kształtach (etap 4) | zrobione |
@@ -59,7 +61,7 @@ Spis treści:
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 650 (+ 19 w `server/`) |
+| Razem testów automatycznych | 674 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -267,13 +269,14 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 |---|---|---|
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
-| `potato/__tests__/potato-test.ts` | 45 | zasady rund „Gorący Ziemniak”, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
+| `potato/__tests__/potato-test.ts` | 47 | zasady rund „Gorący Ziemniak”, limit mnożnika, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
 | `bots-test.ts` | 20 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
 | `potato/__tests__/controller-test.ts` | 72 | sterownik na udawanym zegarze: tury, kolejność wynik → wskazanie → tura, nagroda od razu, wskazania, limit pytań bez gracza, plansza rundy, start od gracza, sprint (start po planszy, kary, koniec w czasie wskazywania), 5 s w finale, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
 | `components/potato/__tests__/gameDisplay-test.ts` | 20 | co widać na ekranie: pytanie w czasie wyniku i planszy, podświetlenie, tryb odbicia, licznik wskazywania, kolor i napis mnożnika |
+| `components/potato/__tests__/scoreboardData-test.ts` | 10 | tabela wyników: kolejność z rankingu, zwycięzca tylko po pełnej grze, nagłówek, wyjaśnienie kolejności, wysokość wierszy |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `integration-test.ts` | 51 | testy integracyjne: całe gry na prawdziwej bazie i botach, tasowanie talii, zgodność logów z przebiegiem gry, limit pytań bez gracza (10 ziaren na każdy poziom), plansze rund, pauza w trakcie całej gry, brak decyzji w finale |
+| `integration-test.ts` | 63 | testy integracyjne: całe gry na prawdziwej bazie i botach, tabela wyników zgodna z rankingiem, limit mnożnika i 10 punktów w finale, tasowanie talii, zgodność logów z przebiegiem gry, limit pytań bez gracza (10 ziaren na każdy poziom), plansze rund, pauza w trakcie całej gry, brak decyzji w finale |
 | `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
 | `narration/__tests__/potato-narrator-test.ts` | 24 | lektor: kiedy mówi, tempo w sprincie, przerywanie kwestii, pominięcie planszy, uciszanie, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
@@ -303,7 +306,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **650** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **674** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
@@ -617,6 +620,12 @@ Przycisk pauzy i pauza przy przejściu aplikacji w tło (sterownik miał pauzę,
 **7.66. Punkty i mnożnik dopiero po wskazaniu gracza**
 Sterownik odkładał całą poprawną odpowiedź człowieka do chwili wskazania następnego gracza, bo silnik miał jedną akcję `answer`, która nagradzała i przekazywała pytanie naraz. Prowadzący mówił „Brawo, dobrze!”, a punkt w sprincie i finale oraz mnożnik w rundzie 2 zmieniały się kilka sekund później (zgłoszone z telefonu). Silnik ma teraz akcje `award` (nagroda od razu) i `pass` (samo przekazanie). Boty nadal odpowiadają jedną akcją, bo nic nie wskazują po czasie, a test pilnuje, że obie drogi dają ten sam stan. Zmieniła się też kolejność na ekranie, bo zielony dymek również czekał na wskazanie: najpierw wynik z dymkiem i pochwałą, potem pytanie znika i gracz wskazuje następnego, a po wskazaniu od razu idzie kolejna tura, bez drugiego wyniku. Czas na wskazanie startuje po pytaniu lektora o gracza, a w sprincie czas biegnie także w trakcie wyniku.
 
+**7.67. Pliki różniące się tylko wielkością liter**
+Pierwsza wersja tabeli miała komponent `Scoreboard.tsx` i dane `scoreboard.ts`. Na Windowsie to ta sama nazwa bez rozszerzenia, więc import `Scoreboard` trafiał w plik z danymi i `tsc` zgłaszał błąd TS1149. Dane są teraz w `scoreboardData.ts`. Po zmianie nazwy `npx expo lint` dalej zgłaszał ten sam błąd, bo czytał wynik z własnej pamięci podręcznej. Zwykłe `npx eslint` przechodziło, a po zmianie daty pliku (`touch`) przeszło też `expo lint`.
+
+**7.68. Wersja webowa przestała się budować**
+`npx expo export --platform web` kończy się błędem `this.validatePath is not a function`, bo przy budowaniu statycznym ładują się wszystkie trasy, a `expo-file-system` nie działa w przeglądarce. Tabelę sprawdziliśmy na tymczasowej, osobnej trasie zbudowanej w trybie `single`; po zrobieniu zrzutów (844×390 i 640×360) trasa została usunięta. Samej wersji webowej nie naprawialiśmy, bo celem projektu jest Android.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).
@@ -624,7 +633,7 @@ Sterownik odkładał całą poprawną odpowiedź człowieka do chwili wskazania 
 - Lektor: mniejszy model (kwantyzacja do int8 zmniejszyłaby go ok. 4 razy, kosztem jakości głosu — do odsłuchania), paczka AAB do Google Play, włącznik lektora w ustawieniach.
 - Etap 5: prowadzący i jego teksty.
 - Etap 6: wstawienie grafik postaci i pulpitów, animacje.
-- Etap 7: dźwięki, wibracje, zapis statystyk, rozbudowa ekranu wyników.
+- Etap 7: dźwięki, wibracje, zapis statystyk.
 - Sprawdzenie balansu zasad „Gorący Ziemniak” (nowy symulator albo testy z graczami).
 - Lektor: limit czasu na zawieszony głos.
 - Rozbudowa bazy pytań.

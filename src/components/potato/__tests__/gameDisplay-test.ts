@@ -78,9 +78,9 @@ describe('licznik wskazywania', () => {
 
 describe('mnożnik', () => {
   it('kolor robi się groźniejszy i nie wychodzi poza listę przy dużym mnożniku', () => {
-    const shades = [1, 2, 3, 4].map(multiplierColor);
-    expect(new Set(shades).size).toBe(4);
-    expect(multiplierColor(50)).toBe(shades[3]);
+    const shades = [1, 2, 3].map(multiplierColor);
+    expect(new Set(shades).size).toBe(3);
+    expect(multiplierColor(50)).toBe(shades[2]);
     expect(multiplierColor(0)).toBe(shades[0]);
   });
 
