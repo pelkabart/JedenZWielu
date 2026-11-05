@@ -33,8 +33,8 @@ describe('parseQuestionBank', () => {
 });
 
 describe('QUESTION_BANK', () => {
-  it('zawiera 50 pytań', () => {
-    expect(QUESTION_BANK).toHaveLength(50);
+  it('zawiera 751 pytań', () => {
+    expect(QUESTION_BANK).toHaveLength(751);
   });
 
   it('ma pytania z każdej kategorii', () => {

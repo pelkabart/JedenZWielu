@@ -16,8 +16,8 @@ const DECK = [question('a'), question('b'), question('c')];
 const PLAYERS = [
   { id: 'h', name: 'Ty', isHuman: true },
   { id: 'b1', name: 'Bot 1', isHuman: false, botId: 'krysia' },
-  { id: 'b2', name: 'Bot 2', isHuman: false, botId: 'bartek' },
-  { id: 'b3', name: 'Bot 3', isHuman: false, botId: 'profesor' },
+  { id: 'b2', name: 'Bot 2', isHuman: false, botId: 'marek' },
+  { id: 'b3', name: 'Bot 3', isHuman: false, botId: 'tadeusz' },
   { id: 'b4', name: 'Bot 4', isHuman: false, botId: 'wiesiek' },
 ];
 

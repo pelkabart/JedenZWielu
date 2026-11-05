@@ -60,6 +60,7 @@ Spis treści:
 | Muzyka menu na wszystkich ekranach poza rozgrywką, bez przycisku wyciszania | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Ustawienia: głośność muzyki i lektora (dwa suwaki 0–100%, zapis na telefonie, działa w menu, grze i lektorze) | zrobione, testy automatyczne; do odsłuchania na telefonie |
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
+| 12 botów ze stałymi skórkami; bot bez skórki nie jest losowany | zrobione, testy automatyczne; wszystkie mają już skórki, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
 | Razem testów automatycznych | 674 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
@@ -145,7 +146,7 @@ Odpowiedź gracza i poprawne odpowiedzi są najpierw normalizowane: małe litery
 Mamy 8 postaci botów i do każdej gry losujemy 4. Każdy bot ma profil:
 
 - wiedza bazowa (szansa na dobrą odpowiedź),
-- mocne i słabe kategorie (np. Profesor Zenon zna się na historii, ale nie na sporcie),
+- mocne i słabe kategorie (np. Karol zna się na sporcie, ale nie na kuchni),
 - czas odpowiadania i czas reakcji w finale,
 - jak chętnie zgłasza się w finale i czy czasem blefuje,
 - pewność siebie, czyli jak często w finale bierze pytanie na siebie,
@@ -257,7 +258,7 @@ Tę funkcjonalność pisaliśmy metodą TDD: najpierw plik zabezpieczeń i testy
 
 Skórki leżą w `assets/skins/<male|female|player>/<id>/<id>-<normal|smile|closed-eyes>.png`, prowadzący w `assets/skins/host/`. Lista powstaje przy budowaniu paczki (`require.context`), więc nowy folder działa bez zmian w kodzie. Na ekranie głównym obok menu stoi postać gracza, a wieszak pod nią otwiera ekran wyboru (`src/app/skins.tsx`). Wybór zostaje na telefonie.
 
-Boty mają w profilu płeć i dostają skórkę ze swojej puli, każdą najwyżej raz w grze. Losowanie botów ma limit płci równy liczbie skórek. Skórki losuje osobny generator, więc gry z tego samego ziarna i symulacje działają jak wcześniej.
+Każdy z 12 botów ma w profilu stałą skórkę (`skinId` w `src/game/bots/profiles.ts`), więc wygląda tak samo w każdej grze. Bot, którego folderu ze skórką jeszcze nie ma, nie jest losowany do gry. Dzięki temu skórki można dodawać stopniowo, a wraz z nimi wchodzą do gry kolejne boty. Przydział skórek nic nie losuje, więc nie zmienia przebiegu gry.
 
 Mimika: dobra odpowiedź to uśmiech, pomyłka to zamknięte oczy, a w spoczynku postać mruga co 2,5–6 s. Prowadzący uśmiecha się przy dobrej odpowiedzi i na koniec gry. Postać, która odpadła, ma otwarte oczy i jest przyciemniona (pod obrazkiem leży jej ciemna sylwetka).
 
@@ -270,7 +271,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
 | `potato/__tests__/potato-test.ts` | 47 | zasady rund „Gorący Ziemniak”, limit mnożnika, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
-| `bots-test.ts` | 20 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, limit płci przy losowaniu |
+| `bots-test.ts` | 21 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, losowanie tylko botów ze skórką, unikalne imiona i skórki |
 | `potato/__tests__/controller-test.ts` | 72 | sterownik na udawanym zegarze: tury, kolejność wynik → wskazanie → tura, nagroda od razu, wskazania, limit pytań bez gracza, plansza rundy, start od gracza, sprint (start po planszy, kary, koniec w czasie wskazywania), 5 s w finale, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
 | `components/potato/__tests__/gameDisplay-test.ts` | 20 | co widać na ekranie: pytanie w czasie wyniku i planszy, podświetlenie, tryb odbicia, licznik wskazywania, kolor i napis mnożnika |
 | `components/potato/__tests__/scoreboardData-test.ts` | 10 | tabela wyników: kolejność z rankingu, zwycięzca tylko po pełnej grze, nagłówek, wyjaśnienie kolejności, wysokość wierszy |
@@ -299,11 +300,11 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
 | `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, muzyka wg ekranu, głośność po ponownym uruchomieniu, nieudany zapis |
 | `skins/__tests__/catalog-test.ts` | 7 | skórki: układanie katalogu ze ścieżek, nowy folder, brakujące klatki, nieznane pliki |
-| `skins/__tests__/assignSkins-test.ts` | 7 | skórki: zgodność płci, brak powtórek, wybór gracza, użycie wszystkich skórek, brak skórki |
+| `skins/__tests__/assignSkins-test.ts` | 5 | skórki: skórka z profilu bota, wybór gracza, brak pliku skórki, zbiór dostępnych skórek |
 | `skins/__tests__/IdleFace-test.ts` | 10 | mimika: mruganie, uśmiech, kasowanie zegarów, mimika w reakcji na odpowiedź |
 | `skins/__tests__/SkinSelectionStore-test.ts` | 12 | wybór skórki: zapis, uszkodzony zapis, usunięta skórka, błędy magazynu, kolejność zapisów |
-| `skins/__tests__/real-assets-test.ts` | 4 | prawdziwy folder skórek: komplet klatek, kanał alfa, liczba skórek, nazwy zasobów Androida |
-| `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowa skórka w losowaniu, wybór gracza |
+| `skins/__tests__/real-assets-test.ts` | 5 | prawdziwy folder skórek: komplet klatek, kanał alfa, co najmniej 4 boty ze skórką, właściciel każdej skórki, nazwy zasobów Androida |
+| `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowe pliki wprowadzają bota do losowania, stała skórka bota, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
 | **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **674** | |

@@ -36,69 +36,82 @@ describe('profile botów', () => {
   });
 });
 
-describe('pickOpponents z limitem płci', () => {
-  const countOf = (opponents: BotProfile[], gender: BotProfile['gender']) => opponents.filter((p) => p.gender === gender).length;
+describe('pickOpponents ze skórkami', () => {
+  const skinsOf = (profiles: BotProfile[]) => new Set(profiles.map((p) => p.skinId));
 
-  it('nigdy nie przekracza limitu', () => {
+  it('bot bez istniejącej skórki nigdy nie jest losowany', () => {
+    const owned = BOT_PROFILES.slice(0, 6);
+    const allowed = skinsOf(owned);
     for (let seed = 0; seed < 1000; seed++) {
-      const opponents = pickOpponents(createRng(seed), 4, { male: 3, female: 3 });
+      const opponents = pickOpponents(createRng(seed), 4, allowed);
       expect(opponents).toHaveLength(4);
       expect(new Set(opponents.map((p) => p.id)).size).toBe(4);
-      expect(countOf(opponents, 'male')).toBeLessThanOrEqual(3);
-      expect(countOf(opponents, 'female')).toBeLessThanOrEqual(3);
+      expect(opponents.every((p) => allowed.has(p.skinId))).toBe(true);
     }
   });
 
-  it('limit nie zmienia składu, gdy nie ma potrzeby', () => {
+  it('z czasem losuje każdego bota, który ma skórkę', () => {
+    const owned = BOT_PROFILES.slice(0, 6);
+    const seen = new Set<string>();
     for (let seed = 0; seed < 200; seed++) {
-      const free = pickOpponents(createRng(seed), 4);
-      expect(pickOpponents(createRng(seed), 4, { male: 8, female: 8 })).toEqual(free);
+      pickOpponents(createRng(seed), 4, skinsOf(owned)).forEach((p) => seen.add(p.id));
+    }
+    expect(seen.size).toBe(owned.length);
+  });
+
+  it('gdy wszystkie skórki istnieją, skład jest taki sam jak bez filtra', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      expect(pickOpponents(createRng(seed), 4, skinsOf(BOT_PROFILES))).toEqual(pickOpponents(createRng(seed), 4));
     }
   });
 
   it('zużywa tyle samo losowań, więc dalszy przebieg gry się nie zmienia', () => {
     const plain = createRng(5);
-    const limited = createRng(5);
+    const filtered = createRng(5);
     pickOpponents(plain, 4);
-    pickOpponents(limited, 4, { male: 1, female: 3 });
-    expect(limited()).toBe(plain());
+    pickOpponents(filtered, 4, skinsOf(BOT_PROFILES.slice(0, 4)));
+    expect(filtered()).toBe(plain());
   });
 
-  it('za małe limity: skład i tak jest pełny, bo gra musi ruszyć', () => {
-    const opponents = pickOpponents(createRng(1), 4, { male: 1, female: 0 });
+  it('za mało skórek: skład i tak jest pełny, najpierw boty ze skórką', () => {
+    const [owner] = BOT_PROFILES;
+    const opponents = pickOpponents(createRng(1), 4, skinsOf([owner]));
     expect(opponents).toHaveLength(4);
     expect(new Set(opponents.map((p) => p.id)).size).toBe(4);
+    expect(opponents[0].id).toBe(owner.id);
   });
 
-  it('każdy profil ma płeć, a obu płci jest po równo', () => {
-    expect(BOT_PROFILES.filter((p) => p.gender === 'male')).toHaveLength(4);
-    expect(BOT_PROFILES.filter((p) => p.gender === 'female')).toHaveLength(4);
+  it('każdy bot ma własne imię i własną skórkę z puli botów', () => {
+    expect(new Set(BOT_PROFILES.map((p) => p.name)).size).toBe(BOT_PROFILES.length);
+    expect(new Set(BOT_PROFILES.map((p) => p.skinId)).size).toBe(BOT_PROFILES.length);
+    const outsidePools = BOT_PROFILES.filter((p) => !/^(male|female)\/[^/]+$/.test(p.skinId)).map((p) => p.id);
+    expect(outsidePools).toEqual([]);
   });
 });
 
 describe('correctChance', () => {
-  const profesor = getBotProfile('profesor');
+  const bot = getBotProfile('tadeusz');
 
   it('rośnie z poziomem trudności gry', () => {
-    const easy = correctChance(profesor, question, 'easy');
-    const normal = correctChance(profesor, question, 'normal');
-    const expert = correctChance(profesor, question, 'expert');
+    const easy = correctChance(bot, question, 'easy');
+    const normal = correctChance(bot, question, 'normal');
+    const expert = correctChance(bot, question, 'expert');
     expect(easy).toBeLessThan(normal);
     expect(normal).toBeLessThan(expert);
   });
 
   it('uwzględnia mocne i słabe kategorie', () => {
-    expect(correctChance(profesor, question, 'normal')).toBeGreaterThan(
-      correctChance(profesor, { ...question, category: 'Sport' }, 'normal'),
+    expect(correctChance(bot, question, 'normal')).toBeGreaterThan(
+      correctChance(bot, { ...question, category: 'Sport' }, 'normal'),
     );
   });
 
   it('spada dla trudniejszych pytań i mieści się w granicach', () => {
-    const easyQ = correctChance(profesor, { ...question, difficulty: 1 }, 'normal');
-    const hardQ = correctChance(profesor, { ...question, difficulty: 3 }, 'normal');
+    const easyQ = correctChance(bot, { ...question, difficulty: 1 }, 'normal');
+    const hardQ = correctChance(bot, { ...question, difficulty: 3 }, 'normal');
     expect(easyQ).toBeGreaterThan(hardQ);
-    const genius = { ...profesor, knowledge: 5 };
-    const hopeless = { ...profesor, knowledge: -5 };
+    const genius = { ...bot, knowledge: 5 };
+    const hopeless = { ...bot, knowledge: -5 };
     expect(correctChance(genius, question, 'expert')).toBeLessThan(1);
     expect(correctChance(hopeless, question, 'easy')).toBeGreaterThan(0);
   });

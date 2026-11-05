@@ -3,7 +3,7 @@ import { BOT_PROFILES } from '@/game/bots/profiles';
 import { SOLO_PLAYER_COUNT } from '@/game/rules';
 import { clearLog, getLogEntries } from '@/lib/log';
 
-import { genderLimits } from '../assignSkins';
+import { availableBotSkins } from '../assignSkins';
 import { buildCatalog, EXPRESSIONS } from '../catalog';
 import { diskSkinFiles, listSkinPaths, pngColorType } from '../testing/diskSkins';
 
@@ -26,12 +26,16 @@ describe('prawdziwe skórki', () => {
 
   it('jest prowadzący, skórka gracza i dość skórek na pełny skład botów', () => {
     const catalog = buildCatalog(diskSkinFiles());
-    const limits = genderLimits(catalog);
+    const available = availableBotSkins(catalog);
     expect(catalog.host).not.toBeNull();
     expect(catalog.player.length).toBeGreaterThan(0);
+    expect(BOT_PROFILES.filter((p) => available.has(p.skinId)).length).toBeGreaterThanOrEqual(SOLO_PLAYER_COUNT - 1);
+  });
 
-    const available = (gender: 'male' | 'female') => Math.min(limits[gender], BOT_PROFILES.filter((p) => p.gender === gender).length);
-    expect(available('male') + available('female')).toBeGreaterThanOrEqual(SOLO_PLAYER_COUNT - 1);
+  it('każda skórka bota ma właściciela w profilach (inaczej nigdy nie pojawi się w grze)', () => {
+    const owned = new Set(BOT_PROFILES.map((p) => p.skinId));
+    const orphans = [...availableBotSkins(buildCatalog(diskSkinFiles()))].filter((id) => !owned.has(id));
+    expect(orphans).toEqual([]);
   });
 
   it('nazwy zasobów Androida są unikalne', () => {

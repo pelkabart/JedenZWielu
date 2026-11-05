@@ -105,7 +105,7 @@ src/
                           useVoiceAnswer, useQuestionSets, useMenuMusic, useKeyboardHeight
   game/                   domena + sterowniki
     types.ts rules.ts clock.ts answers.ts choices.ts questions.ts rng.ts
-    bots/                 profiles.ts (8 postaci), brain.ts (decyzje)
+    bots/                 profiles.ts (12 postaci), brain.ts (decyzje)
     potato/               engine.ts, solo.ts, bots.ts, texts.ts, controller/PotatoController.ts
     testing/              wspólne fikstury testów
   narration/              voice (interfejs), PotatoNarrator, sherpaVoice, pronunciation,
@@ -175,7 +175,7 @@ Zasady są w stałej `POTATO` w `potato/engine.ts`. Poziomy trudności (`DIFFICU
 
 ### 6.4. Boty
 
-`bots/profiles.ts` – 8 postaci z płcią (pula skórek), wiedzą bazową i mocnymi/słabymi dziedzinami. `bots/brain.ts` – czyste decyzje: szansa trafienia (`correctChance`), pomyłka tego samego typu (`wrongAnswer`), odpowiedź i jej opóźnienie (`decideAnswer`). `potato/bots.ts` – wybór celu (`pickTarget`: lider 60%, najsłabszy 40%). Boty nie są w silniku; wywołuje je sterownik.
+`bots/profiles.ts` – 12 postaci ze stałą skórką (`skinId`), wiedzą bazową i mocnymi/słabymi dziedzinami. `bots/brain.ts` – czyste decyzje: szansa trafienia (`correctChance`), pomyłka tego samego typu (`wrongAnswer`), odpowiedź i jej opóźnienie (`decideAnswer`). `potato/bots.ts` – wybór celu (`pickTarget`: lider 60%, najsłabszy 40%). Boty nie są w silniku; wywołuje je sterownik.
 
 ## 7. Sterownik (czas rzeczywisty)
 

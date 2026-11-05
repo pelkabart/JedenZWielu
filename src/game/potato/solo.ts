@@ -1,4 +1,4 @@
-import { pickOpponents, type GenderLimits } from '../bots/profiles';
+import { pickOpponents } from '../bots/profiles';
 import { randomInt, shuffle, type Rng } from '../rng';
 import { SOLO_PLAYER_COUNT } from '../rules';
 import type { PlayerSetup, Question } from '../types';
@@ -10,13 +10,13 @@ export interface PotatoSoloSetup {
   humanName: string;
   questions: Question[];
   rng: Rng;
-  /** Limit botów każdej płci (tyle, ile jest skórek). */
-  botLimits?: GenderLimits;
+  /** Istniejące skórki botów: bot bez skórki nie wchodzi do gry. */
+  availableSkinIds?: ReadonlySet<string>;
 }
 
 /** Gra solo w nowych zasadach: człowiek i 4 losowo dobrane boty, człowiek siada na losowym miejscu. */
-export function createPotatoSoloGame({ humanName, questions, rng, botLimits }: PotatoSoloSetup): PotatoState {
-  const bots: PlayerSetup[] = pickOpponents(rng, SOLO_PLAYER_COUNT - 1, botLimits).map((profile) => ({
+export function createPotatoSoloGame({ humanName, questions, rng, availableSkinIds }: PotatoSoloSetup): PotatoState {
+  const bots: PlayerSetup[] = pickOpponents(rng, SOLO_PLAYER_COUNT - 1, availableSkinIds).map((profile) => ({
     id: profile.id,
     name: profile.name,
     isHuman: false,

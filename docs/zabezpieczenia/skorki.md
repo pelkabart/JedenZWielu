@@ -23,20 +23,20 @@ Skórki leżą w `assets/skins/<male|female|player>/<id>/<id>-<normal|smile|clos
 **Zabezpieczenie:** `scripts/skins/remove_background.py` wycina tło od rogów (próg 12, wyższy naruszał czarny sweter skórki `201`). Test sprawdza kanał alfa każdego pliku.
 **Test:** `real-assets-test.ts › każdy plik ma kanał alfa`; obrys obejrzany na kontrastowym tle.
 
-### 4. Kobieta w męskiej skórce albo dwie takie same postacie
-**Ryzyko:** złe dopasowanie płci, powtórka skórki w jednej grze.
-**Zabezpieczenie:** `BotProfile.gender` jest polem wymaganym, więc nowy bot bez płci się nie skompiluje. `assignSkins` rozdaje każdą skórkę najwyżej raz, tylko z puli płci bota. Pula gracza (`player`) nie pokrywa się z pulami botów.
-**Test:** `assignSkins-test.ts › płeć i brak powtórek na wielu ziarnach`.
+### 4. Ten sam bot za każdym razem wygląda inaczej albo dwie takie same postacie
+**Ryzyko:** losowana skórka zmienia wygląd bota w każdej grze, a dwa boty z tą samą skórką wyglądałyby tak samo.
+**Zabezpieczenie:** `BotProfile.skinId` jest polem wymaganym i jedynym miejscem przypisania skórki do bota, a `assignSkins` nic nie losuje. Test pilnuje, że każde `skinId` jest unikalne i wskazuje pulę `male` albo `female`. Pula gracza (`player`) nie pokrywa się z pulami botów.
+**Test:** `skins-integration-test.ts › ten sam bot ma tę samą skórkę w każdej grze`, `bots-test.ts › każdy bot ma własne imię i własną skórkę z puli botów`.
 
-### 5. Za mało skórek jednej płci
-**Ryzyko:** botów jest po 4 z każdej płci, a skórek po 3. Wylosowanie 4 botów tej samej płci wymusiłoby powtórkę albo złą płeć.
-**Zabezpieczenie:** `pickOpponents` przyjmuje limit płci równy liczbie skórek, więc taki skład nie powstaje. Gdy skórek jest za mało na całą grę (np. ktoś usunął folder), gra i tak rusza: bot bez skórki dostaje dotychczasowy rysunek zastępczy i `log.warn`, nigdy skórkę drugiej płci.
-**Test:** `bots-test.ts › pickOpponents`, `assignSkins-test.ts › brak skórki`.
+### 5. Bot, którego skórki jeszcze nie ma, albo skórka bez bota
+**Ryzyko:** skórki dochodzą stopniowo, więc bot z pustym folderem wszedłby do gry z rysunkiem zastępczym. Skórka z literówką w `skinId` nigdy by się nie pojawiła i nikt by tego nie zauważył.
+**Zabezpieczenie:** `pickOpponents` dostaje zbiór istniejących skórek i losuje tylko ich właścicieli. Gdy botów ze skórką jest za mało (np. ktoś usunął foldery), gra i tak rusza: reszta dostaje rysunek zastępczy i `log.warn`. Test na prawdziwym folderze wymaga co najmniej 4 botów ze skórką i właściciela dla każdej skórki. Log `Nowa gra w rundach` podaje `botsWithSkin`.
+**Test:** `bots-test.ts › bot bez istniejącej skórki nigdy nie jest losowany`, `real-assets-test.ts › każda skórka bota ma właściciela`.
 
 ### 6. Skórki zmieniają przebieg gry
-**Ryzyko:** dodatkowe losowania z generatora gry zmieniłyby wyniki gier z tego samego ziarna i symulacji.
-**Zabezpieczenie:** silniki nie wiedzą o skórkach. Przydział używa osobnego generatora z ziarna gry. Limit działa tylko, gdy zostanie podany, i zużywa tyle samo losowań.
-**Test:** `bots-test.ts › limit nie zmienia składu, gdy nie ma potrzeby`, istniejące `simulate-test.ts`.
+**Ryzyko:** dodatkowe losowania z generatora gry zmieniłyby wyniki gier z tego samego ziarna.
+**Zabezpieczenie:** silniki nie wiedzą o skórkach, a `assignSkins` nie losuje. Filtr w `pickOpponents` tasuje całą listę, więc zużywa tyle samo losowań. Inny zestaw skórek zmienia jednak skład botów, więc do odtworzenia gry z ziarna potrzebne są te same skórki.
+**Test:** `bots-test.ts › zużywa tyle samo losowań`, `gdy wszystkie skórki istnieją, skład jest taki sam jak bez filtra`.
 
 ### 7. Zapisany wybór jest uszkodzony albo skórki już nie ma
 **Ryzyko:** po aktualizacji bez danej skórki albo po przerwanym zapisie gracz zostałby bez postaci.

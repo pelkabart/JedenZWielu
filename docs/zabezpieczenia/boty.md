@@ -37,3 +37,8 @@ Logi: `[sterownik] Bot odpowie` (czas, czy w ogóle odpowie), `[sterownik] Okno 
 **Ryzyko:** bot wskazuje siebie, odpadłego gracza albo nie człowieka, gdy reguła limitu tego wymaga. Silnik rzuciłby wtedy wyjątkiem w trakcie gry.
 **Zabezpieczenie:** bot wybiera tylko spośród `pickTargets` (tej samej funkcji, której używa silnik).
 **Test:** `bots-test.ts › w etapie II nigdy nie wskazuje siebie ani odpadłych`, `integration-test.ts` (brak wpisów `error` w całej grze).
+
+### 7. Dwa boty o tym samym imieniu w jednej grze
+**Ryzyko:** po dopisaniu kolejnych botów dwa profile mogłyby mieć to samo imię, więc gracz i lektor nie odróżniliby ich od siebie.
+**Zabezpieczenie:** imiona i `skinId` są unikalne na całej liście `BOT_PROFILES`, a losowanie nie powtarza profilu w jednej grze.
+**Test:** `bots-test.ts › każdy bot ma własne imię i własną skórkę z puli botów`.

@@ -1,3 +1,5 @@
+import type { BotProfile } from '@/game/bots/profiles';
+
 import type { SkinFile } from '../catalog';
 
 /** Trzy klatki skórki, tak jak w folderze `assets/skins`. */
@@ -7,6 +9,13 @@ export function skinFiles(pool: string, id: string): SkinFile[] {
     asset: `${pool}/${id}`.length * 100 + i,
   }));
 }
+
+/** Pliki skórek przypisanych tym botom. Testy nie zależą dzięki temu od tego, kto jaką skórkę ma w profilach. */
+export const botSkinFiles = (profiles: readonly BotProfile[]): SkinFile[] =>
+  profiles.flatMap(({ skinId }) => {
+    const [pool, id] = skinId.split('/');
+    return skinFiles(pool, id);
+  });
 
 export const hostFiles = (): SkinFile[] =>
   ['normal', 'smile', 'closed-eyes'].map((frame, i) => ({ path: `./host/host-${frame}.png`, asset: 900 + i }));

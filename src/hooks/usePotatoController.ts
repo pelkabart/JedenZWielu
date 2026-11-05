@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
+import { BOT_PROFILES } from '@/game/bots/profiles';
 import { createRng } from '@/game/rng';
 import { PotatoNarrator } from '@/narration/PotatoNarrator';
 import { createSherpaVoice } from '@/narration/sherpaVoice';
@@ -7,13 +8,12 @@ import { PotatoController } from '@/game/potato/controller/PotatoController';
 import { createPotatoSoloGame } from '@/game/potato/solo';
 import type { Difficulty, Question } from '@/game/types';
 import { createLogger } from '@/lib/log';
-import { assignSkins, genderLimits } from '@/skins/assignSkins';
+import { assignSkins, availableBotSkins } from '@/skins/assignSkins';
 import { skinSelectionStore } from '@/skins/selection';
 import { skinCatalog } from '@/skins/skinAssets';
 
 const log = createLogger('gra-solo');
 /** Ziarno skórek to ziarno gry z tą maską, więc przydział też da się odtworzyć. */
-const SKIN_SEED_MASK = 0x5f3759df;
 
 /**
  * Gra solo w nowych zasadach (rundy 1–4) na pytaniach wybranej kategorii.
@@ -23,11 +23,17 @@ export function usePotatoController(difficulty: Difficulty, questions: Question[
   const [{ controller, skins }] = useState(() => {
     const seed = Date.now();
     const rng = createRng(seed);
-    const game = createPotatoSoloGame({ humanName: 'Ty', questions, rng, botLimits: genderLimits(skinCatalog) });
+    const availableSkinIds = availableBotSkins(skinCatalog);
+    const game = createPotatoSoloGame({ humanName: 'Ty', questions, rng, availableSkinIds });
     // Ziarno pozwala odtworzyć dokładnie tę samą grę, jeśli na telefonie wyjdzie błąd.
-    log.info('Nowa gra w rundach', { seed, difficulty, questions: questions.length, players: game.players.map((p) => p.id) });
-    // Osobny generator: skórki nie mogą zmieniać przebiegu gry z danego ziarna.
-    const skins = assignSkins(game.players, skinCatalog, skinSelectionStore.getSelected()?.id ?? null, createRng(seed ^ SKIN_SEED_MASK));
+    log.info('Nowa gra w rundach', {
+      seed,
+      difficulty,
+      questions: questions.length,
+      players: game.players.map((p) => p.id),
+      botsWithSkin: BOT_PROFILES.filter((p) => availableSkinIds.has(p.skinId)).length,
+    });
+    const skins = assignSkins(game.players, skinCatalog, skinSelectionStore.getSelected()?.id ?? null);
     return { controller: new PotatoController({ game, difficulty, rng }), skins };
   });
 
