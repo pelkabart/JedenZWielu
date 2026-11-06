@@ -644,6 +644,9 @@ Gracz zgłosił, że ktoś kończy rundę 2 z 1 lampką, a potem nagle ma 2, i �
 **7.71. Bot w sprincie odpowiedział źle i nie stracił szansy**
 Gracz zauważył to w grze. Tak działała zasada z 7.70: sprint przenosił szanse z rundy 2 i ich nie ruszał, a błąd kosztował tylko sekundę. Gracz chciał jednak, żeby w sprincie dało się tracić szanse. Najpierw sprint dawał każdemu od nowa 3 szanse, ale gracz wolał zachować szanse z rundy 2. Ostatecznie szanse z rundy 2 przechodzą do sprintu, a każdy finalista dostaje nową osłonę (obwódka jak w rundzie 2). Błąd albo brak odpowiedzi kosztuje 1 s i najpierw zdejmuje osłonę (napis „TRACISZ OSŁONĘ”), a potem zabiera po jednej szansie. Przy 0 szansach nikt nie odpada (w finale muszą być trzy osoby), tylko nie dostaje premii. Osłona nie liczy się do premii: po sprincie na punkty zamieniają się same szanse.
 
+**7.72. Sprzątanie i mapa projektu**
+Każde zadanie zaczynało się od przeszukiwania całego projektu, a to kosztowało dużo czasu. Analiza `npx knip` (także `--production`) i `tsc --noUnusedLocals --noUnusedParameters` nie znalazła w `src/` nieużywanych plików ani funkcji. Stary silnik, symulator i ekran klucza API były już usunięte 03.11. Usunęliśmy 14 grafik z szablonu Expo, których nic nie używało (`react-logo*`, `expo-badge*`, `expo-logo`, `logo-glow`, `tutorial-web`, `tabIcons/`). Nieużywanych paczek (`expo-device`, `expo-glass-effect` i innych) nie usuwaliśmy, bo jest na nie zbudowany dev build. Powstała mapa `docs/MAPA.md` („co zmieniam → gdzie”), którą `CLAUDE.md` dołącza do każdej sesji.
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).

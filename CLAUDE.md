@@ -3,6 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 @AGENTS.md
+@docs/MAPA.md
+
+Start from `docs/MAPA.md` (where each thing lives) instead of searching the whole project.
 
 ## Project
 
@@ -24,6 +27,7 @@ Current state: home screen, category and difficulty selection and a playable sol
 3. Add **unit tests** and **integration tests** (`src/game/__tests__/integration-test.ts` wires the same modules as the app, on Jest fake timers).
 4. Update `docs/Dokumentacja_postepow_prac.md` (state table, tests table, and section 7 for problems that actually happened).
 5. Before finishing: `npm test`, `npx tsc --noEmit`, `npx expo lint`.
+6. If a module or file was added, removed or moved, update `docs/MAPA.md`.
 
 ## Commands
 
