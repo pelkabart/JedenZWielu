@@ -1,6 +1,6 @@
 import type { Question } from '@/game/types';
 
-import { blindModeOn, multiplierBurstText, multiplierColor, secondsLeft, shownQuestion, spotlightId } from '../gameDisplay';
+import { blindModeOn, bonusFor, lampCount, multiplierBurstText, shieldBurstText, shieldLostBy, shownLives, multiplierColor, secondsLeft, shownQuestion, spotlightId } from '../gameDisplay';
 
 const question = (id: string): Question => ({ id, category: 'Historia', question: id, answers: ['x'], answerType: 'nazwa', difficulty: 1 });
 const answered = question('answered');
@@ -87,5 +87,44 @@ describe('mnożnik', () => {
   it('wzrost pokazuje mnożnik, a powrót do ×1 wybuch', () => {
     expect(multiplierBurstText(3)).toBe('×3');
     expect(multiplierBurstText(1)).toBe('BUM!');
+  });
+});
+
+describe('lampki na pulpicie', () => {
+  it('w rundzie 1 są 2 (tyle szans na start), w dalszych rundach 3', () => {
+    expect(lampCount('round1')).toBe(2);
+    expect(lampCount('round2')).toBe(3);
+    expect(lampCount('sprint')).toBe(3);
+    expect(lampCount('duel')).toBe(3);
+  });
+
+  const p = { id: 'h', name: 'Ty', isHuman: true, seat: 0, lives: 2, shield: true, points: 0, errors: 0, eliminated: false, eliminatedAt: null, blindPassUsed: false };
+
+  it('świecą szanse gracza; odpadający i czas zamiany szans na punkty: zero', () => {
+    expect(shownLives(p, null)).toBe(2);
+    expect(shownLives(p, round)).toBe(2);
+    expect(shownLives({ ...p, eliminated: true }, null)).toBe(0);
+    expect(shownLives(p, { kind: 'lifeBonus' })).toBe(0);
+  });
+});
+
+describe('osłona i premia', () => {
+  it('utratę osłony widać tylko przy wyniku, który ją zabrał', () => {
+    expect(shieldLostBy({ ...reveal, correct: false, shieldLost: true })).toBe('b1');
+    expect(shieldLostBy({ ...reveal, correct: false })).toBeNull();
+    expect(shieldLostBy(round)).toBeNull();
+    expect(shieldLostBy(null)).toBeNull();
+  });
+
+  it('napis: gracz „TRACISZ”, bot z imieniem wielkimi literami', () => {
+    expect(shieldBurstText({ name: 'Ty', isHuman: true })).toBe('TRACISZ OSŁONĘ');
+    expect(shieldBurstText({ name: 'Łucja', isHuman: false })).toBe('ŁUCJA TRACI OSŁONĘ');
+  });
+
+  it('premia przy pulpicie tylko w czasie animacji', () => {
+    const game = { lifeBonus: [{ playerId: 'h', lives: 2, points: 20 }] } as Parameters<typeof bonusFor>[0];
+    expect(bonusFor(game, { kind: 'lifeBonus' }, 'h')).toBe(20);
+    expect(bonusFor(game, { kind: 'lifeBonus' }, 'b1')).toBeNull();
+    expect(bonusFor(game, null, 'h')).toBeNull();
   });
 });

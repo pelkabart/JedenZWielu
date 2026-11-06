@@ -6,8 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartoonBackground } from '@/components/home/CartoonBackground';
 import { MenuButton } from '@/components/home/MenuButton';
-import { blindModeOn, SEAT_COLORS, shownQuestion, spotlightId } from '@/components/potato/gameDisplay';
-import { MultiplierBadge, MultiplierBurst } from '@/components/potato/MultiplierBadge';
+import { LoadingScreen } from '@/components/potato/LoadingScreen';
+import { frameKey } from '@/components/potato/loadingGate';
+import { blindModeOn, bonusFor, lampCount, SEAT_COLORS, shieldBurstText, shieldLostBy, shownLives, shownQuestion, spotlightId } from '@/components/potato/gameDisplay';
+import { MultiplierBadge, MultiplierBurst, ShieldBurst } from '@/components/potato/MultiplierBadge';
 import { PickCountdown } from '@/components/potato/PickCountdown';
 import { Scoreboard } from '@/components/potato/Scoreboard';
 import { AnswerPanel } from '@/components/solo/AnswerPanel';
@@ -17,14 +19,14 @@ import { Podium, type PodiumBubble } from '@/components/solo/Podium';
 import { QuestionCard } from '@/components/solo/QuestionCard';
 import { TimerBar } from '@/components/solo/TimerBar';
 import { colors } from '@/constants/theme';
-import type { PotatoView } from '@/game/potato/controller/PotatoController';
-import { activePlayers, endedEarly, POTATO, type PotatoPhase, type PotatoPlayer } from '@/game/potato/engine';
+import type { PotatoOverlay, PotatoView } from '@/game/potato/controller/PotatoController';
+import { activePlayers, endedEarly, POTATO, type PotatoPlayer } from '@/game/potato/engine';
 import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
 import { DIFFICULTY_PRESETS } from '@/game/rules';
 import type { Difficulty, PlayerState, Question } from '@/game/types';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { setGameMusicDucked, startGameMusic, stopGameMusic } from '@/audio/gameMusic';
-import { usePotatoController } from '@/hooks/usePotatoController';
+import { HOST_LOAD_ID, usePotatoController } from '@/hooks/usePotatoController';
 
 /** Przesunięcie pulpitów w pionie — układają się w łuk. */
 const ARC = [16, 6, 0, 6, 16];
@@ -39,16 +41,15 @@ type Props = {
   onPlayAgain: () => void;
 };
 
-/** Pulpit pokazuje zasób bieżącej rundy: osłonę w rundzie 2, punkty w sprincie, życia w pozostałych. */
-function toPodium(p: PotatoPlayer, phase: PotatoPhase): PlayerState {
+/** Pulpit pokazuje szanse (przechodzą z rundy 2 do sprintu) i punkty. */
+function toPodium(p: PotatoPlayer, overlay: PotatoOverlay | null): PlayerState {
   return {
     id: p.id,
     name: p.name,
     isHuman: p.isHuman,
     botId: p.botId,
     seat: p.seat,
-    // Odpadający pokazują zero kropek; w rundzie 2 kropki to osłona, w pozostałych życia.
-    lives: p.eliminated ? 0 : phase === 'round2' ? p.shield : p.lives,
+    lives: shownLives(p, overlay),
     score: p.points,
     eliminated: p.eliminated,
   };
@@ -77,7 +78,7 @@ function hostLine(view: PotatoView): string {
 }
 
 export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
-  const { controller, view, skins, silenceHost } = usePotatoController(difficulty, questions);
+  const { controller, view, skins, silenceHost, loading, onFrameLoad } = usePotatoController(difficulty, questions);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
@@ -92,6 +93,8 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
   const blindAvailable = humanTurn && phase === 'round1' && !me.blindPassUsed;
   const blindOn = blindModeOn(blindArmedAt, game.cursor, blindAvailable);
   const finished = overlay?.kind === 'finished';
+  const shieldLoserId = shieldLostBy(overlay);
+  const shieldLoser = game.players.find((p) => p.id === shieldLoserId) ?? null;
 
   const [exitAsked, setExitAsked] = useState(false);
 
@@ -102,9 +105,9 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
     else router.replace('/');
   };
 
-  /** X: wstrzymuje grę i pyta, czy na pewno wyjść (po zakończeniu gry wychodzi od razu). */
+  /** X: wstrzymuje grę i pyta, czy na pewno wyjść (po zakończeniu gry i w czasie ładowania wychodzi od razu). */
   const askExit = () => {
-    if (finished) {
+    if (finished || !loading.ready) {
       leave();
       return;
     }
@@ -236,6 +239,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
               line={hostLine(view)}
               width={hostWidth}
               smiling={(overlay?.kind === 'finished' && !endedEarly(game)) || awaitingPick !== null || (overlay?.kind === 'reveal' && overlay.correct)}
+              onFrameLoad={(frame) => onFrameLoad(frameKey(HOST_LOAD_ID, frame))}
             />
           </View>
 
@@ -275,7 +279,7 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
               {game.players.map((player) => (
                 <View key={player.id} style={{ transform: [{ translateY: ARC[player.seat] ?? 0 }] }}>
                   <Podium
-                    player={toPodium(player, phase)}
+                    player={toPodium(player, overlay)}
                     skin={skins[player.id] ?? null}
                     color={SEAT_COLORS[player.seat % SEAT_COLORS.length]}
                     width={podiumUnit * (SEAT_SCALE[player.seat] ?? 1)}
@@ -283,6 +287,10 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
                     selectable={targets.includes(player.id)}
                     showScore={phase === 'sprint' || phase === 'duel' || phase === 'finished'}
                     bubble={bubbleFor(view, player.id)}
+                    lamps={lampCount(phase)}
+                    shield={player.shield}
+                    bonus={bonusFor(game, overlay, player.id)}
+                    onFrameLoad={(frame) => onFrameLoad(frameKey(player.id, frame))}
                     onPress={() => onPickPlayer(player.id)}
                   />
                 </View>
@@ -317,7 +325,8 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
         </View>
       </View>
 
-      {phase === 'round2' && <MultiplierBurst multiplier={game.multiplier} />}
+      {phase === 'round2' && <MultiplierBurst multiplier={game.multiplier} suppress={shieldLoser !== null} />}
+      {(phase === 'round2' || phase === 'sprint') && <ShieldBurst text={shieldLoser ? shieldBurstText(shieldLoser) : null} eventKey={shieldLoser ? game.cursor : null} />}
 
       {overlay?.kind === 'round' && (
         // Tło przepuszcza dotknięcia, żeby na planszy działały też pauza i wyjście.
@@ -351,6 +360,9 @@ export function PotatoGame({ difficulty, questions, onPlayAgain }: Props) {
       )}
 
       {finished && <Scoreboard game={game} skins={skins} onPlayAgain={onPlayAgain} onMenu={leave} />}
+
+      {/* Zasłania grę, aż wczytają się postacie i lektor; gra pod spodem już się rysuje, ale stoi. */}
+      {!loading.ready && <LoadingScreen progress={loading.progress} />}
     </View>
   );
 }

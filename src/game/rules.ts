@@ -15,9 +15,10 @@ export interface DifficultyPreset {
 }
 
 export const DIFFICULTY_PRESETS: Record<Difficulty, DifficultyPreset> = {
-  easy: { label: 'Łatwy', knowledgeOffset: -0.2, speedFactor: 1.3, answerFormat: 'choice', answerTimeMs: 7000 },
-  normal: { label: 'Normalny', knowledgeOffset: 0, speedFactor: 1, answerFormat: 'choice', answerTimeMs: 5000 },
-  expert: { label: 'Ekspert', knowledgeOffset: 0.15, speedFactor: 0.75, answerFormat: 'text', answerTimeMs: 10000 },
+  // Średnia wiedza botów ≈ 0,62, więc boty trafiają średnio: łatwy ~37%, normalny ~50%, ekspert ~65%.
+  easy: { label: 'Łatwy', knowledgeOffset: -0.25, speedFactor: 1.5, answerFormat: 'choice', answerTimeMs: 7000 },
+  normal: { label: 'Normalny', knowledgeOffset: -0.12, speedFactor: 1.3, answerFormat: 'choice', answerTimeMs: 5000 },
+  expert: { label: 'Ekspert', knowledgeOffset: 0.03, speedFactor: 1, answerFormat: 'text', answerTimeMs: 10000 },
 };
 
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'expert'];

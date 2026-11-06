@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SkinFigure } from '@/components/skins/SkinFigure';
 import { colors } from '@/constants/theme';
 import { useIdleFace } from '@/hooks/useIdleFace';
+import type { Expression } from '@/skins/catalog';
 import { hostExpression } from '@/skins/expression';
 import { skinCatalog } from '@/skins/skinAssets';
 
@@ -15,9 +16,11 @@ type Props = {
   /** Szerokość miejsca na prowadzącego. */
   width: number;
   smiling: boolean;
+  /** Klatka skórki wczytana (ekran ładowania). */
+  onFrameLoad?: (frame: Expression) => void;
 };
 
-export function Host({ line, width, smiling }: Props) {
+export function Host({ line, width, smiling, onFrameLoad }: Props) {
   const skin = skinCatalog.host;
   const idle = useIdleFace();
   const size = width * 0.42;
@@ -34,6 +37,7 @@ export function Host({ line, width, smiling }: Props) {
           width={width}
           height={width * FIGURE_HEIGHT}
           imageSize={width * FIGURE_IMAGE_SIZE}
+          onFrameLoad={onFrameLoad}
         />
       ) : (
         <>

@@ -1,5 +1,33 @@
 import type { PotatoOverlay } from '@/game/potato/controller/PotatoController';
+import { POTATO, type PotatoPhase, type PotatoPlayer, type PotatoState } from '@/game/potato/engine';
 import type { Question } from '@/game/types';
+
+/** Ile lampek ma pulpit: w rundzie 1 tyle, ile szans na start, potem 3 (runda 2, sprint, finał). */
+export function lampCount(phase: PotatoPhase): number {
+  return phase === 'round1' ? POTATO.lives : Math.max(POTATO.round2Lives, POTATO.duelLives);
+}
+
+/** Ile lampek świeci: odpadający nic, a w czasie zamiany szans na punkty wszystkie gasną. */
+export function shownLives(player: PotatoPlayer, overlay: PotatoOverlay | null): number {
+  if (player.eliminated || overlay?.kind === 'lifeBonus') return 0;
+  return player.lives;
+}
+
+/** Kto właśnie stracił osłonę (wynik błędnej odpowiedzi w rundzie 2), albo `null`. */
+export function shieldLostBy(overlay: PotatoOverlay | null): string | null {
+  return overlay?.kind === 'reveal' && overlay.shieldLost ? overlay.playerId : null;
+}
+
+/** Napis na środku ekranu po utracie osłony. */
+export function shieldBurstText(player: Pick<PotatoPlayer, 'name' | 'isHuman'>): string {
+  return player.isHuman ? 'TRACISZ OSŁONĘ' : `${player.name.toLocaleUpperCase('pl-PL')} TRACI OSŁONĘ`;
+}
+
+/** Premia za szanse pokazywana przy pulpicie w czasie animacji po sprincie; `null` = brak napisu. */
+export function bonusFor(game: PotatoState, overlay: PotatoOverlay | null, playerId: string): number | null {
+  if (overlay?.kind !== 'lifeBonus') return null;
+  return game.lifeBonus?.find((b) => b.playerId === playerId)?.points ?? null;
+}
 
 /**
  * Co pokazać na ekranie gry. Silnik rozdaje następne pytanie już przy zatwierdzeniu odpowiedzi,

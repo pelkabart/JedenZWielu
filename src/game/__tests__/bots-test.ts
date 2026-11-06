@@ -100,6 +100,17 @@ describe('correctChance', () => {
     expect(normal).toBeLessThan(expert);
   });
 
+  it('średnio boty trafiają ok. 37% (łatwy), 50% (normalny) i 65% (ekspert) pytań z banku', () => {
+    const average = (d: Difficulty) => {
+      let sum = 0;
+      for (const p of BOT_PROFILES) for (const q of QUESTION_BANK) sum += correctChance(p, q, d);
+      return sum / (BOT_PROFILES.length * QUESTION_BANK.length);
+    };
+    expect(Math.abs(average('easy') - 0.375)).toBeLessThan(0.05);
+    expect(Math.abs(average('normal') - 0.5)).toBeLessThan(0.05);
+    expect(Math.abs(average('expert') - 0.65)).toBeLessThan(0.05);
+  });
+
   it('uwzględnia mocne i słabe kategorie', () => {
     expect(correctChance(bot, question, 'normal')).toBeGreaterThan(
       correctChance(bot, { ...question, category: 'Sport' }, 'normal'),

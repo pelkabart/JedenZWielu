@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { SkinFigure } from '@/components/skins/SkinFigure';
 import { colors } from '@/constants/theme';
 import type { PlayerState } from '@/game/types';
 import { useIdleFace } from '@/hooks/useIdleFace';
-import type { Skin } from '@/skins/catalog';
+import type { Expression, Skin } from '@/skins/catalog';
 import { podiumExpression } from '@/skins/expression';
 
 export type PodiumBubble = { kind: 'thinking' } | { kind: 'answer'; text: string | null; correct: boolean };
@@ -24,10 +26,18 @@ type Props = {
   selectable: boolean;
   showScore: boolean;
   bubble: PodiumBubble | null;
+  /** Liczba lampek (szanse). */
+  lamps?: number;
+  /** Osłona w rundzie 2: jasnoniebieska obwódka wokół lampek. */
+  shield?: boolean;
+  /** Premia za szanse po sprincie: napis „+20” nad pulpitem. */
+  bonus?: number | null;
+  /** Klatka skórki wczytana (ekran ładowania). */
+  onFrameLoad?: (frame: Expression) => void;
   onPress?: () => void;
 };
 
-export function Podium({ player, skin, color, width, highlighted, selectable, showScore, bubble, onPress }: Props) {
+export function Podium({ player, skin, color, width, highlighted, selectable, showScore, bubble, lamps = 3, shield = false, bonus = null, onFrameLoad, onPress }: Props) {
   const head = width * 0.4;
   const label = player.isHuman ? 'TY' : player.name.charAt(0);
   // Postać, która odpadła, nie mruga: zostaje z otwartymi oczami, przyciemniona.
@@ -62,6 +72,7 @@ export function Podium({ player, skin, color, width, highlighted, selectable, sh
           height={width * BUST_HEIGHT}
           imageSize={width * BUST_IMAGE_SIZE}
           dimmed={player.eliminated}
+          onFrameLoad={onFrameLoad}
         />
       ) : (
         <>
@@ -84,13 +95,14 @@ export function Podium({ player, skin, color, width, highlighted, selectable, sh
         <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
           {player.name}
         </Text>
-        <View style={styles.lives}>
-          {Array.from({ length: 3 }, (_, i) => (
+        <View style={[styles.lives, shield && styles.shield]} accessibilityLabel={shield ? 'Osłona' : undefined}>
+          {Array.from({ length: lamps }, (_, i) => (
             <View key={i} style={[styles.lamp, i < player.lives ? styles.lampOn : styles.lampOff]} />
           ))}
         </View>
         {showScore && <Text style={styles.score}>{player.score} pkt</Text>}
       </View>
+      {bonus !== null && <BonusPop points={bonus} />}
     </Pressable>
   );
 }
@@ -173,6 +185,25 @@ const styles = StyleSheet.create({
   lives: {
     flexDirection: 'row',
     gap: 5,
+    padding: 3,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  shield: {
+    borderColor: colors.sky,
+    boxShadow: `0 0 8px ${colors.sky}`,
+  },
+  bonus: {
+    position: 'absolute',
+    bottom: 34,
+    zIndex: 3,
+    color: colors.starYellow,
+    fontSize: 30,
+    fontWeight: '900',
+    textShadowColor: colors.outline,
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 1,
   },
   lamp: {
     width: 12,
@@ -193,3 +224,26 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
+
+/** „+20” wyskakuje nad pulpitem i powoli unosi się w górę. */
+function BonusPop({ points }: { points: number }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.set(withTiming(1, { duration: 1400, easing: Easing.out(Easing.cubic) }));
+  }, [progress]);
+
+  const style = useAnimatedStyle(() => {
+    const p = progress.get();
+    return {
+      opacity: Math.min(1, p * 4),
+      transform: [{ translateY: -30 * p }, { scale: p < 0.2 ? 0.5 + 2.5 * p : 1 }],
+    };
+  });
+
+  return (
+    <Animated.Text style={[styles.bonus, style]} pointerEvents="none">
+      +{points}
+    </Animated.Text>
+  );
+}

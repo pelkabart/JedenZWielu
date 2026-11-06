@@ -1,6 +1,6 @@
 import type { Question } from '../../types';
 import { MAX_QUESTIONS_WITHOUT_HUMAN, pickTarget } from '../bots';
-import { activePlayers, createPotatoGame, endedEarly, POTATO, PotatoRuleError, reducePotato, type PotatoState } from '../engine';
+import { activePlayers, createPotatoGame, endedEarly, errorEliminates, POTATO, PotatoRuleError, reducePotato, resourceOf, type PotatoState } from '../engine';
 
 const OK = 'ok';
 const BAD = 'zle';
@@ -39,11 +39,11 @@ describe('endEarly', () => {
       phase: 'round2',
       eliminations: 2,
       players: base.players.map((p) => {
-        if (p.id === a) return { ...p, eliminated: true, eliminatedAt: 1, shield: 0 };
-        if (p.id === b) return { ...p, eliminated: true, eliminatedAt: 2, shield: 0 };
-        if (p.id === c) return { ...p, shield: 1 };
-        if (p.id === d) return { ...p, shield: 3 };
-        return { ...p, shield: 2 };
+        if (p.id === a) return { ...p, eliminated: true, eliminatedAt: 1, lives: 0 };
+        if (p.id === b) return { ...p, eliminated: true, eliminatedAt: 2, lives: 0 };
+        if (p.id === c) return { ...p, lives: 1 };
+        if (p.id === d) return { ...p, lives: 2, shield: true };
+        return { ...p, lives: 2 };
       }),
     };
     const finished = reducePotato(state, { type: 'endEarly' });
@@ -104,13 +104,14 @@ describe('runda 1: odsiew', () => {
     expect(player(s, 'h').lives).toBe(POTATO.lives - 1);
   });
 
-  it('odpadnięcie w rundzie 1 przechodzi do rundy 2 z 4 graczami i 3 punktami osłony', () => {
+  it('odpadnięcie w rundzie 1 przechodzi do rundy 2 z 4 graczami, 3 szansami i osłoną', () => {
     const s0 = withPlayers(started(), { h: { lives: 1 } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
     expect(s.phase).toBe('round2');
     expect(activePlayers(s)).toHaveLength(4);
     expect(player(s, 'h').eliminated).toBe(true);
-    expect(s.players.filter((p) => !p.eliminated).every((p) => p.shield === POTATO.shield)).toBe(true);
+    expect(activePlayers(s).every((p) => p.lives === POTATO.round2Lives && p.shield)).toBe(true);
+    expect(POTATO.round2Lives).toBe(3);
     expect(s.holderId).toBe('b1');
   });
 
@@ -132,7 +133,10 @@ describe('runda 1: odsiew', () => {
 });
 
 describe('runda 2: bomba', () => {
-  const round2 = (holder = 'h') => withPlayers({ ...started(holder), phase: 'round2' }, { b4: { eliminated: true } });
+  const round2 = (holder = 'h') => {
+    const s = withPlayers({ ...started(holder), phase: 'round2' }, { b4: { eliminated: true, lives: 0 } });
+    return { ...s, players: s.players.map((p) => (p.eliminated ? p : { ...p, lives: POTATO.round2Lives, shield: true })) };
+  };
 
   it('poprawne podanie podnosi mnożnik i przekazuje bombę', () => {
     const s = reducePotato(round2(), { type: 'answer', playerId: 'h', text: OK, next: 'b1' });
@@ -147,37 +151,62 @@ describe('runda 2: bomba', () => {
     expect(reducePotato(atLimit, { type: 'award', playerId: 'h', text: OK }).multiplier).toBe(3);
   });
 
-  it('wybuch przy ×3 zabiera całą osłonę i wraca do ×1', () => {
-    const s0 = { ...round2(), multiplier: POTATO.maxMultiplier };
-    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
-    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: 0 });
-    expect(s.multiplier).toBe(1);
-  });
-
-  it('wybuch odejmuje mnożnik od osłony i resetuje mnożnik do ×1', () => {
-    const s0 = { ...round2(), multiplier: 2 };
-    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
-    expect(player(s, 'h').shield).toBe(POTATO.shield - 2);
+  it.each([1, 2, 3])('pierwszy błąd przy ×%p zabiera tylko osłonę i wraca do ×1', (multiplier) => {
+    const s = reducePotato({ ...round2(), multiplier }, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
+    expect(player(s, 'h')).toMatchObject({ shield: false, lives: POTATO.round2Lives, eliminated: false });
     expect(s.multiplier).toBe(1);
     expect(s.phase).toBe('round2');
   });
 
-  it('odpadający w rundzie 2 nie ma żadnych kropek (osłona i życia na zero)', () => {
-    const s0 = withPlayers({ ...round2(), multiplier: 2 }, { h: { shield: 2, lives: 2 } });
-    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
-    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: 0, lives: 0 });
+  it('brak odpowiedzi też zabiera osłonę, a nie szanse', () => {
+    const s = reducePotato({ ...round2(), multiplier: 3 }, { type: 'answer', playerId: 'h', text: null, next: 'b1' });
+    expect(player(s, 'h')).toMatchObject({ shield: false, lives: POTATO.round2Lives });
   });
 
-  it('osłona spadająca do 0 odpada; przy 3 graczach zaczyna się sprint', () => {
-    const s0 = withPlayers({ ...round2(), multiplier: 2 }, { h: { shield: 2 } });
+  it.each([
+    [1, 2],
+    [2, 1],
+  ])('bez osłony błąd przy ×%p zabiera tyle szans (zostaje %p)', (multiplier, left) => {
+    const s0 = withPlayers({ ...round2(), multiplier }, { h: { shield: false } });
     const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
-    expect(player(s, 'h').eliminated).toBe(true);
+    expect(player(s, 'h')).toMatchObject({ lives: left, shield: false, eliminated: false });
+    expect(s.multiplier).toBe(1);
+  });
+
+  it('bez osłony błąd przy ×3 zabiera wszystkie 3 szanse: odpadnięcie, przy 3 graczach sprint', () => {
+    const s0 = withPlayers({ ...round2(), multiplier: 3 }, { h: { shield: false } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
+    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: false, lives: 0 });
     expect(activePlayers(s)).toHaveLength(3);
     expect(s.phase).toBe('sprint');
     expect(s.sprintMsLeft).toBe(POTATO.sprintMs);
     expect(s.holderId).toBe('b1');
   });
 
+  it('szanse z rundy 2 przechodzą do sprintu, a każdy finalista dostaje nową osłonę', () => {
+    const s0 = withPlayers({ ...round2(), multiplier: 2 }, { h: { shield: false, lives: 1 }, b1: { lives: 1, shield: false }, b3: { lives: 2 } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b1' });
+    expect(s.phase).toBe('sprint');
+    expect(player(s, 'b1')).toMatchObject({ lives: 1, shield: true });
+    expect(player(s, 'b2')).toMatchObject({ lives: 3, shield: true });
+    expect(player(s, 'b3')).toMatchObject({ lives: 2, shield: true });
+    expect(player(s, 'h')).toMatchObject({ eliminated: true, shield: false });
+  });
+
+  it('errorEliminates: z osłoną nigdy, bez osłony gdy szans nie więcej niż mnożnik', () => {
+    const s = { ...round2(), multiplier: 3 };
+    expect(errorEliminates(s, player(s, 'h'))).toBe(false);
+    const bare = withPlayers(s, { h: { shield: false } });
+    expect(errorEliminates(bare, player(bare, 'h'))).toBe(true);
+    const low = withPlayers({ ...s, multiplier: 2 }, { h: { shield: false } });
+    expect(errorEliminates(low, player(low, 'h'))).toBe(false);
+  });
+
+  it('resourceOf: osłona liczy się jak jedna szansa więcej', () => {
+    const s = withPlayers(round2(), { b1: { shield: false } });
+    expect(resourceOf(s, player(s, 'h'))).toBe(4);
+    expect(resourceOf(s, player(s, 'b1'))).toBe(3);
+  });
 });
 
 describe('runda 3: sprint', () => {
@@ -187,26 +216,87 @@ describe('runda 3: sprint', () => {
     sprintMsLeft: POTATO.sprintMs,
   });
 
-  it('dobra odpowiedź daje punkt i rotuje ziemniak', () => {
-    const s = reducePotato(sprint(), { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
-    expect(player(s, 'h').points).toBe(1);
+  it('dobra odpowiedź daje 5 punktów i rotuje ziemniak, szanse się nie zmieniają', () => {
+    const s0 = withPlayers(sprint(), { h: { lives: 2 } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: OK, next: 'b3' });
+    expect(POTATO.sprintPoints).toBe(5);
+    expect(player(s, 'h')).toMatchObject({ points: 5, lives: 2 });
     expect(s.holderId).toBe('b3');
   });
 
-  it('błąd kosztuje 1 s, a upływ czasu kończy sprint i przydziela szanse 3/2/1', () => {
-    let s = reducePotato(sprint(), { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
+  it('błąd w sprincie: najpierw zabiera osłonę, potem po jednej szansie; zawsze 1 s', () => {
+    const s0 = withPlayers(sprint(), { h: { lives: 2, shield: true } });
+    let s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
     expect(s.sprintMsLeft).toBe(POTATO.sprintMs - POTATO.sprintPenaltyMs);
-    s = withPlayers(s, { h: { points: 3 }, b3: { points: 5 }, b4: { points: 1 } });
-    s = reducePotato(s, { type: 'tick', ms: s.sprintMsLeft });
-    expect(s.phase).toBe('duel');
-    expect(s.holderId).toBe('b3');
-    expect(player(s, 'b3').lives).toBe(3);
+    expect(player(s, 'h')).toMatchObject({ lives: 2, shield: false });
+    s = reducePotato({ ...s, holderId: 'h' }, { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
+    expect(s.sprintMsLeft).toBe(POTATO.sprintMs - 2 * POTATO.sprintPenaltyMs);
+    expect(player(s, 'h')).toMatchObject({ lives: 1, shield: false, eliminated: false });
+    expect(errorEliminates(s, player(s, 'h'))).toBe(false);
+  });
+
+  it('brak odpowiedzi w sprincie liczy się jak błąd', () => {
+    const s0 = withPlayers(sprint(), { h: { lives: 3, shield: false } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: null, next: 'b3' });
     expect(player(s, 'h').lives).toBe(2);
-    expect(player(s, 'b4').lives).toBe(1);
+  });
+
+  it('w sprincie nikt nie odpada: szanse spadają najwyżej do 0, a gracz dalej zbiera punkty', () => {
+    let s = withPlayers(sprint(), { h: { lives: 1, shield: false } });
+    s = reducePotato(s, { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
+    expect(player(s, 'h')).toMatchObject({ lives: 0, eliminated: false });
+    s = { ...s, holderId: 'h' };
+    s = reducePotato(s, { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
+    expect(player(s, 'h')).toMatchObject({ lives: 0, eliminated: false });
+    s = { ...s, holderId: 'h' };
+    s = reducePotato(s, { type: 'answer', playerId: 'h', text: s.question!.answers[0], next: 'b3' });
+    expect(player(s, 'h').points).toBe(POTATO.sprintPoints);
+  });
+
+  it('koniec sprintu: każda szansa to 10 punktów, w finale wszyscy mają 3 szanse, zaczyna lider', () => {
+    const s0 = withPlayers(sprint(), {
+      h: { points: 15, lives: 2 },
+      b3: { points: 20, lives: 0 },
+      b4: { points: 5, lives: 3 },
+    });
+    const s = reducePotato(s0, { type: 'tick', ms: POTATO.sprintMs });
+    expect(s.phase).toBe('duel');
+    expect(s.lifeBonus).toEqual([
+      { playerId: 'h', lives: 2, points: 20 },
+      { playerId: 'b3', lives: 0, points: 0 },
+      { playerId: 'b4', lives: 3, points: 30 },
+    ]);
+    expect(player(s, 'h').points).toBe(35);
+    expect(player(s, 'b3').points).toBe(20);
+    expect(player(s, 'b4').points).toBe(35);
+    expect(activePlayers(s).every((p) => p.lives === POTATO.duelLives)).toBe(true);
+    // Remis 35:35 rozstrzyga mniej błędów, potem miejsce przy stole.
+    expect(s.holderId).toBe('h');
+    expect(player(s, 'b1')).toMatchObject({ eliminated: true, points: 0 });
+  });
+
+  it('koniec sprintu karą za błąd też dolicza premię', () => {
+    const s0 = withPlayers({ ...sprint(), sprintMsLeft: POTATO.sprintPenaltyMs }, { h: { lives: 2, shield: false } });
+    const s = reducePotato(s0, { type: 'answer', playerId: 'h', text: BAD, next: 'b3' });
+    expect(s.phase).toBe('duel');
+    // Ostatni błąd zabrał szansę przed liczeniem premii: 2 − 1 = 1.
+    expect(s.lifeBonus?.find((b) => b.playerId === 'h')).toEqual({ playerId: 'h', lives: 1, points: 10 });
+  });
+
+  it('osłona nie liczy się do premii i znika przed finałem', () => {
+    const s0 = withPlayers(sprint(), { h: { lives: 2, shield: true } });
+    const s = reducePotato(s0, { type: 'tick', ms: POTATO.sprintMs });
+    expect(s.lifeBonus?.find((b) => b.playerId === 'h')).toEqual({ playerId: 'h', lives: 2, points: 20 });
+    expect(s.players.every((p) => !p.shield)).toBe(true);
+  });
+
+  it('przed końcem sprintu nie ma premii', () => {
+    expect(sprint().lifeBonus).toBeNull();
+    expect(reducePotato(sprint(), { type: 'tick', ms: 1000 }).lifeBonus).toBeNull();
   });
 
   it('remis punktów rozstrzyga mniej błędów, potem miejsce przy stole', () => {
-    const s0 = withPlayers(sprint(), { h: { points: 2, errors: 3 }, b3: { points: 2, errors: 1 }, b4: { points: 2, errors: 1 } });
+    const s0 = withPlayers(sprint(), { h: { points: 2, errors: 3, lives: 1 }, b3: { points: 2, errors: 1, lives: 1 }, b4: { points: 2, errors: 1, lives: 1 } });
     const s = reducePotato(s0, { type: 'tick', ms: POTATO.sprintMs });
     expect(s.holderId).toBe('b3');
   });

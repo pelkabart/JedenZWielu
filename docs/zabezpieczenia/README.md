@@ -29,6 +29,7 @@ Każda nowa funkcjonalność ma też logi (`src/lib/log.ts`), testy jednostkowe 
 | [symulator.md](symulator.md) | rozgrywanie całych gier botami (kod usunięty) |
 | [sterownik-gry.md](sterownik-gry.md) | czas, pauzy i ruchy botów w starym trybie (kod usunięty) |
 | [ekran-rozgrywki.md](ekran-rozgrywki.md) | ekran gry, klawiatura, wyjście z gry |
+| [ekran-ladowania.md](ekran-ladowania.md) | ekran ładowania przed grą (skórki, lektor), lektor bez czytania zasad |
 | [logowanie.md](logowanie.md) | logi aplikacji |
 | [testy-integracyjne.md](testy-integracyjne.md) | testy całej rozgrywki na prawdziwych modułach |
 | [lektor.md](lektor.md) | głos prowadzącego na żywo (Piper + sherpa-onnx), krok „czytanie” w sterowniku |

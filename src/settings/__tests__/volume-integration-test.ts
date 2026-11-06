@@ -7,7 +7,7 @@ import { playsMenuMusic } from '@/audio/menuMusicRoutes';
 import { MemoryStorage } from '@/categories/testing/fakes';
 import { getLogEntries, resetLog } from '@/lib/log';
 
-import { VolumeStore } from '../VolumeStore';
+import { DEFAULT_VOLUME, VolumeStore } from '../VolumeStore';
 
 interface FakePlayer {
   volume: number;
@@ -122,6 +122,32 @@ describe('głośność w całej aplikacji', () => {
     expect(menuPlayer.volume).toBeCloseTo(0.15);
   });
 
+  it('wyłączniki uciszają muzykę i lektora, a po włączeniu wraca głośność z suwaka', async () => {
+    const app = launch(file);
+    await app.store.load();
+    app.menu.acquireMenuMusic();
+    app.game.startGameMusic();
+    const [menuPlayer, gamePlayer] = players;
+    const voice = { volume: -1 };
+    app.volume.bindVoiceVolume(voice, app.store);
+    await app.store.set('voice', 60);
+
+    await app.store.setEnabled('voice', false);
+    expect(voice.volume).toBe(0);
+    expect(menuPlayer.volume).toBeCloseTo(0.3);
+
+    await app.store.setEnabled('music', false);
+    expect(menuPlayer.volume).toBe(0);
+    expect(gamePlayer.volume).toBe(0);
+    app.game.setGameMusicDucked(true);
+    expect(gamePlayer.volume).toBe(0);
+
+    await app.store.setEnabled('voice', true);
+    await app.store.setEnabled('music', true);
+    expect(voice.volume).toBeCloseTo(0.6);
+    expect(menuPlayer.volume).toBeCloseTo(0.3);
+  });
+
   it('muzyka gra na ekranach menu bez przerwy, a w rozgrywce milknie', async () => {
     const app = launch(file);
     await app.store.load();
@@ -159,7 +185,7 @@ describe('głośność w całej aplikacji', () => {
     const [menuPlayer] = players;
     // Muzyka startuje przed wczytaniem pliku; po wczytaniu głośność od razu się poprawia.
     await second.store.load();
-    expect(second.store.getSettings()).toEqual({ music: 20, voice: 60 });
+    expect(second.store.getSettings()).toEqual({ ...DEFAULT_VOLUME, music: 20, voice: 60 });
     expect(menuPlayer.volume).toBeCloseTo(0.06);
 
     second.game.startGameMusic();

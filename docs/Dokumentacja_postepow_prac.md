@@ -62,7 +62,13 @@ Spis treści:
 | Skórki postaci: gracz, boty i prowadzący z mimiką, wybór skórki w menu | zrobione, sprawdzone w przeglądarce, do sprawdzenia na telefonie |
 | 12 botów ze stałymi skórkami; bot bez skórki nie jest losowany | zrobione, testy automatyczne; wszystkie mają już skórki, do sprawdzenia na telefonie |
 | Serwer testowy na Azure Container Apps (`server/`: `/health`, WebSocket ping-pong, Docker) i przycisk „Sprawdź połączenie” w Ustawieniach; instrukcja `docs/backend-azure-instrukcja.md` | zrobione, testy automatyczne i test lokalny; wdrożenie na Azure do wykonania wg instrukcji |
-| Razem testów automatycznych | 674 (+ 19 w `server/`) |
+| Słabsze boty: średnio ok. 37% (Łatwy), 50% (Normalny), 65% (Ekspert) dobrych odpowiedzi; zmienione tylko modyfikatory poziomów | zrobione, testy automatyczne; do sprawdzenia w grze |
+| Runda 1: 2 szanse zamiast 3 (pulpit pokazuje 2 lampki) | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Szanse z rundy na rundę: runda 2 daje 3 szanse i osłonę (jasnoniebieska obwódka, pierwszy błąd zabiera tylko ją, napis „TRACISZ OSŁONĘ”), potem błąd zabiera tyle szans, ile wynosi mnożnik; szanse przechodzą do sprintu razem z nową osłoną, a błąd w sprincie zdejmuje osłonę, potem zabiera po jednej szansie (bez odpadania); sprint daje 5 pkt; po sprincie każda szansa to 10 pkt (animacja „+20”), a w finale wszyscy mają 3 szanse | zrobione, testy automatyczne; animacje do obejrzenia na telefonie |
+| Ustawienia: włączniki muzyki i lektora; wyłączony suwak blednie i nie reaguje | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Ekran ładowania gry: czeka na skórki postaci i lektora (próbna synteza), najdłużej 10 s | zrobione, testy automatyczne; do sprawdzenia na telefonie |
+| Lektor czyta na planszy rundy tylko tytuł, zasady są tylko napisane | zrobione, testy automatyczne |
+| Razem testów automatycznych | 718 (+ 19 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -156,7 +162,7 @@ Mamy 8 postaci botów i do każdej gry losujemy 4. Każdy bot ma profil:
   - mściciel – tego, kto ostatnio wskazał jego,
   - chaotyk – losowo.
 
-Szansa bota na dobrą odpowiedź zależy od jego wiedzy, kategorii, trudności pytania i poziomu trudności gry. Na poziomie Łatwym boty wiedzą mniej, są wolniejsze i częściej grają losowo. Na poziomie Ekspert jest odwrotnie.
+Szansa bota na dobrą odpowiedź zależy od jego wiedzy, kategorii, trudności pytania i poziomu trudności gry. Na poziomie Łatwym boty wiedzą mniej, są wolniejsze i częściej grają losowo. Na poziomie Ekspert jest odwrotnie. Od 06.11.2026 poziom odejmuje albo dodaje do wiedzy: Łatwy −0,25, Normalny −0,12, Ekspert +0,03 (tempo 1,5 / 1,3 / 1,0). Przy średniej wiedzy botów ok. 0,62 daje to średnio ok. 37%, 50% i 65% dobrych odpowiedzi. Same profile botów się nie zmieniły.
 
 Kiedy bot się myli, podaje odpowiedź tego samego rodzaju co poprawna (pole `answerType`). Kolejność wyboru:
 
@@ -178,7 +184,7 @@ Układ ekranu (w poziomie):
 - u góry: przycisk przerwania gry, nazwa etapu, numer pytania w finale i poziom trudności,
 - z lewej: prowadzący z dymkiem, w którym mówi, co się dzieje („Odpowiada: Ola.”, „Niestety nie. Poprawna odpowiedź: Ottawa.”),
 - na środku: karta z pytaniem, kategorią i paskiem czasu,
-- niżej: 5 pulpitów ułożonych w łuk; na każdym imię, 3 lampki szans, a w finale punkty; nad pulpitem pojawia się dymek z odpowiedzią gracza (zielony albo czerwony),
+- niżej: 5 pulpitów ułożonych w łuk; na każdym imię, lampki szans (2 w rundzie 1, 3 w rundzie 2 i w finale), a w finale punkty; nad pulpitem pojawia się dymek z odpowiedzią gracza (zielony albo czerwony),
 - na dole: przyciski zależne od sytuacji („Zgłaszam się!”, „Biorę na siebie”, „Pomiń do wyników”).
 
 Gracz („Ty”) siedzi na losowym miejscu. Przed każdym pytaniem zadawanym z kolei (cały etap I i etap II po złej odpowiedzi) przez ok. 4 s widać zapowiedź „Odpowiada: Wiesiek” albo „Odpowiadasz Ty!”, a dopiero potem pytanie. Pytanie czyta lektor (punkt 5, „Lektor”). Licznik czasu rusza dopiero, gdy lektor skończy czytać. Kiedy przychodzi kolej gracza, scena się chowa, a pytanie i pole na odpowiedź przesuwają się na górę ekranu, bo w poziomie klawiatura zasłania około połowy ekranu. Klawiatura pojawia się dopiero po dotknięciu pola odpowiedzi. Gdy jest otwarta, panel z pytaniem i polem odpowiedzi stoi tuż nad nią, a pasek z nazwą etapu się chowa. Jeśli nad klawiaturą jest mało miejsca, panel przechodzi w tryb kompaktowy (bez nagłówka, mniejsza czcionka pytania). Wskazywanie innego gracza odbywa się przez dotknięcie jego pulpitu.
@@ -270,17 +276,18 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 |---|---|---|
 | `answers-test.ts` | 11 | normalizacja tekstu, literówki, liczby, krótkie odpowiedzi |
 | `questions-test.ts` | 18 | walidacja bazy pytań i typów odpowiedzi, czy każda zapisana odpowiedź jest akceptowana |
-| `potato/__tests__/potato-test.ts` | 47 | zasady rund „Gorący Ziemniak”, limit mnożnika, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
-| `bots-test.ts` | 21 | decyzje botów, wpływ poziomu trudności, pomyłki tego samego rodzaju, losowanie tylko botów ze skórką, unikalne imiona i skórki |
-| `potato/__tests__/controller-test.ts` | 72 | sterownik na udawanym zegarze: tury, kolejność wynik → wskazanie → tura, nagroda od razu, wskazania, limit pytań bez gracza, plansza rundy, start od gracza, sprint (start po planszy, kary, koniec w czasie wskazywania), 5 s w finale, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
-| `components/potato/__tests__/gameDisplay-test.ts` | 20 | co widać na ekranie: pytanie w czasie wyniku i planszy, podświetlenie, tryb odbicia, licznik wskazywania, kolor i napis mnożnika |
+| `potato/__tests__/potato-test.ts` | 59 | zasady rund „Gorący Ziemniak”, osłona i szanse w rundzie 2, osłona i utrata szans w sprincie, 5 pkt w sprincie, zamiana szans na punkty przed finałem, limit mnożnika, odrzucanie niedozwolonych ruchów, ranking, licznik i limit pytań bez gracza, nagroda przed przekazaniem pytania |
+| `bots-test.ts` | 22 | decyzje botów, wpływ poziomu trudności, średnia skuteczność botów na poziomach, pomyłki tego samego rodzaju, losowanie tylko botów ze skórką, unikalne imiona i skórki |
+| `potato/__tests__/controller-test.ts` | 75 | sterownik na udawanym zegarze: animacja premii przed finałem (koniec z zegara i z kary, pauza), osłona w sprincie, tury, kolejność wynik → wskazanie → tura, nagroda od razu, wskazania, limit pytań bez gracza, plansza rundy, start od gracza, sprint (start po planszy, kary, koniec w czasie wskazywania), 5 s w finale, pauza, czekanie na lektora, pasek czasu, odpadający gracz, koniec gry po odpadnięciu człowieka |
+| `components/potato/__tests__/loadingGate-test.ts` | 7 | ekran ładowania: postęp, każdy obrazek raz, gotowość raz, czas graniczny 10 s, wstrzymanie czasu, niedostępny lektor |
+| `components/potato/__tests__/gameDisplay-test.ts` | 25 | co widać na ekranie: utrata osłony i jej napis, premia przy pulpicie, gaśnięcie lampek, pytanie w czasie wyniku i planszy, podświetlenie, tryb odbicia, licznik wskazywania, kolor i napis mnożnika, liczba lampek wg rundy |
 | `components/potato/__tests__/scoreboardData-test.ts` | 10 | tabela wyników: kolejność z rankingu, zwycięzca tylko po pełnej grze, nagłówek, wyjaśnienie kolejności, wysokość wierszy |
 | `components/solo/__tests__/answerLayout-test.ts` | 4 | położenie panelu odpowiedzi nad klawiaturą, tryb kompaktowy |
 | `lib/__tests__/log-test.ts` | 15 | logi: poziomy, bufor, wyjście do konsoli, odporność na błędy, czystość silnika |
-| `integration-test.ts` | 63 | testy integracyjne: całe gry na prawdziwej bazie i botach, tabela wyników zgodna z rankingiem, limit mnożnika i 10 punktów w finale, tasowanie talii, zgodność logów z przebiegiem gry, limit pytań bez gracza (10 ziaren na każdy poziom), plansze rund, pauza w trakcie całej gry, brak decyzji w finale |
+| `integration-test.ts` | 69 | testy integracyjne: całe gry na prawdziwej bazie i botach, szanse z rundy na rundę (osłona, sprint, premia), tabela wyników zgodna z rankingiem, limit mnożnika i 10 punktów w finale, tasowanie talii, zgodność logów z przebiegiem gry, limit pytań bez gracza (10 ziaren na każdy poziom), plansze rund, pauza w trakcie całej gry, brak decyzji w finale |
 | `narration/__tests__/questionIntonation-test.ts` | 10 | intonacja pytająca: rozpoznanie pytań, koniec mowy przed ciszą, wzrost tonu w końcówce, początek i cisza bez zmian, krótki dźwięk, cisza |
 | `narration/__tests__/pronunciation-test.ts` | 3 | wymowa: cyfry rzymskie po imieniu jako liczebniki, zwykły tekst bez zmian |
-| `narration/__tests__/potato-narrator-test.ts` | 24 | lektor: kiedy mówi, tempo w sprincie, przerywanie kwestii, pominięcie planszy, uciszanie, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
+| `narration/__tests__/potato-narrator-test.ts` | 25 | lektor: kiedy mówi, plansza rundy bez czytania zasad, cisza przed startem, tempo w sprincie, przerywanie kwestii, pominięcie planszy, uciszanie, pauza, błędy syntezy, pasek po odbiciu w ciemno, zwolnienie |
 | `narration/__tests__/narration-integration-test.ts` | 11 | testy integracyjne lektora: całe gry na prawdziwej bazie, intonacja pytająca, brak paska w czasie mówienia, pominięcie planszy, pauza, wyjście |
 | `speech/__tests__/spokenAnswer-test.ts` | 7 | odpowiedź głosem: zapis jak w bazie (cyfry rzymskie), wybór wersji rozpoznania, cisza |
 | `speech/__tests__/VoiceAnswerSession-test.ts` | 10 | mikrofon: zgoda, słuchanie, jedna odpowiedź, cisza, błędy, pauza, zamknięcie panelu |
@@ -294,11 +301,11 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `categories/__tests__/transferQuestionSet-test.ts` | 13 | import/eksport: zapis jak kategoria z OpenAI, rozszerzenie, rozmiar i limit sprawdzane przed czytaniem, zajęta nazwa, błędy odczytu i zapisu, anulowanie, domyślna nieeksportowalna |
 | `categories/__tests__/categories-integration-test.ts` | 21 | testy integracyjne: od plików przez OpenAI (atrapa) do całej gry na wygenerowanej kategorii, zabezpieczenia przed wysłaniem plików (także brak klucza), eksport → import na innym telefonie → gra, limit przy imporcie |
 | `settings/__tests__/configApiKey-test.ts` | 8 | klucz z `.env.local`: format, brak klucza, klucz poza logami |
-| `settings/__tests__/VolumeStore-test.ts` | 36 | głośność: przycinanie do 0–100, odczyt uszkodzonego pliku, wczytanie, zapis, łączenie zapisów, zmiana przed wczytaniem, błędy pliku |
+| `settings/__tests__/VolumeStore-test.ts` | 42 | głośność: przycinanie do 0–100, włączniki muzyki i lektora (stary plik = włączone), odczyt uszkodzonego pliku, wczytanie, zapis, łączenie zapisów, zmiana przed wczytaniem, błędy pliku |
 | `audio/__tests__/menuMusicRoutes-test.ts` | 1 | muzyka menu gra na każdym ekranie z `src/app` poza rozgrywką |
-| `audio/__tests__/volume-test.ts` | 7 | głośność odtwarzaczy: skalowanie poziomu muzyki, lektor, podpięcie lektora do ustawień |
+| `audio/__tests__/volume-test.ts` | 9 | głośność odtwarzaczy: skalowanie poziomu muzyki, lektor, cisza przy wyłączonym dźwięku, podpięcie lektora do ustawień |
 | `components/settings/__tests__/sliderValue-test.ts` | 9 | suwak: wartość z położenia palca, poza torem, tor bez rozmiaru, krok czytnika ekranu |
-| `settings/__tests__/volume-integration-test.ts` | 5 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, muzyka wg ekranu, głośność po ponownym uruchomieniu, nieudany zapis |
+| `settings/__tests__/volume-integration-test.ts` | 6 | testy integracyjne: zmiana głośności od razu w muzyce menu, gry (także przyciszonej przy lektorze) i lektorze, włączniki uciszają i przywracają głośność, muzyka wg ekranu, głośność po ponownym uruchomieniu, nieudany zapis |
 | `skins/__tests__/catalog-test.ts` | 7 | skórki: układanie katalogu ze ścieżek, nowy folder, brakujące klatki, nieznane pliki |
 | `skins/__tests__/assignSkins-test.ts` | 5 | skórki: skórka z profilu bota, wybór gracza, brak pliku skórki, zbiór dostępnych skórek |
 | `skins/__tests__/IdleFace-test.ts` | 10 | mimika: mruganie, uśmiech, kasowanie zegarów, mimika w reakcji na odpowiedź |
@@ -307,7 +314,7 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowe pliki wprowadzają bota do losowania, stała skórka bota, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **674** | |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **718** | |
 | `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
@@ -338,7 +345,8 @@ Moduł `src/lib/log.ts` zapisuje, co aplikacja robi w trakcie działania. Każdy
 | `[klawiatura]` | otwarcie (z wysokością) i schowanie klawiatury |
 | `[ekran-gry]` | przerwanie gry przez gracza |
 | `[mikrofon]` | początek słuchania, rozpoznana odpowiedź (liczba wersji, czy pusta), brak zgody, anulowanie, błędy rozpoznawania (`error`), brak modułu albo usługi rozpoznawania |
-| `[lektor]` | wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
+| `[ladowanie]` | start ładowania (liczba obrazków), gra wczytana (czas), ładowanie za długie (`warn`: ile obrazków brakuje, czy lektor gotowy) |
+| `[lektor]` | przygotowanie przed grą (czas, brak lektora), wczytanie modelu (czas, wersja), usunięcie starej wersji modelu, każda wypowiedź (liczba zdań, pytanie, nakładka), synteza zdania (`debug`: czas syntezy i długość mowy), pauza, wznowienie, przerwanie, błędy syntezy i odtwarzacza (`error`) |
 | `[ustawienia]` | wczytanie ustawień i zapis albo usunięcie klucza API – tylko czy klucz jest, nigdy jaki; błędy magazynu (`warn`/`error`); wczytanie i zmiana głośności (liczby 0–100), uszkodzony plik głośności (`warn`), błąd zapisu (`error`) |
 | `[symulator]` | przekroczenie limitu kroków |
 
@@ -626,6 +634,15 @@ Pierwsza wersja tabeli miała komponent `Scoreboard.tsx` i dane `scoreboard.ts`.
 
 **7.68. Wersja webowa przestała się budować**
 `npx expo export --platform web` kończy się błędem `this.validatePath is not a function`, bo przy budowaniu statycznym ładują się wszystkie trasy, a `expo-file-system` nie działa w przeglądarce. Tabelę sprawdziliśmy na tymczasowej, osobnej trasie zbudowanej w trybie `single`; po zrobieniu zrzutów (844×390 i 640×360) trasa została usunięta. Samej wersji webowej nie naprawialiśmy, bo celem projektu jest Android.
+
+**7.69. Zmiana liczby szans w rundzie 1 popsuła test limitu pytań**
+Po zmianie `POTATO.lives` z 3 na 2 dwa testy `controller-test.ts › limit pytań bez gracza` zaczęły padać. Test ustawiał życia tylko człowiekowi i jednemu botowi, a pozostałe brał z wartości domyślnej, więc zmienił się lider i pytanie trafiało do innego bota. Test podaje teraz życia wszystkim graczom, bo sprawdza limit, a nie liczbę szans. Przy tej zmianie wyszło też, że pulpit miał na sztywno 3 lampki, więc w rundzie 1 jedna lampka byłaby od początku zgaszona. Liczbę lampek podaje teraz `lampCount(phase)` w `gameDisplay.ts`.
+
+**7.70. Lampki szans skakały między rundami**
+Gracz zgłosił, że ktoś kończy rundę 2 z 1 lampką, a potem nagle ma 2, i że w finale też jest dziwnie. W rundzie 2 lampki pokazywały punkty osłony, w sprincie znów szanse z rundy 1 (pulpit pokazywał osłonę tylko w rundzie 2), a finał rozdawał od nowa 3/2/1 za miejsce w sprincie. Wynik był liczony dobrze, ale ekran wyglądał jak błąd. Zasady są teraz jedne: w rundzie 2 każdy ma 3 szanse i jedną osłonę (obwódka wokół lampek), szanse przechodzą do sprintu, a po sprincie zamieniają się na punkty (po 10) z animacją. Finał zaczyna każdy z 3 szansami. Osłona jest polem `shield: boolean`, a premia polem `lifeBonus` w stanie gry, więc ekran tylko ją pokazuje. Animacja premii jest w sterowniku (nakładka `lifeBonus`), bo sprint kończy się dwiema drogami (zegar albo kara za błąd) i obie muszą ją pokazać.
+
+**7.71. Bot w sprincie odpowiedział źle i nie stracił szansy**
+Gracz zauważył to w grze. Tak działała zasada z 7.70: sprint przenosił szanse z rundy 2 i ich nie ruszał, a błąd kosztował tylko sekundę. Gracz chciał jednak, żeby w sprincie dało się tracić szanse. Najpierw sprint dawał każdemu od nowa 3 szanse, ale gracz wolał zachować szanse z rundy 2. Ostatecznie szanse z rundy 2 przechodzą do sprintu, a każdy finalista dostaje nową osłonę (obwódka jak w rundzie 2). Błąd albo brak odpowiedzi kosztuje 1 s i najpierw zdejmuje osłonę (napis „TRACISZ OSŁONĘ”), a potem zabiera po jednej szansie. Przy 0 szansach nikt nie odpada (w finale muszą być trzy osoby), tylko nie dostaje premii. Osłona nie liczy się do premii: po sprincie na punkty zamieniają się same szanse.
 
 ## 8. Dalsze plany
 

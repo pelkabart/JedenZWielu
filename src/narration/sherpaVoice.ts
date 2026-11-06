@@ -490,6 +490,26 @@ function synthesize(
 }
 
 /**
+ * Przygotowuje lektora przed grą: ładuje silnik i robi jedną próbną syntezę (bez odtwarzania),
+ * bo pierwsza synteza po starcie trwa najdłużej. Zawsze się kończy: `false` = lektor niedostępny.
+ */
+export async function prepareVoice(): Promise<boolean> {
+  const started = Date.now();
+  const tts = await loadEngine();
+  if (!tts) {
+    log.info('Lektor niedostępny, gra bez głosu');
+    return false;
+  }
+  try {
+    await synthesize(tts, 'Gramy.', 1);
+    log.info('Lektor gotowy', { ms: Date.now() - started });
+  } catch (error) {
+    log.warn('Próbna synteza się nie udała', { error: errorMessage(error) });
+  }
+  return true;
+}
+
+/**
  * Lektor dla pojedynczego ekranu gry.
  *
  * Synteza: Piper / sherpa-onnx

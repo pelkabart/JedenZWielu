@@ -95,6 +95,8 @@ describe('co mówi prowadzący', () => {
 
   it('przy wskazywaniu tylko pyta o gracza: pochwała padła już przy wyniku', () => {
     expect(narrationFor(view({ awaitingPick: { chooserId: 'h', allowSelf: false } }))).toEqual(['Komu przekazujesz pytanie?']);
+    // Zamiana szans na punkty po sprincie to sama animacja: lektor milczy.
+    expect(narrationFor(view({ overlay: { kind: 'lifeBonus' } }))).toEqual([]);
   });
 
   it('gdy gracz odpada przed rozstrzygnięciem, nikt nie jest ogłaszany zwycięzcą', () => {
@@ -110,8 +112,13 @@ describe('co mówi prowadzący', () => {
     expect(narrationFor(view({ game, overlay: { kind: 'finished' } }))).toEqual(['Koniec gry!', 'Wygrywa Bot 1.']);
   });
 
-  it('przy zmianie rundy czyta tytuł i zasady', () => {
-    expect(narrationFor(view({ overlay: { kind: 'round', phase: 'sprint' } }))[0]).toBe('Runda 3 · Sprint');
+  it('plansza rundy: tylko tytuł, bez zasad (zasady są napisane na planszy)', () => {
+    expect(narrationFor(view({ overlay: { kind: 'round', phase: 'sprint' } }))).toEqual(['Runda 3 · Sprint']);
+    expect(narrationFor(view({ overlay: { kind: 'round', phase: 'round2' } }))).toEqual(['Runda 2 · Bomba']);
+  });
+
+  it('przed startem gry (ekran ładowania) lektor milczy', () => {
+    expect(narrationFor(view({ game: createPotatoGame({ players: PLAYERS, deck: DECK }) }))).toEqual([]);
   });
 });
 

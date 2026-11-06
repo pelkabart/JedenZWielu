@@ -8,7 +8,7 @@ const player = (id: string, seat: number, over: Partial<PotatoPlayer> = {}): Pot
   isHuman: id === 'h',
   seat,
   lives: 0,
-  shield: 0,
+  shield: false,
   points: 0,
   errors: 0,
   eliminated: true,
@@ -30,6 +30,7 @@ const finished = (players: PotatoPlayer[], ranking: string[]): PotatoState => ({
   ranking,
   questionsWithoutHuman: 0,
   awarded: false,
+  lifeBonus: null,
 });
 
 describe('wiersze tabeli', () => {

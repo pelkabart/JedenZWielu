@@ -1,20 +1,25 @@
 import { MemoryStorage } from '@/categories/testing/fakes';
-import { VolumeStore } from '@/settings/VolumeStore';
+import { DEFAULT_VOLUME, VolumeStore } from '@/settings/VolumeStore';
 
 import { bindVoiceVolume, musicGain, voiceGain } from '../volume';
 
 describe('musicGain', () => {
   it('100% = poziom bazowy utworu', () => {
-    expect(musicGain(0.3, { music: 100, voice: 100 })).toBeCloseTo(0.3);
+    expect(musicGain(0.3, { ...DEFAULT_VOLUME, music: 100, voice: 100 })).toBeCloseTo(0.3);
   });
 
   it('skaluje poziom bazowy', () => {
-    expect(musicGain(0.22, { music: 50, voice: 100 })).toBeCloseTo(0.11);
-    expect(musicGain(0.3, { music: 0, voice: 100 })).toBe(0);
+    expect(musicGain(0.22, { ...DEFAULT_VOLUME, music: 50, voice: 100 })).toBeCloseTo(0.11);
+    expect(musicGain(0.3, { ...DEFAULT_VOLUME, music: 0, voice: 100 })).toBe(0);
   });
 
   it('nie zależy od głośności lektora', () => {
-    expect(musicGain(0.3, { music: 80, voice: 0 })).toBeCloseTo(0.24);
+    expect(musicGain(0.3, { ...DEFAULT_VOLUME, music: 80, voice: 0 })).toBeCloseTo(0.24);
+  });
+
+  it('wyłączona muzyka = cisza, niezależnie od suwaka', () => {
+    expect(musicGain(0.3, { ...DEFAULT_VOLUME, music: 80, musicEnabled: false })).toBe(0);
+    expect(musicGain(0.3, { ...DEFAULT_VOLUME, music: 80, voiceEnabled: false })).toBeCloseTo(0.24);
   });
 });
 
@@ -24,7 +29,12 @@ describe('voiceGain', () => {
     [50, 0.5],
     [0, 0],
   ])('%p%% → %p', (voice, expected) => {
-    expect(voiceGain({ music: 100, voice })).toBeCloseTo(expected);
+    expect(voiceGain({ ...DEFAULT_VOLUME, music: 100, voice })).toBeCloseTo(expected);
+  });
+
+  it('wyłączony lektor = cisza, niezależnie od suwaka i muzyki', () => {
+    expect(voiceGain({ ...DEFAULT_VOLUME, voice: 70, voiceEnabled: false })).toBe(0);
+    expect(voiceGain({ ...DEFAULT_VOLUME, voice: 70, musicEnabled: false })).toBeCloseTo(0.7);
   });
 });
 

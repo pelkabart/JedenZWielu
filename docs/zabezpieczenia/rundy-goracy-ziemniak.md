@@ -152,3 +152,28 @@ Silnik jest czysty (`src/game/potato/engine.ts`): nie losuje i nie loguje. Losow
 - **Ryzyko:** kilku graczy nadal gra, więc kolejność byłaby przypadkowa, a lektor ogłosiłby zwycięzcę, którego nie ma.
 - **Zabezpieczenie:** aktywni gracze są układani wg stanu gry (zasób rundy, punkty, mniej błędów, miejsce). Lektor mówi „Odpadasz” zamiast „Wygrywa”, a ekran wyników zaznacza, że kolejność to stan z chwili odpadnięcia.
 - **Test:** `potato-test.ts` › „endEarly”; `potato-narrator-test.ts` › „gdy gracz odpada przed rozstrzygnięciem…”.
+
+### 29. Za długa runda 1 i zła liczba lampek
+- **Ryzyko:** runda 1 z 3 szansami trwała za długo. Po zmianie na 2 szanse pulpit z 3 lampkami pokazywałby jedną zgaszoną od początku, a dalsze rundy mogłyby przypadkiem stracić szansę.
+- **Zabezpieczenie:** `POTATO.lives = 2` działa tylko w rundzie 1. Runda 2 daje każdemu `round2Lives` (3), a finał `duelLives` (3). Liczba lampek idzie z `lampCount(phase)`: 2 w rundzie 1, 3 w pozostałych rundach.
+- **Test:** `potato-test.ts` i `controller-test.ts` (oparte na `POTATO.lives`), `gameDisplay-test.ts › lampki na pulpicie`.
+
+### 30. Osłona działa źle
+- **Ryzyko:** osłona zabiera szanse, chroni więcej niż raz, nie chroni przy ×3 albo zostaje na sprint. Gracz z osłoną odpada od jednego błędu, a sterownik oddaje mu ziemniaka jako „odpadającemu”.
+- **Zabezpieczenie:** `shield` to `boolean`. Pierwszy błąd w rundzie 2 (także brak odpowiedzi) tylko ją zdejmuje, bez względu na mnożnik, i zeruje mnożnik. Dopiero kolejne błędy odejmują `multiplier` szans. `errorEliminates` w rundzie 2 to `!shield && lives <= multiplier`. Wejście do sprintu zostawia szanse z rundy 2 i daje każdemu finaliście nową osłonę. Koniec sprintu zdejmuje osłony.
+- **Test:** `potato-test.ts` › „pierwszy błąd przy ×1/×2/×3 zabiera tylko osłonę…”, „bez osłony błąd przy ×…”, „errorEliminates…”, „szanse z rundy 2 przechodzą do sprintu, a każdy finalista dostaje nową osłonę”; `integration-test.ts` › „osłona, szanse w sprincie i premia…”.
+
+### 31. Premia za szanse pominięta albo doliczona dwa razy
+- **Ryzyko:** sprint kończy się z zegara albo karą za błąd. Jedna z dróg mogłaby pominąć animację lub premię, premia mogłaby się doliczyć drugi raz, a finał mógłby wystartować w trakcie animacji.
+- **Zabezpieczenie:** premię liczy tylko `finishSprint` w silniku (jedno miejsce dla obu dróg) i zapisuje ją w `lifeBonus`. Ekran ją tylko pokazuje. Sterownik przy wejściu w finał zawsze najpierw pokazuje nakładkę `lifeBonus`, a planszę finału dopiero po `lifeBonusMs`. Czas animacji stoi w pauzie i po `stop/start` jest planowany od nowa.
+- **Test:** `potato-test.ts` › „koniec sprintu: każda szansa to 10 punktów…”, „koniec sprintu karą za błąd też dolicza premię”; `controller-test.ts` › „po upływie czasu: najpierw zamiana szans…”, „koniec sprintu karą…”, „pauza zatrzymuje animację premii…”.
+
+### 32. Dwa napisy naraz na środku ekranu
+- **Ryzyko:** błąd zdejmujący osłonę zeruje też mnożnik, więc obok „TRACISZ OSŁONĘ” wyskoczyłoby „BUM!”.
+- **Zabezpieczenie:** wynik odpowiedzi ma pole `shieldLost`. Gdy jest ustawione, `MultiplierBurst` dostaje `suppress` i nie animuje, a pokazuje się tylko `ShieldBurst` (bot: „<IMIĘ> TRACI OSŁONĘ”).
+- **Test:** `gameDisplay-test.ts` › „utratę osłony widać tylko przy wyniku, który ją zabrał”, „napis: gracz…”; wygląd ręcznie na telefonie.
+
+### 33. Błąd w sprincie bez kary, za mocna kara albo osłona w premii
+- **Ryzyko:** błąd w sprincie nie zabiera szansy (tak było do 7.71). Albo zabiera ją za mocno: gracz z 0 szansami odpada i w finale jest mniej niż trzy osoby. Albo osłona doliczy się do premii jak szansa.
+- **Zabezpieczenie:** szanse przechodzą z rundy 2, a sprint daje nową osłonę. Błąd albo brak odpowiedzi kosztuje 1 s i najpierw zdejmuje osłonę, potem zabiera 1 szansę (`Math.max(0, …)`). `errorEliminates` w sprincie zawsze zwraca `false`. Premia liczy tylko `lives`, a `finishSprint` zdejmuje osłony. Sterownik ustawia `shieldLost` także w sprincie, więc ekran pokazuje obwódkę i napis jak w rundzie 2.
+- **Test:** `potato-test.ts` › „błąd w sprincie: najpierw zabiera osłonę…”, „brak odpowiedzi w sprincie liczy się jak błąd”, „w sprincie nikt nie odpada…”, „osłona nie liczy się do premii…”; `controller-test.ts` › „błąd w sprincie: pierwszy zdejmuje osłonę…”; `integration-test.ts` › „osłona, szanse w sprincie i premia…”.

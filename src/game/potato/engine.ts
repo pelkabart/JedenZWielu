@@ -9,10 +9,10 @@ import type { Question } from '../types';
 export class PotatoRuleError extends Error {}
 
 export const POTATO = {
-  /** Życia w rundzie 1. */
-  lives: 3,
-  /** Punkty osłony w rundzie 2. */
-  shield: 3,
+  /** Szanse w rundzie 1. */
+  lives: 2,
+  /** Szanse na start rundy 2 (każdy dostaje też jedną osłonę). Przechodzą do sprintu. */
+  round2Lives: 3,
   /** Najwyższy mnożnik w rundzie 2. */
   maxMultiplier: 3,
   /** Czas sprintu (runda 3). */
@@ -20,11 +20,13 @@ export const POTATO = {
   /** Kara za błąd lub brak odpowiedzi w sprincie. */
   sprintPenaltyMs: 1_000,
   /** Punkty za dobrą odpowiedź w sprincie. */
-  sprintPoints: 1,
+  sprintPoints: 5,
   /** Punkty za dobrą odpowiedź w finale. */
   duelPoints: 10,
-  /** Szanse w rundzie 4 wg miejsca w sprincie (1., 2., 3.). */
-  awards: [3, 2, 1],
+  /** Punkty za każdą szansę pozostałą po sprincie. */
+  lifePoints: 10,
+  /** Szanse każdego finalisty na start finału. */
+  duelLives: 3,
 } as const;
 
 export type PotatoPhase = 'round1' | 'round2' | 'sprint' | 'duel' | 'finished';
@@ -35,10 +37,10 @@ export interface PotatoPlayer {
   isHuman: boolean;
   botId?: string;
   seat: number;
-  /** Życia (runda 1 i finał). */
+  /** Szanse: runda 1 ma 2, runda 2 daje 3 i przechodzą do sprintu, finał od nowa 3. */
   lives: number;
-  /** Punkty osłony (runda 2). */
-  shield: number;
+  /** Osłona w rundzie 2 i w sprincie (każda runda daje nową): pierwszy błąd zabiera tylko ją. Nie liczy się do premii. */
+  shield: boolean;
   /** Punkty ze sprintu i finału. */
   points: number;
   errors: number;
@@ -64,6 +66,14 @@ export interface PotatoState {
   questionsWithoutHuman: number;
   /** Bieżąca odpowiedź jest już nagrodzona (`award`) i zostało tylko przekazanie pytania (`pass`). */
   awarded: boolean;
+  /** Premia za szanse pozostałe po sprincie (do animacji); `null` przed końcem sprintu. */
+  lifeBonus: LifeBonus[] | null;
+}
+
+export interface LifeBonus {
+  playerId: string;
+  lives: number;
+  points: number;
 }
 
 export type PotatoAction =
@@ -96,7 +106,7 @@ export function createPotatoGame({ players, deck }: PotatoSetup): PotatoState {
       ...p,
       seat,
       lives: POTATO.lives,
-      shield: POTATO.shield,
+      shield: false,
       points: 0,
       errors: 0,
       eliminated: false,
@@ -113,6 +123,7 @@ export function createPotatoGame({ players, deck }: PotatoSetup): PotatoState {
     ranking: null,
     questionsWithoutHuman: 0,
     awarded: false,
+    lifeBonus: null,
   };
 }
 
@@ -155,9 +166,9 @@ export function activePlayers(state: PotatoState): PotatoPlayer[] {
   return state.players.filter((p) => !p.eliminated);
 }
 
-/** Resource, o który toczy się runda: życia, osłona albo punkty w sprincie. */
+/** Zasób, o który toczy się runda: szanse (w rundzie 2 osłona liczy się jak jedna więcej) albo punkty w sprincie. */
 export function resourceOf(state: PotatoState, player: PotatoPlayer): number {
-  if (state.phase === 'round2') return player.shield;
+  if (state.phase === 'round2') return player.lives + (player.shield ? 1 : 0);
   if (state.phase === 'sprint') return player.points;
   return player.lives;
 }
@@ -167,10 +178,10 @@ export function endedEarly(state: PotatoState): boolean {
   return state.phase === 'finished' && activePlayers(state).length > 1;
 }
 
-/** Czy błąd tego gracza oznacza odpadnięcie (ostatnia szansa albo osłona nie wyższa niż mnożnik). Sprint nikogo nie eliminuje. */
+/** Czy błąd tego gracza oznacza odpadnięcie (ostatnia szansa; w rundzie 2 bez osłony i szans nie więcej niż mnożnik). Sprint nikogo nie eliminuje (szanse spadają najwyżej do 0). */
 export function errorEliminates(state: PotatoState, player: PotatoPlayer): boolean {
   if (state.phase === 'sprint') return false;
-  return state.phase === 'round2' ? player.shield <= state.multiplier : player.lives <= 1;
+  return state.phase === 'round2' ? !player.shield && player.lives <= state.multiplier : player.lives <= 1;
 }
 
 // ---------- obsługa akcji ----------
@@ -241,21 +252,29 @@ function answerRound1(s: PotatoState, holder: PotatoPlayer, correct: boolean, ne
 function enterRound2(s: PotatoState, next: string) {
   s.phase = 'round2';
   s.multiplier = 1;
-  for (const p of s.players) if (!p.eliminated) p.shield = POTATO.shield;
+  for (const p of s.players) {
+    if (p.eliminated) continue;
+    p.lives = POTATO.round2Lives;
+    p.shield = true;
+  }
   requireActive(s, next);
   hand(s, next);
 }
 
-/** Runda 2: poprawne podanie podnosi mnożnik; błąd to wybuch — odejmuje punkty osłony równe mnożnikowi. */
+/**
+ * Runda 2: poprawne podanie podnosi mnożnik; błąd to wybuch i mnożnik wraca do ×1.
+ * Pierwszy błąd zabiera tylko osłonę, każdy kolejny tyle szans, ile wynosił mnożnik.
+ */
 function answerRound2(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
   if (correct) {
     requireOther(s, holder, next);
     hand(s, next);
     return;
   }
-  holder.shield = Math.max(0, holder.shield - s.multiplier);
+  if (holder.shield) holder.shield = false;
+  else holder.lives = Math.max(0, holder.lives - s.multiplier);
   s.multiplier = 1;
-  if (holder.shield === 0) {
+  if (holder.lives === 0) {
     eliminate(s, holder);
     if (activePlayers(s).length === 3) {
       enterSprint(s, next);
@@ -269,14 +288,25 @@ function answerRound2(s: PotatoState, holder: PotatoPlayer, correct: boolean, ne
 function enterSprint(s: PotatoState, next: string) {
   s.phase = 'sprint';
   s.sprintMsLeft = POTATO.sprintMs;
-  for (const p of s.players) p.points = 0;
+  for (const p of s.players) {
+    // Szanse zostają z rundy 2, osłona jest nowa.
+    p.shield = !p.eliminated;
+    p.points = 0;
+  }
   requireActive(s, next);
   hand(s, next);
 }
 
-/** Sprint: +1 za dobrą odpowiedź, −1 s za błąd albo brak odpowiedzi. Ziemniak zawsze rotuje do innego gracza. */
+/**
+ * Sprint: dobra odpowiedź to punkty; błąd albo brak odpowiedzi to 1 s mniej i najpierw osłona, potem po jednej szansie
+ * (najwyżej do 0, bez odpadania). Ziemniak zawsze rotuje do innego gracza.
+ */
 function answerSprint(s: PotatoState, holder: PotatoPlayer, correct: boolean, next: string) {
-  if (!correct) s.sprintMsLeft = Math.max(0, s.sprintMsLeft - POTATO.sprintPenaltyMs);
+  if (!correct) {
+    if (holder.shield) holder.shield = false;
+    else holder.lives = Math.max(0, holder.lives - 1);
+    s.sprintMsLeft = Math.max(0, s.sprintMsLeft - POTATO.sprintPenaltyMs);
+  }
   requireOther(s, holder, next);
   if (s.sprintMsLeft === 0) {
     finishSprint(s);
@@ -285,13 +315,17 @@ function answerSprint(s: PotatoState, holder: PotatoPlayer, correct: boolean, ne
   hand(s, next);
 }
 
-/** Koniec sprintu: 3/2/1 szanse wg miejsca, zwycięzca ma pierwszy atak w finale. */
+/** Koniec sprintu: każda pozostała szansa to 10 punktów, w finale wszyscy od nowa mają 3 szanse. Lider zaczyna finał. */
 function finishSprint(s: PotatoState) {
   s.question = null;
-  const ranked = activePlayers(s).sort((a, b) => b.points - a.points || a.errors - b.errors || a.seat - b.seat);
-  ranked.forEach((p, place) => {
-    if (place < POTATO.awards.length) p.lives = POTATO.awards[place];
-  });
+  const finalists = activePlayers(s);
+  for (const p of s.players) p.shield = false;
+  s.lifeBonus = finalists.map((p) => ({ playerId: p.id, lives: p.lives, points: p.lives * POTATO.lifePoints }));
+  for (const p of finalists) {
+    p.points += p.lives * POTATO.lifePoints;
+    p.lives = POTATO.duelLives;
+  }
+  const ranked = [...finalists].sort((a, b) => b.points - a.points || a.errors - b.errors || a.seat - b.seat);
   s.phase = 'duel';
   hand(s, ranked[0].id);
 }
@@ -377,7 +411,7 @@ function loseLife(s: PotatoState, player: PotatoPlayer) {
 function eliminate(s: PotatoState, player: PotatoPlayer) {
   // Odpadający nie ma już żadnych kropek (życia ani osłony), żeby ekran pokazywał zero.
   player.lives = 0;
-  player.shield = 0;
+  player.shield = false;
   player.eliminated = true;
   s.eliminations++;
   player.eliminatedAt = s.eliminations;

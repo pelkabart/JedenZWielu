@@ -36,14 +36,15 @@ export function MultiplierBadge({ multiplier }: { multiplier: number }) {
   );
 }
 
-/** Duży napis na środku ekranu po zmianie mnożnika. Nie przechwytuje dotknięć i sam znika. */
-export function MultiplierBurst({ multiplier }: { multiplier: number }) {
+/** Wejście, chwila w miejscu i wyjście napisu przy każdej zmianie `trigger` (gdy `enabled`). */
+function useBurst(trigger: unknown, enabled: boolean) {
   const progress = useSharedValue(0);
-  const previous = useRef(multiplier);
+  const previous = useRef(trigger);
 
   useEffect(() => {
-    if (previous.current === multiplier) return;
-    previous.current = multiplier;
+    if (previous.current === trigger) return;
+    previous.current = trigger;
+    if (!enabled) return;
     progress.set(0);
     progress.set(
       withSequence(
@@ -52,19 +53,38 @@ export function MultiplierBurst({ multiplier }: { multiplier: number }) {
         withTiming(2, { duration: BURST_OUT_MS, easing: Easing.in(Easing.quad) }),
       ),
     );
-  }, [multiplier, progress]);
+  }, [trigger, enabled, progress]);
 
-  const style = useAnimatedStyle(() => {
+  return useAnimatedStyle(() => {
     const p = progress.get();
     return {
       opacity: p <= 1 ? Math.min(1, p) : 2 - p,
       transform: [{ scale: p <= 1 ? 0.3 + 0.7 * p : 1 + (p - 1) * 0.6 }],
     };
   });
+}
 
+/**
+ * Duży napis na środku ekranu po zmianie mnożnika. Nie przechwytuje dotknięć i sam znika.
+ * `suppress`: błąd zabrał osłonę, więc zamiast „BUM!” widać napis o osłonie.
+ */
+export function MultiplierBurst({ multiplier, suppress = false }: { multiplier: number; suppress?: boolean }) {
+  const style = useBurst(multiplier, !suppress);
   return (
     <View style={styles.burstSlot} pointerEvents="none">
       <Animated.Text style={[styles.burstText, { color: multiplierColor(multiplier) }, style]}>{multiplierBurstText(multiplier)}</Animated.Text>
+    </View>
+  );
+}
+
+/** Napis „TRACISZ OSŁONĘ” na środku ekranu. `eventKey` zmienia się przy każdej utracie osłony. */
+export function ShieldBurst({ text, eventKey }: { text: string | null; eventKey: number | null }) {
+  const style = useBurst(eventKey, text !== null);
+  return (
+    <View style={styles.burstSlot} pointerEvents="none">
+      <Animated.Text style={[styles.burstText, styles.shieldText, style]} numberOfLines={2} adjustsFontSizeToFit>
+        {text ?? ''}
+      </Animated.Text>
     </View>
   );
 }
@@ -104,5 +124,11 @@ const styles = StyleSheet.create({
     textShadowColor: colors.outline,
     textShadowOffset: { width: 0, height: 6 },
     textShadowRadius: 2,
+  },
+  shieldText: {
+    fontSize: 60,
+    color: colors.sky,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

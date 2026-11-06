@@ -51,6 +51,8 @@ export default function SettingsScreen() {
             value={volume.music}
             onPreview={(value) => volumeStore.preview('music', value)}
             onCommit={(value) => void volumeStore.set('music', value)}
+            enabled={volume.musicEnabled}
+            onToggle={(enabled) => void volumeStore.setEnabled('music', enabled)}
           />
           <VolumeSlider
             label="Lektor"
@@ -58,6 +60,8 @@ export default function SettingsScreen() {
             value={volume.voice}
             onPreview={(value) => volumeStore.preview('voice', value)}
             onCommit={(value) => void volumeStore.set('voice', value)}
+            enabled={volume.voiceEnabled}
+            onToggle={(enabled) => void volumeStore.setEnabled('voice', enabled)}
           />
           {volumeSaveFailed && (
             <Text style={styles.error}>Nie udało się zapisać głośności – po ponownym uruchomieniu gry wróci poprzednia.</Text>

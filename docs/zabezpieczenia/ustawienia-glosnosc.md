@@ -47,3 +47,8 @@ Na ekranie „Ustawienia” (zębatka w prawym górnym rogu ekranu głównego) s
 **Ryzyko:** po wejściu w ustawienia muzyka menu pauzowała (ekran nie był „ekranem menu”), więc suwak „Muzyka” nic nie zmieniał w słyszalny sposób.
 **Zabezpieczenie:** ekran ustawień używa `useMenuMusic()`, więc melodia gra dalej i zmiana jest słyszalna od razu w trakcie przesuwania (`preview`).
 **Test:** ręcznie na telefonie.
+
+### 9. Wyłączony dźwięk dalej słychać albo psuje grę
+**Ryzyko:** wyłączony lektor albo muzyka dalej grają; stary plik `volume.json` bez włączników wycisza grę; wyłączenie lektora zmienia tempo gry; po ponownym włączeniu głośność nie wraca.
+**Zabezpieczenie:** `musicGain` i `voiceGain` zwracają 0, gdy dźwięk jest wyłączony, a wszystkie odtwarzacze biorą głośność z tych funkcji. Lektor gra wtedy po cichu, tak jak przy 0%, więc czasy gry się nie zmieniają. Brak pola albo zły typ w pliku = włączony. Głośność suwaka jest przechowywana osobno i wraca po włączeniu. Wyłączony suwak jest blady (`opacity 0.4`), nie przyjmuje dotyku ani akcji czytnika ekranu.
+**Test:** `volume-test.ts › wyłączona muzyka / wyłączony lektor`, `VolumeStore-test.ts › setEnabled…`, `stary plik bez włączników`, `wyłączenie przed wczytaniem…`, `volume-integration-test.ts › wyłączniki uciszają muzykę i lektora…`; wygląd suwaka ręcznie na telefonie.

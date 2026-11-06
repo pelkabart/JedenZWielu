@@ -153,6 +153,56 @@ describe('tabela wyników i punkty', () => {
   });
 });
 
+describe('szanse z rundy na rundę', () => {
+  it.each([1, 2, 3, 4, 5, 6])('osłona, szanse w sprincie i premia przed finałem zgadzają się w całej grze (ziarno %i)', (seed) => {
+    const c = newController(seed);
+    type Snap = { phase: string; lives: number; shield: boolean; points: number; eliminated: boolean };
+    let prev = new Map<string, Snap>();
+    let sprintEnd: Map<string, Snap> | null = null;
+    let bonusSeen = false;
+    c.subscribe(() => {
+      const { game, overlay } = c.getView();
+      const now = new Map(game.players.map((p) => [p.id, { phase: game.phase, lives: p.lives, shield: p.shield, points: p.points, eliminated: p.eliminated }]));
+      for (const [id, s] of now) {
+        const before = prev.get(id);
+        if (!before) continue;
+        // Runda 2: osłona znika przed pierwszą utratą szans.
+        if (before.phase === 'round2' && s.phase === 'round2' && s.lives < before.lives) expect(before.shield).toBe(false);
+        // Sprint: szanse tylko maleją, najwyżej o 1 na raz, dopiero po utracie osłony, i nikt nie odpada.
+        if (before.phase === 'sprint' && s.phase === 'sprint') {
+          expect(before.lives - s.lives).toBeGreaterThanOrEqual(0);
+          expect(before.lives - s.lives).toBeLessThanOrEqual(1);
+          if (s.lives < before.lives) expect(before.shield).toBe(false);
+          expect(s.eliminated).toBe(before.eliminated);
+        }
+        // Start sprintu: szanse zostają z rundy 2, osłona jest nowa.
+        if (before.phase === 'round2' && s.phase === 'sprint' && !s.eliminated) {
+          expect(s.lives).toBe(before.lives);
+          expect(s.shield).toBe(true);
+        }
+      }
+      if (game.phase === 'round2' && [...prev.values()].some((s) => s.phase === 'round1')) {
+        for (const p of activePlayers(game)) expect(p.lives).toBeLessThanOrEqual(POTATO.round2Lives);
+      }
+      if (game.phase === 'sprint') sprintEnd = now;
+      if (overlay?.kind === 'lifeBonus' && !bonusSeen) {
+        bonusSeen = true;
+        for (const b of game.lifeBonus!) {
+          const before = sprintEnd!.get(b.playerId)!;
+          expect(b.lives).toBe(before.lives);
+          expect(b.points).toBe(before.lives * POTATO.lifePoints);
+          expect(game.players.find((p) => p.id === b.playerId)!.points).toBe(before.points + b.points);
+        }
+        expect(activePlayers(game).every((p) => p.lives === POTATO.duelLives)).toBe(true);
+      }
+      prev = now;
+    });
+    playUntilFinished(c, 'right');
+    expect(bonusSeen).toBe(true);
+    expect(getLogEntries({ minLevel: 'warn' })).toEqual([]);
+  });
+});
+
 describe('limit pytań bez gracza', () => {
   const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 

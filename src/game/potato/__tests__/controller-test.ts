@@ -137,13 +137,14 @@ describe('tury człowieka', () => {
 
 describe('limit pytań bez gracza', () => {
   // Stałe losowanie: niskie = bot zna odpowiedź i wskazuje lidera, wysokie = myli się i wskazuje najsłabszego.
-  // Życia są tak dobrane, że bez limitu gracz nie dostałby żadnego z tych pytań.
+  // Życia są tak dobrane, że bez limitu gracz nie dostałby żadnego z tych pytań. Podane wszystkie,
+  // bo w rundzie 1 jest tylko POTATO.lives (2) szans, a test sprawdza limit, nie liczbę szans.
   it.each([
     { name: 'dobrej odpowiedzi bota', roll: 0.01, humanLives: 2, first: 'b3', firstLives: 3 },
     { name: 'błędzie bota', roll: 0.99, humanLives: 3, first: 'b2', firstLives: 1 },
   ])('trzecie pytanie trafia do gracza po $name', ({ roll, humanLives, first, firstLives }) => {
     const timers = fakeClock();
-    const lives: Record<string, number> = { h: humanLives, b2: 2 };
+    const lives: Record<string, number> = { h: humanLives, b1: 3, b2: 2, b3: 3, b4: 3 };
     const base = started('b1');
     const controller = new PotatoController({
       game: { ...base, players: base.players.map((p) => ({ ...p, lives: lives[p.id] ?? p.lives })) },
@@ -175,7 +176,7 @@ describe('błąd, po którym gracz odpada', () => {
 
   it.each([
     ['runda 1: ostatnie życie', withHolder({ lives: 1 })],
-    ['runda 2: osłona mniejsza niż mnożnik', withHolder({ shield: 2 }, { phase: 'round2', multiplier: 3 })],
+    ['runda 2: bez osłony, szans nie więcej niż mnożnik', withHolder({ shield: false, lives: 2 }, { phase: 'round2', multiplier: 3 })],
     ['finał: ostatnia szansa', withHolder({ lives: 1 }, { phase: 'duel' })],
   ])('%s: odpada od razu i ziemniak nie wraca do niego', (_name, game) => {
     for (let seed = 0; seed < 50; seed++) {
@@ -210,11 +211,11 @@ describe('odpadnięcie człowieka kończy grę', () => {
     const base = started('h', game);
     return { ...base, players: base.players.map((p) => (p.id === 'h' ? { ...p, ...patch } : p)) };
   };
-  const out = (id: string) => (p: PotatoState['players'][number]) => (p.id === id ? { ...p, eliminated: true, eliminatedAt: 1, lives: 0, shield: 0 } : p);
+  const out = (id: string) => (p: PotatoState['players'][number]) => (p.id === id ? { ...p, eliminated: true, eliminatedAt: 1, lives: 0, shield: false } : p);
 
   it.each([
     ['runda 1', withHuman({ lives: 1 })],
-    ['runda 2', withHuman({ shield: 1 }, { phase: 'round2' })],
+    ['runda 2', withHuman({ shield: false, lives: 1 }, { phase: 'round2' })],
     ['finał, gdy gra jeszcze dwóch rywali', withHuman({ lives: 1 }, { phase: 'duel', eliminations: 1, players: started().players.map(out('b1')).map(out('b2')) })],
   ])('%s: najpierw wynik, potem od razu wyniki gry, bez nowych zegarów', (_name, game) => {
     const { controller, advance } = setup(game);
@@ -236,7 +237,7 @@ describe('odpadnięcie człowieka kończy grę', () => {
 
   it('odpadnięcie, po którym zaczynałby się sprint, nie uruchamia zegara sprintu', () => {
     const players = started().players.map(out('b1'));
-    const game = withHuman({ shield: 1 }, { phase: 'round2', players });
+    const game = withHuman({ shield: false, lives: 1 }, { phase: 'round2', players });
     const { controller, advance } = setup(game);
     controller.start();
     controller.submitAnswer(BAD);
@@ -285,20 +286,63 @@ describe('tury botów', () => {
 });
 
 describe('sprint na zegarze', () => {
-  it('po upływie czasu sprint kończy się i gracze dostają szanse 3/2/1', () => {
+  it('po upływie czasu: najpierw zamiana szans na punkty, po animacji plansza finału, wszyscy z 3 szansami', () => {
     const game = started('h', {
       phase: 'sprint',
       sprintMsLeft: 3000,
-      players: started().players.map((p) => (p.id === 'b1' || p.id === 'b2' ? { ...p, eliminated: true } : p)),
+      players: started().players.map((p) =>
+        p.id === 'b1' || p.id === 'b2' ? { ...p, eliminated: true, lives: 0 } : { ...p, lives: p.id === 'h' ? 2 : p.id === 'b3' ? 1 : 0 },
+      ),
     });
     const { controller, advance } = setup(game);
     controller.start();
     advance(3000);
-    const view = controller.getView();
+    let view = controller.getView();
     expect(view.game.phase).toBe('duel');
-    expect(view.overlay).toMatchObject({ kind: 'round', phase: 'duel' });
-    const lives = activePlayers(controller.getView().game).map((p) => p.lives).sort((a, b) => b - a);
-    expect(lives).toEqual([3, 2, 1]);
+    expect(view.overlay).toEqual({ kind: 'lifeBonus' });
+    expect(view.game.lifeBonus).toEqual([
+      { playerId: 'h', lives: 2, points: 20 },
+      { playerId: 'b3', lives: 1, points: 10 },
+      { playerId: 'b4', lives: 0, points: 0 },
+    ]);
+    expect(player(view.game, 'h').points).toBe(20);
+    expect(activePlayers(view.game).every((p) => p.lives === POTATO.duelLives)).toBe(true);
+    expect(getLogEntries().some((e) => e.message === 'Szanse na punkty')).toBe(true);
+
+    advance(DEFAULT_POTATO_PACING.lifeBonusMs - 1);
+    expect(controller.getView().overlay).toEqual({ kind: 'lifeBonus' });
+    advance(1);
+    view = controller.getView();
+    expect(view.overlay).toEqual({ kind: 'round', phase: 'duel' });
+    // Plansza czeka na gracza: nikt nie odpowiada, dopóki jej nie zamknie.
+    advance(60_000);
+    expect(controller.getView().game).toBe(view.game);
+  });
+
+  it('pauza zatrzymuje animację premii, a stop/start ją dokańcza', () => {
+    const { controller, advance } = setup(sprintGame(1000));
+    controller.start();
+    advance(1000);
+    expect(controller.getView().overlay).toEqual({ kind: 'lifeBonus' });
+    controller.pause();
+    advance(60_000);
+    expect(controller.getView().overlay).toEqual({ kind: 'lifeBonus' });
+    controller.unpause();
+    controller.stop();
+    controller.start();
+    advance(DEFAULT_POTATO_PACING.lifeBonusMs);
+    expect(controller.getView().overlay).toEqual({ kind: 'round', phase: 'duel' });
+  });
+
+  it('koniec sprintu karą za błąd też pokazuje animację premii przed planszą finału', () => {
+    const { controller, advance } = setup(sprintGame(POTATO.sprintPenaltyMs));
+    controller.start();
+    controller.submitAnswer(BAD);
+    expect(controller.getView().game.phase).toBe('duel');
+    advance(REVEAL);
+    expect(controller.getView().overlay).toEqual({ kind: 'lifeBonus' });
+    advance(DEFAULT_POTATO_PACING.lifeBonusMs);
+    expect(controller.getView().overlay).toEqual({ kind: 'round', phase: 'duel' });
   });
 
   it('kara za błąd odejmuje czas od zegara na bieżąco', () => {
@@ -314,6 +358,26 @@ describe('sprint na zegarze', () => {
     expect(controller.getView().game.sprintMsLeft).toBe(10000 - 1000 - POTATO.sprintPenaltyMs);
     advance(REVEAL);
     expect(controller.getView().game.phase).toBe('sprint');
+  });
+
+  it('błąd w sprincie: pierwszy zdejmuje osłonę (napis), drugi zabiera szansę', () => {
+    const base = sprintGame();
+    const game = { ...base, players: base.players.map((p) => (p.id === 'h' ? { ...p, lives: 2, shield: true } : p)) };
+    const { controller } = setup(game);
+    controller.start();
+    controller.submitAnswer(BAD);
+    let view = controller.getView();
+    expect(view.overlay).toMatchObject({ kind: 'reveal', playerId: 'h', shieldLost: true });
+    expect(player(view.game, 'h')).toMatchObject({ lives: 2, shield: false });
+
+    const again = { ...view.game, holderId: 'h' };
+    const second = setup(again).controller;
+    second.start();
+    second.submitAnswer(BAD);
+    view = second.getView();
+    expect(view.overlay).toMatchObject({ kind: 'reveal', playerId: 'h' });
+    expect(view.overlay).not.toHaveProperty('shieldLost');
+    expect(player(view.game, 'h').lives).toBe(1);
   });
 });
 
@@ -486,6 +550,9 @@ describe('pauza i lektor', () => {
   });
 });
 
+/** Premia za szanse po sprincie dla gracza (0, gdy sprint się nie skończył). */
+const bonusOf = (game: PotatoState, id: string) => game.lifeBonus?.find((b) => b.playerId === id)?.points ?? 0;
+
 const sprintGame = (sprintMsLeft = 10_000) =>
   started('h', {
     phase: 'sprint',
@@ -496,7 +563,7 @@ const sprintGame = (sprintMsLeft = 10_000) =>
 /** Runda 2 przed odpadnięciem bota, po którym zaczyna się sprint. Odpowiada `h`, a `b1` odpadł wcześniej. */
 const beforeSprint = () => {
   const base = started('h', { phase: 'round2', eliminations: 1 });
-  return { ...base, players: base.players.map((p) => (p.id === 'b1' ? { ...p, eliminated: true, eliminatedAt: 1, lives: 0, shield: 0 } : p.id === 'b2' ? { ...p, shield: 1 } : p)) };
+  return { ...base, players: base.players.map((p) => (p.id === 'b1' ? { ...p, eliminated: true, eliminatedAt: 1, lives: 0, shield: false } : p.id === 'b2' ? { ...p, shield: false, lives: 1 } : p)) };
 };
 
 /** Gracz odpowiada dobrze i oddaje pytanie `b2`, który myli się na ostatniej osłonie: wchodzimy do sprintu. */
@@ -683,7 +750,7 @@ describe('sprint a plansza', () => {
     const view = controller.getView();
     expect(view.game.phase).toBe('duel');
     expect(view.awaitingPick).toBeNull();
-    expect(player(view.game, 'h').points).toBe(1);
+    expect(player(view.game, 'h').points).toBe(POTATO.sprintPoints + bonusOf(view.game, 'h'));
     // Odpowiedź jest rozliczona: spóźnione wskazanie nic nie zmienia.
     controller.pick('b3');
     expect(controller.getView().game).toBe(view.game);
@@ -717,7 +784,7 @@ describe('sprint a plansza', () => {
     controller.submitAnswer(BAD);
     const view = controller.getView();
     expect(view.game.phase).toBe('duel');
-    expect(view.overlay).toEqual({ kind: 'round', phase: 'duel' });
+    expect(view.overlay).toEqual({ kind: 'lifeBonus' });
     expect(player(view.game, 'h').errors).toBe(errors);
   });
 });
@@ -822,7 +889,7 @@ describe('nagroda od razu po dobrej odpowiedzi', () => {
   const inPhase = (phase: PotatoState['phase']) => started('h', { phase });
 
   it.each([
-    ['sprint', 1],
+    ['sprint', POTATO.sprintPoints],
     ['duel', 10],
   ] as const)('%s: punkt razem z wynikiem, a wskazanie go nie zmienia', (phase, points) => {
     const { controller, advance } = setup(inPhase(phase));
@@ -905,9 +972,9 @@ describe('nagroda od razu po dobrej odpowiedzi', () => {
     controller.submitAnswer(OK);
     advance(1000);
     const view = controller.getView();
-    expect(view.overlay).toEqual({ kind: 'round', phase: 'duel' });
+    expect(view.overlay).toEqual({ kind: 'lifeBonus' });
     expect(view.awaitingPick).toBeNull();
-    expect(player(view.game, 'h').points).toBe(1);
+    expect(player(view.game, 'h').points).toBe(POTATO.sprintPoints + bonusOf(view.game, 'h'));
   });
 
   it('po czasie na wybór punkty są naliczone raz', () => {

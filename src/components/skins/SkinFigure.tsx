@@ -14,12 +14,14 @@ type Props = {
   imageSize: number;
   /** Przyciemnia postać: pod obrazkiem leży jej ciemna sylwetka, więc tło nie prześwituje. */
   dimmed?: boolean;
+  /** Klatka się wczytała albo nie dała się wczytać (ekran ładowania gry). */
+  onFrameLoad?: (frame: Expression) => void;
 };
 
 const DIMMED_OPACITY = 0.4;
 
 /** Klatki leżą jedna na drugiej i zmienia się tylko przezroczystość, więc mrugnięcie nie miga pustym polem. */
-export function SkinFigure({ skin, expression, width, height, imageSize, dimmed = false }: Props) {
+export function SkinFigure({ skin, expression, width, height, imageSize, dimmed = false, onFrameLoad }: Props) {
   const position = { width: imageSize, height: imageSize, left: (width - imageSize) / 2 };
   return (
     <View style={[styles.window, { width, height }]}>
@@ -32,6 +34,8 @@ export function SkinFigure({ skin, expression, width, height, imageSize, dimmed 
           source={skin.frames[frame]}
           contentFit="contain"
           accessible={false}
+          onLoad={onFrameLoad && (() => onFrameLoad(frame))}
+          onError={onFrameLoad && (() => onFrameLoad(frame))}
           style={[styles.frame, position, { opacity: frame !== expression ? 0 : dimmed ? DIMMED_OPACITY : 1 }]}
         />
       ))}

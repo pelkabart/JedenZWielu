@@ -42,3 +42,8 @@ Logi: `[sterownik] Bot odpowie` (czas, czy w ogóle odpowie), `[sterownik] Okno 
 **Ryzyko:** po dopisaniu kolejnych botów dwa profile mogłyby mieć to samo imię, więc gracz i lektor nie odróżniliby ich od siebie.
 **Zabezpieczenie:** imiona i `skinId` są unikalne na całej liście `BOT_PROFILES`, a losowanie nie powtarza profilu w jednej grze.
 **Test:** `bots-test.ts › każdy bot ma własne imię i własną skórkę z puli botów`.
+
+### 8. Poziomy trudności w złej kolejności albo za mocne boty
+**Ryzyko:** po zmianie modyfikatorów Łatwy mógłby wyjść trudniejszy od Normalnego, albo boty dalej trafiałyby za często (zgłoszone przez gracza: Normalny i Ekspert były za trudne).
+**Zabezpieczenie:** zmieniane są tylko `knowledgeOffset` i `speedFactor` w `DIFFICULTY_PRESETS` (`src/game/rules.ts`), a profile botów zostają bez zmian. Docelowo boty trafiają średnio ok. 37%, 50% i 65%.
+**Test:** `bots-test.ts › średnio boty trafiają ok. 37% (łatwy), 50% (normalny) i 65% (ekspert) pytań z banku` (średnia po wszystkich botach i całym banku, tolerancja 5 pkt proc.), `rośnie z poziomem trudności gry`, `answer-format-test.ts › skuteczność i tempo botów na poziomach`.

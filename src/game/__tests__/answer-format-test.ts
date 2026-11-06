@@ -50,10 +50,10 @@ describe('format odpowiedzi na poziomach', () => {
     expect(DIFFICULTY_PRESETS.expert.answerFormat).toBe('text');
   });
 
-  it('pozostałe parametry poziomów (skuteczność botów, tempo) się nie zmieniły', () => {
-    expect(DIFFICULTY_PRESETS.easy).toMatchObject({ knowledgeOffset: -0.2, speedFactor: 1.3 });
-    expect(DIFFICULTY_PRESETS.normal).toMatchObject({ knowledgeOffset: 0, speedFactor: 1 });
-    expect(DIFFICULTY_PRESETS.expert).toMatchObject({ knowledgeOffset: 0.15, speedFactor: 0.75 });
+  it('skuteczność i tempo botów na poziomach', () => {
+    expect(DIFFICULTY_PRESETS.easy).toMatchObject({ knowledgeOffset: -0.25, speedFactor: 1.5, answerTimeMs: 7000 });
+    expect(DIFFICULTY_PRESETS.normal).toMatchObject({ knowledgeOffset: -0.12, speedFactor: 1.3, answerTimeMs: 5000 });
+    expect(DIFFICULTY_PRESETS.expert).toMatchObject({ knowledgeOffset: 0.03, speedFactor: 1, answerTimeMs: 10000 });
   });
 });
 

@@ -5,15 +5,29 @@ const log = createLogger('ustawienia');
 
 export type VolumeKind = 'music' | 'voice';
 
-/** Głośność w procentach (0–100, liczby całkowite). 100 = dotychczasowy poziom danego dźwięku. */
+/**
+ * Głośność w procentach (0–100, liczby całkowite). 100 = dotychczasowy poziom danego dźwięku.
+ * `…Enabled = false` wycisza dźwięk całkiem, a zapamiętana głośność wraca po ponownym włączeniu.
+ */
 export interface VolumeSettings {
   music: number;
   voice: number;
+  musicEnabled: boolean;
+  voiceEnabled: boolean;
 }
 
-export const DEFAULT_VOLUME: VolumeSettings = { music: 100, voice: 100 };
+type SettingKey = keyof VolumeSettings;
 
-const KINDS: VolumeKind[] = ['music', 'voice'];
+export const DEFAULT_VOLUME: VolumeSettings = { music: 100, voice: 100, musicEnabled: true, voiceEnabled: true };
+
+const KEYS: SettingKey[] = ['music', 'voice', 'musicEnabled', 'voiceEnabled'];
+
+const ENABLED_KEY = { music: 'musicEnabled', voice: 'voiceEnabled' } as const satisfies Record<VolumeKind, SettingKey>;
+
+/** Czy dany dźwięk jest włączony. */
+export function isEnabled(settings: VolumeSettings, kind: VolumeKind): boolean {
+  return settings[ENABLED_KEY[kind]];
+}
 
 /** Przycina do 0–100 i zaokrągla; `NaN` i nieliczby dają `fallback`. */
 export function clampVolume(value: unknown, fallback = 100): number {
@@ -32,9 +46,13 @@ export function parseVolumeSettings(text: string | null): VolumeSettings {
     return { ...DEFAULT_VOLUME };
   }
   const record = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
+  // Brak pola albo zły typ (np. stary plik sprzed włącznika) = dźwięk włączony.
+  const flag = (value: unknown) => (typeof value === 'boolean' ? value : true);
   return {
     music: clampVolume(record.music, DEFAULT_VOLUME.music),
     voice: clampVolume(record.voice, DEFAULT_VOLUME.voice),
+    musicEnabled: flag(record.musicEnabled),
+    voiceEnabled: flag(record.voiceEnabled),
   };
 }
 
@@ -49,7 +67,7 @@ export class VolumeStore {
   private loading: Promise<void> | null = null;
   private loaded = false;
   /** Pola zmienione przez gracza przed wczytaniem pliku – wczytanie ich nie nadpisuje. */
-  private readonly touched = new Set<VolumeKind>();
+  private readonly touched = new Set<SettingKey>();
   private saving: Promise<void> | null = null;
   private dirty = false;
   private saveFailed = false;
@@ -92,6 +110,13 @@ export class VolumeStore {
     return this.save();
   }
 
+  /** Włącza albo wyłącza dźwięk (przełącznik w ustawieniach) i zapisuje. Głośność suwaka zostaje. */
+  setEnabled(kind: VolumeKind, enabled: boolean): Promise<void> {
+    this.change(ENABLED_KEY[kind], enabled);
+    log.info(enabled ? 'Dźwięk włączony' : 'Dźwięk wyłączony', { kind });
+    return this.save();
+  }
+
   /** Zapisuje bieżący stan. Gdy zapis już trwa, zapisze najnowszy stan zaraz po nim. */
   save(): Promise<void> {
     if (this.saving !== null) {
@@ -114,7 +139,7 @@ export class VolumeStore {
     try {
       await this.storage.write(JSON.stringify(snapshot));
       this.setSaveFailed(false);
-      log.debug('Zapisano głośność', { music: snapshot.music, voice: snapshot.voice });
+      log.debug('Zapisano głośność', { ...snapshot });
     } catch (error) {
       log.error('Nie udało się zapisać głośności', { error: errorMessage(error) });
       this.setSaveFailed(true);
@@ -122,10 +147,13 @@ export class VolumeStore {
   }
 
   private update(kind: VolumeKind, value: number) {
-    const next = clampVolume(value, this.settings[kind]);
-    if (!this.loaded) this.touched.add(kind);
-    if (next === this.settings[kind]) return;
-    this.settings = { ...this.settings, [kind]: next };
+    this.change(kind, clampVolume(value, this.settings[kind]));
+  }
+
+  private change<K extends SettingKey>(key: K, value: VolumeSettings[K]) {
+    if (!this.loaded) this.touched.add(key);
+    if (value === this.settings[key]) return;
+    this.settings = { ...this.settings, [key]: value };
     this.notify();
   }
 
@@ -147,10 +175,10 @@ export class VolumeStore {
       log.warn('Nie udało się odczytać głośności', { error: errorMessage(error) });
     }
     this.loaded = true;
-    const next = { ...this.settings };
-    for (const kind of KINDS) if (!this.touched.has(kind)) next[kind] = saved[kind];
-    log.info('Wczytano głośność', { music: next.music, voice: next.voice, keptUserChanges: this.touched.size });
-    if (next.music !== this.settings.music || next.voice !== this.settings.voice) {
+    const next: VolumeSettings = { ...this.settings };
+    for (const key of KEYS) if (!this.touched.has(key)) Object.assign(next, { [key]: saved[key] });
+    log.info('Wczytano głośność', { ...next, keptUserChanges: this.touched.size });
+    if (KEYS.some((key) => next[key] !== this.settings[key])) {
       this.settings = next;
       this.notify();
     }

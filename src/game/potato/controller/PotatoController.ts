@@ -16,9 +16,11 @@ const log = createLogger('ziemniak');
 export interface PotatoPacing {
   /** Jak długo widać wynik odpowiedzi. */
   revealMs: number;
+  /** Jak długo trwa animacja zamiany szans na punkty po sprincie. */
+  lifeBonusMs: number;
 }
 
-export const DEFAULT_POTATO_PACING: PotatoPacing = { revealMs: 1500 };
+export const DEFAULT_POTATO_PACING: PotatoPacing = { revealMs: 1500, lifeBonusMs: 2500 };
 
 /** Ile czasu ma gracz na wskazanie, komu przekazać ziemniaka. Po upływie wybór jest losowy. */
 export const PICK_TIMEOUT_MS = 10_000;
@@ -27,9 +29,12 @@ export const DUEL_PICK_TIMEOUT_MS = 5_000;
 
 export type PotatoOverlay =
   /** `question`: pytanie, na które odpowiadano; w stanie gry jest już następne. */
-  | { kind: 'reveal'; playerId: string; question: Question; text: string | null; correct: boolean; correctAnswer: string }
+  /** `shieldLost`: ten błąd zabrał osłonę w rundzie 2 albo w sprincie (zamiast szans). */
+  | { kind: 'reveal'; playerId: string; question: Question; text: string | null; correct: boolean; correctAnswer: string; shieldLost?: boolean }
   /** Plansza rundy: czeka na gracza (`acceptRound`), żaden czas nie biegnie. */
   | { kind: 'round'; phase: PotatoPhase }
+  /** Po sprincie: szanse gasną i zamieniają się na punkty (`game.lifeBonus`), potem plansza finału. */
+  | { kind: 'lifeBonus' }
   | { kind: 'finished' };
 
 export interface PotatoView {
@@ -192,6 +197,10 @@ export class PotatoController {
       return;
     }
     if (overlay?.kind === 'round') return;
+    if (overlay?.kind === 'lifeBonus') {
+      this.scheduleLifeBonusEnd();
+      return;
+    }
     if (awaitingPick) {
       this.startPickCountdown();
       return;
@@ -342,19 +351,20 @@ export class PotatoController {
     const before = this.view.game;
     const question = before.question!;
     const correct = text !== null && isCorrectAnswer(text, question.answers);
+    const shieldLost = !correct && (before.phase === 'round2' || before.phase === 'sprint') && before.players.some((p) => p.id === playerId && p.shield);
     // Stan gry i wynik zmieniają się razem: lektor nie może zobaczyć nowego stanu bez wyniku.
-    if (!this.apply({ type: 'answer', playerId, text, next }, this.revealPatch(playerId, question, text, correct))) {
+    if (!this.apply({ type: 'answer', playerId, text, next }, this.revealPatch(playerId, question, text, correct, shieldLost))) {
       this.takeTurn();
       return;
     }
-    log.debug('Odpowiedź', { playerId, correct, next, withoutHuman: this.view.game.questionsWithoutHuman });
+    log.debug('Odpowiedź', { playerId, correct, next, shieldLost, withoutHuman: this.view.game.questionsWithoutHuman });
     this.revealFrom = before.phase;
     this.schedule(this.pacing.revealMs, () => this.afterReveal(before.phase));
   }
 
-  private revealPatch(playerId: string, question: Question, text: string | null, correct: boolean): Partial<PotatoView> {
+  private revealPatch(playerId: string, question: Question, text: string | null, correct: boolean, shieldLost = false): Partial<PotatoView> {
     return {
-      overlay: { kind: 'reveal', playerId, question, text, correct, correctAnswer: question.answers[0] },
+      overlay: { kind: 'reveal', playerId, question, text, correct, correctAnswer: question.answers[0], ...(shieldLost && { shieldLost }) },
       awaitingPick: null,
       thinkingId: null,
       choices: null,
@@ -394,8 +404,8 @@ export class PotatoController {
       return;
     }
     if (game.phase !== previousPhase) {
-      log.info('Runda', { phase: game.phase });
-      this.update({ overlay: { kind: 'round', phase: game.phase } });
+      this.update({ overlay: this.phaseStartOverlay(game.phase) });
+      this.afterPhaseStart();
       return;
     }
     this.update({ overlay: null });
@@ -433,9 +443,32 @@ export class PotatoController {
     }
     // Koniec czasu. Dobra odpowiedź czekająca na wskazanie ma już punkt, więc wskazanie przepada.
     this.clearMain();
-    this.apply({ type: 'tick', ms: elapsed }, { overlay: { kind: 'round', phase: 'duel' }, thinkingId: null, awaitingPick: null, choices: null });
+    this.apply({ type: 'tick', ms: elapsed }, { overlay: this.phaseStartOverlay('duel'), thinkingId: null, awaitingPick: null, choices: null });
     log.info('Koniec sprintu', { duel: this.view.game.holderId });
-    log.info('Runda', { phase: 'duel' });
+    this.afterPhaseStart();
+  }
+
+  /** Nakładka na początek rundy. Finał zawsze poprzedza zamiana szans na punkty. */
+  private phaseStartOverlay(phase: PotatoPhase): PotatoOverlay {
+    return phase === 'duel' ? { kind: 'lifeBonus' } : { kind: 'round', phase };
+  }
+
+  private afterPhaseStart() {
+    const { overlay, game } = this.view;
+    if (overlay?.kind === 'lifeBonus') {
+      log.info('Szanse na punkty', { players: game.lifeBonus?.length ?? 0, total: (game.lifeBonus ?? []).reduce((sum, b) => sum + b.points, 0) });
+      this.scheduleLifeBonusEnd();
+      return;
+    }
+    log.info('Runda', { phase: game.phase });
+  }
+
+  /** Po animacji premii plansza finału (czas animacji staje w pauzie). */
+  private scheduleLifeBonusEnd() {
+    this.schedule(this.pacing.lifeBonusMs, () => {
+      this.update({ overlay: { kind: 'round', phase: 'duel' } });
+      log.info('Runda', { phase: 'duel' });
+    });
   }
 
   private clearSprintTimer() {

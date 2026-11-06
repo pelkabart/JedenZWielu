@@ -1,7 +1,7 @@
 import { createLogger } from '@/lib/log';
 import type { PotatoView } from '@/game/potato/controller/PotatoController';
 import { endedEarly } from '@/game/potato/engine';
-import { PHASE_RULE, PHASE_TITLE } from '@/game/potato/texts';
+import { PHASE_TITLE } from '@/game/potato/texts';
 
 import type { Voice } from './voice';
 
@@ -30,7 +30,8 @@ export function narrationFor(view: PotatoView): string[] {
     if (endedEarly(game)) return ['Odpadasz!', 'Koniec gry.'];
     return ['Koniec gry!', `Wygrywa ${name(game.ranking?.[0] ?? null)}.`];
   }
-  if (overlay?.kind === 'round') return [PHASE_TITLE[overlay.phase], PHASE_RULE[overlay.phase]];
+  // Zasady rundy są tylko napisane na planszy; lektor czyta sam tytuł.
+  if (overlay?.kind === 'round') return [PHASE_TITLE[overlay.phase]];
   if (overlay?.kind === 'reveal') {
     return overlay.correct ? ['Brawo, dobrze!'] : ['Niestety.', `Poprawna odpowiedź: ${overlay.correctAnswer}.`];
   }
