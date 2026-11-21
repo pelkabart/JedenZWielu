@@ -1,5 +1,5 @@
 import { router, useNavigation } from 'expo-router';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/home/BackButton';
@@ -12,15 +12,36 @@ import { roomClient } from '@/multiplayer/roomStore';
 
 export default function LobbyScreen() {
   const navigation = useNavigation();
-  const state = useSyncExternalStore(roomClient.subscribe, roomClient.getState);
+  // Ostatni stan inny niż „idle”. Po wyjściu ekran zostaje taki, jaki był, aż zniknie: przerysowanie
+  // ekranu w trakcie odpinania wywracało Fabric (`addViewAt: View already has a parent`, zob. 7.76).
+  const [state, setState] = useState(roomClient.getState);
 
-  // Ekran bez połączenia (wyjście, otwarcie bezpośrednio) wraca do wyboru.
   useEffect(() => {
-    if (state.status === 'idle') router.replace('/multiplayer');
-  }, [state.status]);
-
-  // Każde wyjście z poczekalni (przycisk, systemowe „wstecz”) zwalnia miejsce w pokoju.
-  useEffect(() => navigation.addListener('beforeRemove', () => roomClient.leave()), [navigation]);
+    let removing = false;
+    const sync = () => {
+      if (removing) return;
+      const next = roomClient.getState();
+      // Ekran bez połączenia („Wyjdź”, otwarcie bezpośrednio) wraca do wyboru.
+      if (next.status === 'idle') {
+        removing = true;
+        router.replace('/multiplayer');
+      } else {
+        setState(next);
+      }
+    };
+    sync();
+    const unsubscribe = roomClient.subscribe(sync);
+    // Każde wyjście z poczekalni (strzałka, systemowe „wstecz”) zwalnia miejsce w pokoju. Ekran już znika,
+    // więc ani nie przerysowujemy go, ani nie nawigujemy drugi raz.
+    const unlisten = navigation.addListener('beforeRemove', () => {
+      removing = true;
+      roomClient.leave();
+    });
+    return () => {
+      unsubscribe();
+      unlisten();
+    };
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
@@ -61,7 +82,6 @@ export default function LobbyScreen() {
               </Text>
             </View>
             <PlayerSlots players={state.room.players} youId={state.youId} maxPlayers={MAX_PLAYERS} />
-            <Text style={styles.hint}>Rozgrywka multiplayer pojawi się w kolejnej wersji.</Text>
             <MenuButton label="Wyjdź" color={colors.extras} baseColor={colors.extrasBase} width={200} onPress={() => roomClient.leave()} />
           </>
         )}
@@ -111,11 +131,6 @@ const styles = StyleSheet.create({
     color: colors.sky,
     fontSize: 15,
     fontWeight: '700',
-  },
-  hint: {
-    color: colors.sky,
-    fontSize: 12,
-    fontWeight: '600',
   },
   error: {
     color: colors.danger,

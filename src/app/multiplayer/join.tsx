@@ -17,7 +17,9 @@ export default function JoinScreen() {
   const navigation = useNavigation();
   const state = useSyncExternalStore(roomClient.subscribe, roomClient.getState);
   const [code, setCode] = useState('');
-  const connecting = state.status === 'connecting';
+  // „W pokoju” wygląda tu tak samo jak „łączę”: ekran właśnie przechodzi do poczekalni, a zmiana przycisku
+  // w trakcie odpinania ekranu wywracała Fabric (`addViewAt: View already has a parent`, zob. 7.76).
+  const connecting = state.status === 'connecting' || state.status === 'in-room';
 
   // Bez nicku (np. ekran otwarty bezpośrednio) wracamy do jego wpisania.
   useEffect(() => {

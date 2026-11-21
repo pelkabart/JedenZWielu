@@ -662,6 +662,9 @@ Instrukcja zakładała Docker Desktop do zbudowania obrazu. Na komputerze, z kt�
 **7.75. Nowe ekrany nie przechodziły `tsc`**
 Po dodaniu `src/app/multiplayer/` `tsc` odrzucał `router.push('/multiplayer')`, bo typy tras (`.expo/types/router.d.ts`) powstają tylko przy starcie serwera deweloperskiego, tak jak w 7.10. Wystarczyło na chwilę uruchomić `npx expo start`, żeby wygenerował typy na nowo.
 
+**7.76. Aplikacja gościa wywracała się przy wejściu do poczekalni**
+Test na dwóch telefonach (dev buildy): gość wpisywał kod, u hosta przez chwilę pojawiał się nowy gracz i zaraz znikał, a u gościa wyskakiwał czerwony ekran błędu i aplikacja startowała od nowa. Log z `adb logcat` pokazał błąd natywny Fabric, a nie błąd JS: `IllegalStateException: addViewAt: cannot insert view [610] into parent [614]: View already has a parent`. Dotyczył widoków przycisku `MenuButton` na ekranie, którego `RNSScreen` był już odpięty (`parentTag=-1`). Gdy serwer przyjmował gracza, stan zmieniał się z „łączę” na „w pokoju” i ekran „Dołącz do gry” robił `router.replace` na poczekalnię. W tej samej klatce ten ekran jeszcze się przerysowywał: przycisk zmieniał napis z „Łączę…” na „Dołącz” i przestawał być wyłączony. Fabric dostawał zmiany widoków ekranu, który react-native-screens właśnie zdejmował. Wywrócony JS zamykał socket, więc serwer usuwał gościa z pokoju. Testy tego nie złapały, bo sprawdzają `RoomClient` i czyste funkcje, a nie natywne montowanie widoków. Rozwiązanie: ekran, który odchodzi, już się nie zmienia. Na ekranie dołączania „w pokoju” wygląda tak samo jak „łączę”. Poczekalnia pokazuje ostatni stan inny niż „idle” i nie czyści zawartości po wyjściu, a wyjście nawiguje tylko raz (flaga przy `beforeRemove`).
+
 ## 8. Dalsze plany
 
 - Testy na prawdziwym telefonie (szczególnie klawiatura i wycięcie aparatu w poziomie oraz lektor: wymowa, opóźnienie syntezy na słabszym telefonie).

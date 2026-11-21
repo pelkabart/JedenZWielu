@@ -68,3 +68,8 @@ Zakres: gracz podaje nick, tworzy pokój (serwer losuje kod) albo dołącza kode
 **Ryzyko:** nicki to dane wpisane przez użytkownika. Logowanie całych list zapycha Log Analytics i zostawia dane osobowe w logach.
 **Zabezpieczenie:** logi zawierają tylko `connectionId`, kod pokoju, liczbę graczy i powód błędu, bez nicków.
 **Test:** przegląd kodu; `app.test.ts` sprawdza wpisy logów przy tworzeniu pokoju.
+
+### 13. Ekran przerysowuje się w trakcie znikania
+**Ryzyko:** zmiana stanu i nawigacja w tej samej chwili, np. „w pokoju” → `router.replace` na poczekalnię albo „Wyjdź” → stan „idle” → powrót. Ekran, który właśnie znika, dostaje nowe widoki, a Fabric na Androidzie rzuca `addViewAt: View already has a parent`. Aplikacja się restartuje i gracz wypada z pokoju (zdarzyło się, 7.76).
+**Zabezpieczenie:** ekran dołączania traktuje „w pokoju” jak „łączę”, więc nic się na nim nie zmienia przed przejściem. Poczekalnia trzyma ostatni stan inny niż „idle” i nie czyści się przy wyjściu. Wyjście nawiguje tylko raz (flaga `removing`, ustawiana też w `beforeRemove`).
+**Test:** ręcznie na dwóch telefonach: dołączenie kodem, „Wyjdź”, strzałka wstecz i systemowe „wstecz” w poczekalni, „Wróć” po błędzie. Logika stanów: `RoomClient-test.ts`.
