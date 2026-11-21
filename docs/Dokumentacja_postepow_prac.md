@@ -23,7 +23,7 @@ Spis treści:
 
 ---
 
-## 1. Stan projektu (05.11.2026)
+## 1. Stan projektu (21.11.2026)
 
 | Element | Stan |
 |---|---|
@@ -68,7 +68,8 @@ Spis treści:
 | Ustawienia: włączniki muzyki i lektora; wyłączony suwak blednie i nie reaguje | zrobione, testy automatyczne; do sprawdzenia na telefonie |
 | Ekran ładowania gry: czeka na skórki postaci i lektora (próbna synteza), najdłużej 10 s | zrobione, testy automatyczne; do sprawdzenia na telefonie |
 | Lektor czyta na planszy rundy tylko tytuł, zasady są tylko napisane | zrobione, testy automatyczne |
-| Razem testów automatycznych | 718 (+ 19 w `server/`) |
+| Multiplayer, etap 1: MultiPlayer → nick → „Stwórz grę” (serwer losuje 5-znakowy kod) albo „Dołącz do gry” (wpisanie kodu); poczekalnia z listą graczy na żywo (maks. 5, korona hosta, wolne miejsca); pokoje w pamięci serwera, heartbeat, przekazanie hosta; obraz serwera budowany przez GitHub Actions do GHCR, kontener na Azure w regionie `austriaeast` | zrobione, testy automatyczne (aplikacja i serwer na prawdziwych socketach); do sprawdzenia na dwóch telefonach |
+| Razem testów automatycznych | 786 (+ 67 w `server/`) |
 | Pierwsza rozgrywka na telefonie (Expo Go) | zrobione, poprawki wprowadzone |
 | Grafiki pulpitów | czekamy na grafiki |
 
@@ -314,8 +315,13 @@ Testy uruchamiamy poleceniem `npm test` (Jest z presetem `jest-expo`). Same test
 | `skins/__tests__/skins-integration-test.ts` | 5 | testy integracyjne: prawdziwe skórki w całej grze, nowe pliki wprowadzają bota do losowania, stała skórka bota, wybór gracza |
 | `backend/__tests__/serverHealth-test.ts` | 24 | połączenie z serwerem: adres z `.env.local` (spacje, ukośnik, protokół), odpowiedź `/health`, błędy HTTP, nie-JSON, inny kształt, brak sieci, limit czasu, logi |
 | `backend/__tests__/serverHealth-integration-test.ts` | 2 | testy integracyjne: zimny start kontenera na Azure (pierwsza próba po czasie, druga udana), logi `[backend]` |
-| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **718** | |
-| `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 19 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001 |
+| `multiplayer/__tests__/RoomClient-test.ts` | 28 | połączenie z pokojem: adres `wss://…/ws`, create/join po `hello`, odmowy serwera z komunikatami, brak adresu, limit czasu (zimny start), zerwanie i restart serwera (1001), wyjście w trakcie łączenia, złe wiadomości, logi bez nicku |
+| `multiplayer/__tests__/nick-test.ts` | 27 | nick (te same przypadki co na serwerze), kod pokoju (wielkie litery, bez 0/O/1/I), zapamiętany nick i błędy pliku |
+| `multiplayer/__tests__/roomStore-integration-test.ts` | 8 | testy integracyjne: kilku klientów i atrapa serwera z opóźnieniem sieci: wspólna lista, zły kod i zajęty nick, pełny pokój, przekazanie hosta, utrata zasięgu, restart serwera, logi `[multiplayer]` |
+| `components/multiplayer/__tests__/lobbySlots-test.ts` | 5 | miejsca w poczekalni: kolejność, puste miejsca, etykiety host/ty, za dużo graczy |
+| **Razem** (cały `npm test`, łącznie z plikami spoza tabeli) | **786** | |
+| `server/src/__tests__/app.test.ts` (osobno: `cd server && npm test`) | 38 | serwer: `/health`, 404, WebSocket ping-pong, zły JSON i nieznany typ bez zamykania, za duża wiadomość zamyka tylko jedno połączenie, zła ścieżka, zamknięcie kodem 1001; pokoje na prawdziwych socketach: 3 graczy, zły kod, zajęty nick, pełny pokój, `leave` i rozłączenie, heartbeat zrywa martwe połączenie, logi bez nicków |
+| `server/src/__tests__/rooms.test.ts` (osobno) | 29 | `RoomRegistry`: kody (alfabet, kolizje, brak pętli), limit 5 graczy, nick zajęty i zły, przekazanie hosta, pusty pokój znika, limit pokoi |
 
 Wszystkie testy przechodzą. Cały zestaw trwa ok. 40 sekund.
 
@@ -646,6 +652,15 @@ Gracz zauważył to w grze. Tak działała zasada z 7.70: sprint przenosił szan
 
 **7.72. Sprzątanie i mapa projektu**
 Każde zadanie zaczynało się od przeszukiwania całego projektu, a to kosztowało dużo czasu. Analiza `npx knip` (także `--production`) i `tsc --noUnusedLocals --noUnusedParameters` nie znalazła w `src/` nieużywanych plików ani funkcji. Stary silnik, symulator i ekran klucza API były już usunięte 03.11. Usunęliśmy 14 grafik z szablonu Expo, których nic nie używało (`react-logo*`, `expo-badge*`, `expo-logo`, `logo-glow`, `tutorial-web`, `tabIcons/`). Nieużywanych paczek (`expo-device`, `expo-glass-effect` i innych) nie usuwaliśmy, bo jest na nie zbudowany dev build. Powstała mapa `docs/MAPA.md` („co zmieniam → gdzie”), którą `CLAUDE.md` dołącza do każdej sesji.
+
+**7.73. Subskrypcja studencka nie pozwala na region z instrukcji**
+Instrukcja wdrożenia używała `westeurope`, a w podpowiedziach były `polandcentral` i `germanywestcentral`. Polityka subskrypcji Azure for Students („Allowed resource deployment regions”, sprawdzona poleceniem `az policy assignment list`) dopuszczała tylko `denmarkeast`, `francecentral`, `austriaeast`, `switzerlandnorth` i `italynorth`. Container Apps jest dostępne we wszystkich pięciu, więc wybraliśmy `austriaeast`, bo jest najbliżej Polski. Instrukcja mówi teraz, jak sprawdzić dozwolone regiony przed utworzeniem grupy zasobów.
+
+**7.74. Brak Dockera na komputerze z Windowsem**
+Instrukcja zakładała Docker Desktop do zbudowania obrazu. Na komputerze, z którego wdrażamy, nie było ani Dockera, ani Azure CLI, a Docker Desktop na Windowsie wymaga WSL2. `az containerapp up --source` zbudowałby obraz w chmurze, ale zakłada płatny Azure Container Registry (ok. 5 USD/mies.). Rozwiązanie: workflow GitHub Actions (`.github/workflows/server-image.yml`) uruchamia testy serwera, buduje obraz `linux/amd64` i wysyła go do darmowego GHCR. Lokalnie potrzebne jest tylko Azure CLI.
+
+**7.75. Nowe ekrany nie przechodziły `tsc`**
+Po dodaniu `src/app/multiplayer/` `tsc` odrzucał `router.push('/multiplayer')`, bo typy tras (`.expo/types/router.d.ts`) powstają tylko przy starcie serwera deweloperskiego, tak jak w 7.10. Wystarczyło na chwilę uruchomić `npx expo start`, żeby wygenerował typy na nowo.
 
 ## 8. Dalsze plany
 

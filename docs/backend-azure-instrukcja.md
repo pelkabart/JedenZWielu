@@ -1,11 +1,13 @@
 # Serwer gry na Azure – instrukcja krok po kroku
 
-Instrukcja stawia **testowy serwer** z katalogu `server/` na Azure i sprawdza, czy łączy się z nim komputer i telefon. Serwer na razie umie tylko dwie rzeczy:
+Instrukcja stawia serwer z katalogu `server/` na Azure i sprawdza, czy łączy się z nim komputer i telefon. Serwer umie:
 
-- `GET /health` → `{"status":"ok","version":"0.1.0","time":"…"}`,
-- WebSocket `/ws` → na powitanie `{"type":"hello"}`, na `{"type":"ping","id":1}` odpowiada `{"type":"pong","id":1,"serverTime":…}`.
+- `GET /health` → `{"status":"ok","version":"0.2.0","time":"…"}`,
+- WebSocket `/ws` → na powitanie `{"type":"hello"}`, ping-pong oraz pokoje multiplayera (`create`, `join`, `leave`, rozsyłanie listy graczy; opis w `docs/zabezpieczenia/multiplayer-pokoje.md`).
 
-Na tym samym szkielecie powstaną później pośrednik OpenAI, baza pytań, Eliminacje i multiplayer.
+Później dojdą pośrednik OpenAI, baza pytań, Eliminacje i rozgrywka multiplayer.
+
+> **Aktualne wdrożenie (Windows, bez Dockera):** obraz buduje GitHub Actions (`.github/workflows/server-image.yml`) po każdym pushu na `main` ze zmianą w `server/`. Trafia on do `ghcr.io/pelkabart/jzw-server:<wersja z server/package.json>`. Na komputerze potrzebne jest tylko Azure CLI (`winget install -e --id Microsoft.AzureCLI`). Kroki 4–5 z Dockerem są wtedy niepotrzebne, a po pierwszym przebiegu workflow pakiet trzeba raz ustawić jako publiczny (krok 5, punkt 3). Subskrypcja studencka pozwala tylko na regiony `denmarkeast`, `francecentral`, `austriaeast`, `switzerlandnorth`, `italynorth` (sprawdzisz to poleceniem `az policy assignment list`), dlatego używamy `austriaeast`. W Git Bash poprzedzaj polecenia `az` ustawieniem `MSYS_NO_PATHCONV=1`, inaczej ścieżki typu `/subscriptions/...` zostaną przerobione na ścieżki Windows.
 
 ## Kontener czy maszyna wirtualna?
 
@@ -70,7 +72,7 @@ Wszystko, co tworzymy, trafia do jednej grupy, którą na koniec usuwa się jedn
 
 ```bash
 RG=rg-jedenzwielu
-LOCATION=westeurope
+LOCATION=austriaeast
 az group create --name $RG --location $LOCATION
 ```
 
@@ -191,6 +193,15 @@ npx wscat -c wss://$FQDN/ws
 Działa to też w Expo Go, bo nie wymaga modułu natywnego.
 
 ## 8. Nowa wersja serwera
+
+Z GitHub Actions: podnieś `version` w `server/package.json` i zrób push na `main`. Gdy workflow „Obraz serwera” skończy pracę:
+
+```bash
+az containerapp update -n $APP -g $RG --image ghcr.io/$GH_USER/jzw-server:$VERSION --set-env-vars APP_VERSION=$VERSION
+npm run smoke -- https://$FQDN
+```
+
+Z Dockerem lokalnie:
 
 ```bash
 cd server

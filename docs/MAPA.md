@@ -41,6 +41,11 @@ Krótki spis dla szybkiej pracy, a nie dokumentacja. Aktualizuj go, gdy dochodzi
 | Kolory i motyw | `constants/theme.ts` |
 | Logi | `lib/log.ts` (`createLogger('<tag>')`) |
 | Test połączenia z serwerem | `backend/serverHealth.ts`, `backend/serverUrl.ts` |
+| Multiplayer: ekrany nick / kod / poczekalnia | `app/multiplayer/` (`index.tsx`, `join.tsx`, `lobby.tsx`), `components/multiplayer/` (`TextField`, `PlayerSlots`, `lobbySlots.ts`) |
+| Multiplayer: połączenie, stan, komunikaty błędów | `multiplayer/RoomClient.ts` (singleton w `roomStore.ts`), nick `nick.ts` + `nickStore.ts`, kod `roomCode.ts` |
+| Protokół wiadomości (dwie kopie, zmieniaj obie) | `server/src/protocol.ts` i `src/multiplayer/protocol.ts` |
+| Pokoje na serwerze (kody, limit 5, host, limit pokoi) | `server/src/rooms.ts`; połączenia, heartbeat: `server/src/app.ts` |
+| Budowa obrazu serwera, wdrożenie | `.github/workflows/server-image.yml`, `docs/backend-azure-instrukcja.md` |
 
 ## Testy (który plik sprawdza co)
 - Silnik: `game/potato/__tests__/potato-test.ts`. Sterownik na udawanym zegarze: `controller-test.ts`.
@@ -49,16 +54,19 @@ Krótki spis dla szybkiej pracy, a nie dokumentacja. Aktualizuj go, gdy dochodzi
 - Lektor: `narration/__tests__/potato-narrator-test.ts`, `narration-integration-test.ts`.
 - Głośność: `settings/__tests__/VolumeStore-test.ts`, `volume-integration-test.ts`, `audio/__tests__/volume-test.ts`.
 - Skórki: `skins/__tests__/` (`real-assets-test.ts` sprawdza prawdziwe pliki).
-- Pomocnicze funkcje testów: `game/testing/`, `narration/testing/`, `skins/testing/`, `speech/testing/`, `categories/testing/`.
+- Multiplayer: `multiplayer/__tests__/RoomClient-test.ts`, `nick-test.ts`, `roomStore-integration-test.ts` (kilka klientów + atrapa serwera z `multiplayer/testing/`), `components/multiplayer/__tests__/lobbySlots-test.ts`.
+- Serwer (osobno, `cd server && npm test`): `server/src/__tests__/rooms.test.ts`, `app.test.ts` (prawdziwe sockety).
+- Pomocnicze funkcje testów: `game/testing/`, `narration/testing/`, `skins/testing/`, `speech/testing/`, `categories/testing/`, `multiplayer/testing/`.
 - Uwaga: testy silnika i sterownika używają `POTATO.*` albo konkretnych liczb (np. lifeBonus 20). Zmiana zasad wymaga poprawek w `potato-test`, `controller-test` i asercjach w `integration-test`.
 
 ## Dokumentacja przy zmianie
 - Zasady rund, osłona, sprint, premia: `docs/zabezpieczenia/rundy-goracy-ziemniak.md`.
-- Inne obszary: `boty.md`, `limit-pytan-botow.md`, `lektor.md`, `ekran-ladowania.md`, `ustawienia-glosnosc.md`, `skorki.md`, `tabela-wynikow.md`, `kategorie-pytan.md`, `kategorie-import-eksport.md`, `odpowiedzi-glosem.md`, `muzyka-menu.md`, `muzyka-gra.md`, `logowanie.md`, `formaty-odpowiedzi.md`.
+- Inne obszary: `boty.md`, `limit-pytan-botow.md`, `lektor.md`, `ekran-ladowania.md`, `ustawienia-glosnosc.md`, `skorki.md`, `tabela-wynikow.md`, `kategorie-pytan.md`, `kategorie-import-eksport.md`, `odpowiedzi-glosem.md`, `muzyka-menu.md`, `muzyka-gra.md`, `logowanie.md`, `formaty-odpowiedzi.md`, `serwer-testowy.md`, `multiplayer-pokoje.md`.
 - `silnik-gry.md`, `sterownik-gry.md`, `symulator.md` to archiwum: opisują usunięte moduły, nie aktualizujemy ich.
 - `docs/Dokumentacja_postepow_prac.md` jest duży, więc nie czytaj go w całości. Zmieniaj w nim przez grep tylko trzy rzeczy: wiersz w tabeli stanu (sekcja 1), licznik „Razem” w tabeli stanu i w tabeli testów (sekcja 6) oraz nowy wpis `**7.N.**` na końcu sekcji 7 (przed `## 8.`).
 
 ## Nie ruszać
 - `src/game/bots/profiles.ts`: należy do właściciela projektu.
 - Zależności natywne w `package.json`: jest na nie zbudowany dev build.
-- `server/`: na razie bez zmian. `android/` i `ios/` są generowane.
+- `android/` i `ios/` są generowane.
+- Serwer na Azure: grupa `rg-jedenzwielu` (`austriaeast`), kontener `jzw-server`, `min-replicas 0`, `max-replicas 1`. Nie podnosić `max-replicas`, bo pokoje są w pamięci jednego procesu.

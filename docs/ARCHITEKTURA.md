@@ -22,7 +22,7 @@ flowchart LR
     App -->|JSON w dokumentach aplikacji| FS[(Pamięć telefonu)]
 ```
 
-Własny backend jest na etapie szkieletu: `server/` (Node + TypeScript, `/health` i WebSocket `/ws`) wdrażany jako kontener na **Azure Container Apps** (Azure for Students), instrukcja w `docs/backend-azure-instrukcja.md`. Aplikacja na razie tylko sprawdza z nim połączenie (Ustawienia → „Sprawdź połączenie”, adres z `EXPO_PUBLIC_SERVER_URL`). OpenAI dalej jest wywoływane z telefonu kluczem gracza (albo programisty z `.env.local`). Plan dla serwera: pośrednik OpenAI, baza pytań, Eliminacje, konta i autorytatywny multiplayer.
+Własny backend: `server/` (Node + TypeScript, `/health` i WebSocket `/ws`) wdrażany jako kontener na **Azure Container Apps** (Azure for Students, region `austriaeast`). Obraz buduje GitHub Actions (`.github/workflows/server-image.yml`) do GHCR, instrukcja w `docs/backend-azure-instrukcja.md`. Serwer prowadzi pokoje multiplayera w pamięci (`server/src/rooms.ts`, maks. 5 graczy, kod 5 znaków), a aplikacja łączy się z nim przez `src/multiplayer/RoomClient.ts` (adres z `EXPO_PUBLIC_SERVER_URL`). Rozgrywki multiplayer jeszcze nie ma, jest tylko poczekalnia. OpenAI dalej jest wywoływane z telefonu kluczem gracza (albo programisty z `.env.local`). Plan dla serwera: pośrednik OpenAI, baza pytań, Eliminacje, konta i autorytatywny multiplayer.
 
 ## 2. Stos technologiczny
 
@@ -100,7 +100,8 @@ src/
     solo/categories.tsx   wybór kategorii przed grą (gdy jest więcej niż domyślna)
     solo/index.tsx        wybór poziomu trudności
     solo/game.tsx         rozgrywka
-  components/             home/, solo/, potato/, categories/, settings/
+    multiplayer/          index.tsx (nick, Stwórz/Dołącz), join.tsx (kod), lobby.tsx (poczekalnia)
+  components/             home/, solo/, potato/, categories/, settings/, multiplayer/
   hooks/                  usePotatoController,
                           useVoiceAnswer, useQuestionSets, useMenuMusic, useKeyboardHeight
   game/                   domena + sterowniki
@@ -120,6 +121,8 @@ src/
   constants/theme.ts      kolory
 server/                   serwer gry (osobny pakiet npm, Docker → Azure Container Apps); poza tsc/jest/lint aplikacji
 src/backend/              checkServer (połączenie z serwerem), adres serwera z .env.local
+src/multiplayer/          RoomClient (WebSocket + stan pokoju), protocol (kopia typów z server/src/protocol.ts), nick, roomCode
+.github/workflows/        server-image.yml: testy serwera i obraz Dockera do GHCR
 plugins/withVoiceModel.js wtyczka konfiguracyjna: kopiuje model głosu do zasobów Androida
 scripts/narration/        przygotowanie modelu Piper dla sherpa-onnx (Python)
 voiceModel/               voice.onnx (źródło); vits-piper-pl/ generowany, w .gitignore
@@ -140,7 +143,7 @@ flowchart LR
     Home -->|zębatka| Settings["/settings"]
 ```
 
-Parametry przechodzą przez URL (`difficulty`, `set`). Stan współdzielony między ekranami (kategorie, głośność) jest w singletonach-magazynach czytanych przez `useSyncExternalStore`, a nie w kontekście React. „MultiPlayer” i „Dodatki” nie mają jeszcze ekranów.
+Parametry przechodzą przez URL (`difficulty`, `set`). Stan współdzielony między ekranami (kategorie, głośność) jest w singletonach-magazynach czytanych przez `useSyncExternalStore`, a nie w kontekście React. „Dodatki” nie mają jeszcze ekranu. Stan połączenia multiplayera to singleton `roomClient` (`src/multiplayer/roomStore.ts`), czytany tak samo.
 
 ## 6. Domena gry
 
@@ -291,7 +294,7 @@ Rzeczy znalezione przy przeglądzie kodu, do decyzji architekta:
 3. **„Gorący Ziemniak” nie ma pełnego opisu w `Dokumentacja_postepow_prac.md`** (rozdziały 3–5 opisują usunięte zasady; aktualne ryzyka są w `docs/zabezpieczenia/rundy-goracy-ziemniak.md`).
 4. **Brak symulacji balansu.** Symulator działał tylko na starym silniku i został usunięty; nowych zasad nie sprawdzono na setkach gier pod kątem balansu.
 5. **Klucz OpenAI w APK.** Klucz jest tylko w `.env.local` i trafia do paczki jawnym tekstem, więc gra z kategoriami z plików nie nadaje się do rozdawania. Build EAS bez zmiennych środowiskowych nie ma klucza wcale. Docelowo pośrednik po stronie serwera.
-6. **Backend tylko jako szkielet, brak multiplayera.** Serwer testowy (`server/`) działa, ale nie ma jeszcze żadnej logiki gry. Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
+6. **Multiplayer tylko do poczekalni.** Serwer tworzy pokoje i rozsyła listę graczy, ale nie ma jeszcze logiki gry. Pokoje są w pamięci jednego kontenera (`max-replicas 1`), więc restart je kasuje. Typy protokołu są w dwóch kopiach (serwer i aplikacja). Silniki są deterministyczne i oparte na akcjach, co dobrze pasuje do multiplayera z autorytatywnym serwerem (ten sam `reduce` po stronie serwera), ale nic z tego jeszcze nie istnieje.
 7. **Rozmiar modelu głosu** (63 MB) w APK. Rozważana kwantyzacja int8; AAB dla Google Play.
 8. **Brak testów komponentów** (np. React Native Testing Library) – UI sprawdzany ręcznie.
 9. **Martwy skrypt:** `reset-project` w `package.json` wskazuje nieistniejący `scripts/reset-project.js`.

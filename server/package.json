@@ -1,8 +1,8 @@
 {
   "name": "jedenzwielu-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Serwer gry Jeden z Wielu (na razie: /health i WebSocket ping-pong)",
+  "description": "Serwer gry Jeden z Wielu (/health, WebSocket: ping-pong i pokoje multiplayer)",
   "main": "dist/main.js",
   "engines": {
     "node": ">=20"
@@ -30,6 +30,8 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "roots": ["<rootDir>/src"]
+    "roots": [
+      "<rootDir>/src"
+    ]
   }
 }

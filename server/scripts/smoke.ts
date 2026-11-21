@@ -2,7 +2,8 @@
  * Test działającego serwera (lokalnie albo na Azure):
  *   npm run smoke -- http://localhost:8080
  *   npm run smoke -- https://<nazwa>.<region>.azurecontainerapps.io
- * Sprawdza GET /health i WebSocket /ws (hello + 3× ping-pong). Kod wyjścia 0 = wszystko działa.
+ * Sprawdza GET /health, WebSocket /ws (hello + 3× ping-pong) oraz pokój: jeden klient tworzy, drugi dołącza kodem.
+ * Kod wyjścia 0 = wszystko działa.
  */
 import { WebSocket } from 'ws';
 
@@ -65,12 +66,68 @@ function checkWebSocket(base: string): Promise<void> {
   });
 }
 
+type RoomMessage = { type: string; room?: { code: string; players: { nick: string; host: boolean }[] }; reason?: string };
+
+/** Otwiera WebSocket i czeka na `hello`; `next()` daje kolejną wiadomość. */
+function openClient(wsUrl: string): Promise<{ ws: WebSocket; next: () => Promise<RoomMessage> }> {
+  return new Promise((resolve) => {
+    const ws = new WebSocket(wsUrl, { handshakeTimeout: TIMEOUT_MS });
+    const inbox: RoomMessage[] = [];
+    const waiters: ((m: RoomMessage) => void)[] = [];
+    const next = () =>
+      new Promise<RoomMessage>((res) => {
+        const queued = inbox.shift();
+        if (queued) res(queued);
+        else waiters.push(res);
+      });
+    ws.on('error', (e) => fail(`WebSocket ${wsUrl}: ${e.message}`));
+    ws.on('message', (raw) => {
+      const message = JSON.parse(raw.toString()) as RoomMessage;
+      const waiter = waiters.shift();
+      if (waiter) waiter(message);
+      else inbox.push(message);
+    });
+    ws.once('open', async () => {
+      const hello = await next();
+      if (hello.type !== 'hello') fail(`WebSocket: zamiast hello przyszło ${JSON.stringify(hello)}`);
+      resolve({ ws, next });
+    });
+  });
+}
+
+async function checkRoom(base: string) {
+  const wsUrl = base.replace(/^http/, 'ws') + '/ws';
+  const timer = setTimeout(() => fail(`Pokój: brak odpowiedzi w ${TIMEOUT_MS / 1000} s`), TIMEOUT_MS);
+  const host = await openClient(wsUrl);
+  host.ws.send(JSON.stringify({ type: 'create', nick: 'Smoke1' }));
+  const created = await host.next();
+  if (created.type !== 'room' || !created.room) fail(`create: ${JSON.stringify(created)}`);
+  const code = created.room.code;
+  console.log(`✓ create – pokój ${code}`);
+
+  const guest = await openClient(wsUrl);
+  guest.ws.send(JSON.stringify({ type: 'join', code, nick: 'Smoke2' }));
+  const [forGuest, forHost] = await Promise.all([guest.next(), host.next()]);
+  for (const message of [forGuest, forHost]) {
+    if (message.type !== 'room' || message.room?.players.length !== 2) fail(`join: ${JSON.stringify(message)}`);
+  }
+  console.log(`✓ join – obaj widzą 2 graczy`);
+
+  guest.ws.close(1000);
+  const afterLeave = await host.next();
+  if (afterLeave.type !== 'room' || afterLeave.room?.players.length !== 1) fail(`rozłączenie: ${JSON.stringify(afterLeave)}`);
+  console.log('✓ rozłączenie – host widzi 1 gracza');
+  host.ws.close(1000);
+  clearTimeout(timer);
+}
+
 async function main() {
   const arg = process.argv[2];
   if (!arg || !/^https?:\/\//.test(arg)) fail('Podaj adres serwera, np. npm run smoke -- http://localhost:8080');
   const base = arg.replace(/\/+$/, '');
   await checkHealth(base);
   await checkWebSocket(base);
+  await checkRoom(base);
   console.log('✓ Serwer działa');
 }
 

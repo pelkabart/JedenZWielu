@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/theme';
 
-export function BackButton() {
+/** `to`: dokąd wrócić (domyślnie menu główne). */
+export function BackButton({ to = '/' }: { to?: Href }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -13,8 +14,8 @@ export function BackButton() {
       accessibilityRole="button"
       accessibilityLabel="Wróć"
       hitSlop={10}
-      // Ekran wyboru poziomu zawsze wraca do menu głównego. Nie zależy to od historii, bo strona może być otwarta bezpośrednio.
-      onPress={() => router.replace('/')}
+      // Zawsze ten sam ekran, a nie „poprzedni z historii”, bo strona może być otwarta bezpośrednio.
+      onPress={() => router.replace(to)}
       style={({ pressed }) => [
         styles.button,
         { top: insets.top + 16, left: insets.left + 20 },

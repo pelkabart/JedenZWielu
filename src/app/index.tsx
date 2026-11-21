@@ -70,7 +70,12 @@ export default function HomeScreen() {
             baseColor={colors.soloBase}
             onPress={openSolo}
           />
-          <MenuButton label="MultiPlayer" color={colors.multi} baseColor={colors.multiBase} />
+          <MenuButton
+            label="MultiPlayer"
+            color={colors.multi}
+            baseColor={colors.multiBase}
+            onPress={() => router.push('/multiplayer')}
+          />
           <MenuButton label="Dodatki" color={colors.extras} baseColor={colors.extrasBase} />
           <MenuButton
             label="Kategorie"

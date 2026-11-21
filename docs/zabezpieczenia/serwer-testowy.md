@@ -6,7 +6,7 @@ Testy: `server/src/__tests__/app.test.ts`, `src/backend/__tests__/serverHealth-t
 Logi: serwer – JSON na stdout (`{"tag":"serwer",...}`), aplikacja – `[backend]`.
 Instrukcja wdrożenia: `docs/backend-azure-instrukcja.md`.
 
-Serwer jest na razie tylko „szkieletem”: pokazuje, że kontener działa w chmurze i że telefon się z nim łączy (HTTP i WebSocket). Na nim powstaną potem pośrednik OpenAI, baza pytań, Eliminacje i multiplayer.
+Ten plik opisuje szkielet serwera: pokazuje, że kontener działa w chmurze i że telefon się z nim łączy (HTTP i WebSocket). Pokoje multiplayera na tym samym serwerze opisuje `multiplayer-pokoje.md`.
 
 ## Co może pójść nie tak i jak to zabezpieczamy
 
